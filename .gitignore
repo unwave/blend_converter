@@ -1,8 +1,21 @@
 __pycache__/
+.pytest_cache/
 
 *.egg-info/
 dist/
 
+.vscode/
+
 # Project Tool' files, a project manager application
 __project__.json
 __icon__.png
+uf_*.json
+
+_result/
+*.blend?*
+_*.blend
+_other/
+
+
+# auto generated typing
+_generated.py

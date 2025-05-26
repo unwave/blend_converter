@@ -1,21 +1,16 @@
-import bpy
-import sys
-import os
-import argparse
 import json
+import os
+import typing
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-caller_script_dir')
+import bpy
 
-args = sys.argv[sys.argv.index('--') + 1:]
-args = parser.parse_args(args)
-
-
-job: dict = get_job() # type: ignore
+if typing.TYPE_CHECKING:
+    __KWARGS__: dict
+    __GLTF_PATH__: str
 
 
-def export_physics(gltf_data, settings):
-    """ https://github.com/Moguri/blend2bam/blob/master/blend2bam/blend2gltf/blender28_script.py """ 
+def export_physics(gltf_data, invisible_collisions_collection: str):
+    """ https://github.com/Moguri/blend2bam/blob/master/blend2bam/blend2gltf/blender28_script.py """
 
     physics_extensions = ['BLENDER_physics', 'PANDA3D_physics_collision_shapes']
     gltf_data.setdefault('extensionsUsed', []).extend(physics_extensions)
@@ -41,11 +36,10 @@ def export_physics(gltf_data, settings):
         collision_layers = sum(layer << i for i, layer in enumerate(rbody.collision_collections))
         shape_type = rbody.collision_shape.upper()
         if shape_type in ('CONVEX_HULL', 'MESH'):
-            meshref = [
-                idx
-                for idx, mesh in enumerate(gltf_data['meshes'])
-                if mesh['name'] == obj.data.name
-            ][0]
+            meshrefs = [idx for idx, mesh in enumerate(gltf_data.get('meshes', ())) if mesh['name'] == obj.data.name]
+            if not meshrefs:
+                continue
+            meshref = meshrefs[0]
         else:
             meshref = None
 
@@ -82,25 +76,18 @@ def export_physics(gltf_data, settings):
 
         # Remove the visible mesh from the gltf_node if the object
         # is in a specific collection
-        collection = settings['invisible_collisions_collection']
-        if any(x.name == collection for x in obj.users_collection) and "mesh" in gltf_node:
+        if any(x.name == invisible_collisions_collection for x in obj.users_collection) and "mesh" in gltf_node:
             del gltf_node["mesh"]
 
 
-def unquote_image_uri(gltf_data):
 
-    from urllib.parse import unquote
+def get_block_realpath(block: typing.Union[bpy.types.Image, bpy.types.Library]):
+    return os.path.realpath(bpy.path.abspath(block.filepath, library = block.library))
 
-    for img in gltf_data.get('images', []):
-
-        uri = img.get('uri')
-        if not uri:
-            # print(f'No URI in: {img}')
-            continue
-
-        img['uri'] = unquote(uri)
 
 def get_image_path(name):
+
+    # TODO: what if image is from a library
     image = bpy.data.images.get(name)
 
     if not image:
@@ -109,83 +96,132 @@ def get_image_path(name):
     if image.source != 'FILE':
         return None
 
-    return bpy.path.abspath(image.filepath, library = image.library)
+    return os.path.realpath(bpy.path.abspath(image.filepath, library = image.library))
 
-def unquote_and_repath(gltf_data: dict, blend_path: str, gltf_path: str, bam_path: str):
-    """
-    fixing image URIs when converting with 'ref' so they will point to the place the .blend file uses them
-    """
 
-    from urllib.parse import unquote
+def validate_image_paths(gltf_data: dict, gltf_path: str):
 
-    blend_dir = os.path.dirname(blend_path)
-    bam_dir = os.path.dirname(bam_path)
+    from urllib.parse import unquote, quote
+
     gltf_dir = os.path.dirname(gltf_path)
 
     for img in gltf_data.get('images', ()):
 
         path = get_image_path(img['name'])
         if not path:
-            print(f"No Blender image from file by name: {img}")
+            print(f"No Blender image for the image by name: {img}")
             continue
-        
+
         uri = img.get('uri')
         if uri:
             path_from_uri = os.path.abspath(os.path.join(gltf_dir, unquote(uri).replace('/', os.sep)))
             try:
                 os.path.samefile(path, path_from_uri)
-            except:
-                import traceback
-                traceback.print_exc()
-                raise BaseException(f"{path} and {path_from_uri} are different files or do not exist.")
+            except Exception as e:
+                raise Exception(f"{path} and {path_from_uri} are different files or do not exist.") from e
 
         try:
-            path = os.path.relpath(path, bam_dir)
-        except ValueError:
+            # https://github.com/Moguri/panda3d-gltf/blob/95e2621d21792d522b5c939251f07a01259ffd69/gltf/cli.py#L121
+            # converter = Converter(src, settings=settings)
+            # https://github.com/Moguri/panda3d-gltf/blob/95e2621d21792d522b5c939251f07a01259ffd69/gltf/_converter.py#L133
+            # self.filedir = Filename(filepath.get_dirname())
+            # https://github.com/Moguri/panda3d-gltf/blob/95e2621d21792d522b5c939251f07a01259ffd69/gltf/_converter.py#L611
+            # fulluri = Filename(self.filedir, uri)
+            # path = os.path.relpath(path, gltf_dir)
             path = os.path.abspath(path)
-        
-        img['uri'] = path
+        except ValueError as e:
+            raise Exception(f"The image path must be relative to the glTF file: {path} {gltf_dir}") from e
+
+        img['uri'] = quote(path)
 
 
-def export_gltf(settings: dict, blend_path: str, gltf_path: str, bam_path: str, blender_gltf_settings: dict = None):
 
-    target_dir = os.path.dirname(gltf_path)
-    os.makedirs(target_dir, exist_ok=True)
+def export_gltf():
 
-    gltf_settings = dict(
-        filepath = gltf_path,
+    result_dir = os.path.dirname(__GLTF_PATH__)
+    os.makedirs(result_dir, exist_ok=True)
 
-        export_format = 'GLTF_EMBEDDED' if settings['textures'] == 'embed' else 'GLTF_SEPARATE',
-        export_animations = settings['animations'] != 'skip',
+    rna_type = bpy.ops.export_scene.gltf.get_rna_type()
+    export_options_keys = rna_type.properties.keys()
+    export_format_options = [item.identifier for item in rna_type.properties['export_format'].enum_items_static]
 
-        export_cameras = True,
-        export_extras = True,
-        export_yup = False,
-        export_lights = True,
-        export_force_sampling = True,
-        export_apply = True,
-        export_tangents = True,
+    from blend_converter.format import bam
 
-        export_keep_originals = settings['textures'] == 'ref'
-    )
+    gltf_settings = bam.Settings_Blender_Gltf._from_dict(__KWARGS__['gltf_settings'])
+    gltf2bam_settings = bam.Settings_Gltf_2_Bam._from_dict(__KWARGS__['gltf2bam_settings'])
 
-    if blender_gltf_settings:
-        gltf_settings.update(blender_gltf_settings)
 
-    bpy.ops.export_scene.gltf(**gltf_settings)
+    gltf_settings.export_animations = gltf2bam_settings.animations != 'skip'
 
-    with open(gltf_path) as gltf_file:
+
+    if gltf2bam_settings.textures == 'embed':
+        if 'GLTF_EMBEDDED' in export_format_options:
+            gltf_settings.export_format = 'GLTF_EMBEDDED'
+        else:
+            print("GLTF_EMBEDDED option is not supported.")
+
+
+    if 'export_keep_originals' in export_options_keys:
+        gltf_settings.export_keep_originals = gltf2bam_settings.textures == 'ref'
+    if 'use_mesh_edges' in export_options_keys:
+        gltf_settings.use_mesh_edges = True
+    if 'use_mesh_vertices' in export_options_keys:
+        gltf_settings.use_mesh_vertices = True
+    if 'export_optimize_animation_size' in export_options_keys:
+        gltf_settings.export_optimize_animation_size = False
+    if 'convert_lighting_mode' in export_options_keys:
+        gltf_settings.convert_lighting_mode = 'RAW'
+    if 'export_import_convert_lighting_mode' in export_options_keys:
+        gltf_settings.export_import_convert_lighting_mode = 'RAW'
+    if 'export_try_sparse_sk' in export_options_keys:
+        gltf_settings.export_try_sparse_sk = False
+
+
+    if 'export_keep_originals' in export_options_keys:
+
+        # case if the setting are getting updated
+        if gltf2bam_settings.textures == 'ref' and gltf_settings.export_keep_originals == False:
+            message = "Cannot reference textures that will being deleted with the temporal glTF file when `export_keep_originals == False`. When `export_keep_originals == False` use `textures == 'copy'`."
+            print('Warning:', message)
+            gltf_settings.export_keep_originals = True
+            # raise Exception(message)
+
+
+        if gltf_settings.export_keep_originals or gltf2bam_settings.textures == 'ref':
+            for image in bpy.data.images:
+                if image.filepath:
+                    try:
+                        os.path.relpath(os.path.realpath(__GLTF_PATH__), get_block_realpath(image))
+                    except ValueError as e:
+                        gltf_settings.export_keep_originals = False
+                        gltf2bam_settings.textures = 'copy'
+                        message = f"Cannot export a gltf keeping an original image with no possible relative path to the gltf file being written: {image} {image.filepath}"
+                        print('Warning:', message)
+                        # raise Exception(message) from e
+
+
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('default')
+
+        gltf_settings_dict = gltf_settings._to_dict()
+
+        print("GLTF:", gltf_settings_dict)
+
+        bpy.ops.export_scene.gltf(filepath = __GLTF_PATH__, **gltf_settings_dict)
+
+
+    with open(__GLTF_PATH__) as gltf_file:
         gltf_data = json.load(gltf_file)
 
-    export_physics(gltf_data, settings)
+    export_physics(gltf_data, gltf2bam_settings.invisible_collisions_collection)
 
-    if settings['textures'] == 'ref':
-        unquote_and_repath(gltf_data, blend_path, gltf_path, bam_path)
-    elif settings['textures'] == 'copy':
-        unquote_image_uri(gltf_data)
+    if gltf2bam_settings.textures in ('ref', 'copy'):
+        validate_image_paths(gltf_data, __GLTF_PATH__)
 
-    with open(gltf_path, 'w') as gltf_file:
+    with open(__GLTF_PATH__, 'w') as gltf_file:
         json.dump(gltf_data, gltf_file)
 
 
-export_gltf(job['settings_gltf'], bpy.data.filepath, job['dst'], job['bam_dst'], job['settings_blender_gltf'])
+export_gltf()

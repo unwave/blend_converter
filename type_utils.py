@@ -1,61 +1,70 @@
-import json
-import inspect
+""" Blender types docs parsing. """
+
+import bpy
+
+SENTINEL = object()
 
 COMMON_KEYWORDS = {
-    'soft_min', 
-    'items', 
-    'update', 
-    'default', 
-    'soft_max', 
-    'max', 
-    'attr', 
-    'options', 
-    'min', 
-    'name', 
+    'soft_min',
+    'items',
+    'update',
+    'default',
+    'soft_max',
+    'max',
+    'attr',
+    'options',
+    'min',
+    'name',
     'description',
     'hard_max',
     'hard_min'
     }
+""" The Blender property keywords. Used for the docs parsing. """
 
 PROPERTY_INTERNAL = {
-    '__doc__', 
-    '__module__', 
-    '__slots__', 
-    'bl_rna', 
-    'fixed_type', 
-    'icon', 
-    'identifier', 
-    'is_animatable', 
-    'is_argument_optional', 
-    'is_hidden', 
-    'is_library_editable', 
-    'is_output', 
-    'is_overridable', 
-    'is_registered', 
-    'is_registered_optional', 
-    'is_required', 
-    'is_runtime', 
-    'is_skip_save', 
-    'rna_type', 
-    'srna', 
-    'tags', 
-    'translation_context', 
-    'type', 
-    'unit', 
-    'length_max', 
-    'array_dimensions', 
-    'array_length', 
-    'default_array', 
-    'is_array', 
-    'precision', 
+    '__doc__',
+    '__module__',
+    '__slots__',
+    'bl_rna',
+    'fixed_type',
+    'icon',
+    'identifier',
+    'is_animatable',
+    'is_argument_optional',
+    'is_hidden',
+    'is_library_editable',
+    'is_output',
+    'is_overridable',
+    'is_registered',
+    'is_registered_optional',
+    'is_required',
+    'is_runtime',
+    'is_skip_save',
+    'rna_type',
+    'srna',
+    'tags',
+    'translation_context',
+    'type',
+    'unit',
+    'length_max',
+    'array_dimensions',
+    'array_length',
+    'default_array',
+    'is_array',
+    'precision',
     'step',
     'enum_items',
-    'is_readonly'
+    'is_readonly',
+    'enum_items_static_ui',
+    'is_path_output',
+    'is_skip_preset',
     }
+""" The internal Blender property keywords. Ignored in the docs parsing. """
 
-SENTINEL = object()
 
 def prop_name_to_python_type(name, keywords):
+    """ Get an equivalent of a Blender property as a python type. Used for the docs parsing. """
+
     if name == 'BoolProperty':
         return 'bool'
     elif name == 'StringProperty':
@@ -77,55 +86,64 @@ def prop_name_to_python_type(name, keywords):
     else:
         raise NotImplementedError(f'Type: {name} is not supported.')
 
+
 def get_docs_string(keywords: dict, is_property = False):
+    """ Get docs from a property `keywords` dict. """
+
     docs_string = []
     docs_string.append('"""')
     docs_string.append('\n')
-    
+
     text = keywords.get('name')
     if text:
         docs_string.append(text)
         docs_string.append('\n\n')
-        
+
     text = keywords.get('description')
     if text:
         docs_string.append(text)
         docs_string.append('\n\n')
-        
+
     items = keywords.get('items', SENTINEL)
     if items is not SENTINEL:
         docs_string.append(f"Options:")
         docs_string.append('\n')
+
+        if type(items).__name__ == 'function':
+            items = items(bpy.context.scene, bpy.context)
+
         for item in items:
             docs_string.append(f"* `{item[0]}`: {item[1]}{', ' + item[2] if item[2] else ''}\n")
         docs_string.append('\n')
 
-    
+
     value = keywords.get('hard_min', SENTINEL)
     if value is not SENTINEL:
         docs_string.append(f"Hard Min: `{round(value, 8)}`")
         docs_string.append('\n')
-        
+
     value = keywords.get('hard_max', SENTINEL)
     if value is not SENTINEL:
         docs_string.append(f"Hard Max: `{round(value, 8)}`")
         docs_string.append('\n')
-        
-    value = keywords.get('soft_min', SENTINEL)
-    if value is not SENTINEL:
-        docs_string.append(f"Soft Min: `{round(value, 8)}`")
-        docs_string.append('\n')
-        
-    value = keywords.get('soft_max', SENTINEL)
-    if value is not SENTINEL:
-        docs_string.append(f"Soft Max: `{round(value, 8)}`")
-        docs_string.append('\n')
-        
+
+    if keywords.get('hard_min', SENTINEL) != keywords.get('soft_min', SENTINEL):
+        value = keywords.get('soft_min', SENTINEL)
+        if value is not SENTINEL:
+            docs_string.append(f"Soft Min: `{round(value, 8)}`")
+            docs_string.append('\n')
+
+    if keywords.get('hard_max', SENTINEL) != keywords.get('soft_max', SENTINEL):
+        value = keywords.get('soft_max', SENTINEL)
+        if value is not SENTINEL:
+            docs_string.append(f"Soft Max: `{round(value, 8)}`")
+            docs_string.append('\n')
+
     value = keywords.get('min', SENTINEL)
     if value is not SENTINEL:
         docs_string.append(f"Min: `{round(value, 8)}`")
         docs_string.append('\n')
-        
+
     value = keywords.get('max', SENTINEL)
     if value is not SENTINEL:
         docs_string.append(f"Max: `{round(value, 8)}`")
@@ -134,7 +152,7 @@ def get_docs_string(keywords: dict, is_property = False):
     if any(keywords.get(key, SENTINEL) is not SENTINEL for key in ('max', 'max', 'soft_max', 'soft_min', 'hard_max', 'hard_min')):
         docs_string.append('\n')
 
-        
+
     options = keywords.get('options', SENTINEL)
     if options is not SENTINEL:
         docs_string.append(f"Blender Property Options: `{options}`")
@@ -168,7 +186,7 @@ def get_docs_string(keywords: dict, is_property = False):
         if value and value != 'NONE':
             docs_string.append(f"Subtype: `{value}`")
             docs_string.append('\n')
-        
+
         for key, value in keywords.items():
             if key not in COMMON_KEYWORDS and key not in PROPERTY_INTERNAL:
                 docs_string.append(f"`{key}`: `{value}`")
@@ -188,16 +206,16 @@ def get_docs_string(keywords: dict, is_property = False):
 
 
 def get_docs_from_annotations(annotations, argument_names = None) -> str:
-    """ 
-    From `__annotations__` 
-    
+    """
+    From `__annotations__`
+
     ```
     import io_scene_fbx
     __annotations__ = io_scene_fbx.ExportFBX.__annotations__
-    docs = bl_utils.get_docs_from_annotations(__annotations__)
+    docs = get_docs_from_annotations(__annotations__)
     ```
-    
     """
+
     if argument_names:
         argument_names = set(argument_names)
 
@@ -216,7 +234,7 @@ def get_docs_from_annotations(annotations, argument_names = None) -> str:
         assert keywords['attr'] == key
 
         docs_string = get_docs_string(keywords)
-        
+
         docs.append(''.join(docs_string))
         docs.append('\n\n')
 
@@ -224,14 +242,17 @@ def get_docs_from_annotations(annotations, argument_names = None) -> str:
 
 
 def get_docs_from_properties(properties, argument_names = None) -> str:
-    """ 
-    From `properties` 
+    """
+    From `properties`
 
     ```
     properties = bpy.ops.wm.obj_export.get_rna_type().properties
-    docs = bl_utils.get_docs_from_properties(properties)
+    docs = get_docs_from_properties(properties)
     ```
     """
+
+    import inspect
+
     if argument_names:
         argument_names = set(argument_names)
 
@@ -258,7 +279,7 @@ def get_docs_from_properties(properties, argument_names = None) -> str:
             docs.append('\n')
 
         docs_string = get_docs_string(keywords, is_property = True)
-        
+
         docs.append(''.join(docs_string))
         docs.append('\n\n')
 
@@ -274,12 +295,18 @@ def to_json(object):
     else:
         return repr(object)
 
+
 def annotations_to_json(annotations, json_default = to_json):
+    import json
     return json.dumps(dict(annotations), ensure_ascii = False, indent = 4, default = json_default)
 
+
 def get_arguments_names(func):
+    import inspect
     return [argument.name for argument in inspect.signature(func).parameters.values()]
 
+
 def print_members(object):
+    import inspect
     for key, value in inspect.getmembers(object):
         print(key, '—', value)

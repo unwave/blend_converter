@@ -1,18 +1,10 @@
-import bpy
 import os
-import sys
-import argparse
-
-parser = argparse.ArgumentParser()
-parser.add_argument('-caller_script_dir')
-
-args = sys.argv[sys.argv.index('--') + 1:]
-args = parser.parse_args(args)
-
-CALLER_SCRIPT_DIR: str = args.caller_script_dir
 
 
 def ensure_addon(name: str, zip_url: str):
+    """ Download an addon zip file and put into Blender's `script/addons` directory. """
+
+    import bpy
 
     import importlib
     import importlib.util
@@ -28,7 +20,10 @@ def ensure_addon(name: str, zip_url: str):
     zip_file = zipfile.ZipFile(io.BytesIO(response.content))
     namelist = zip_file.namelist()
 
-    addon_dir = os.path.join(bpy.utils.script_path_user(), 'addons')
+    script_path_user = bpy.utils.script_path_user()
+    assert script_path_user is not None
+
+    addon_dir = os.path.join(script_path_user, 'addons')
     os.makedirs(addon_dir, exist_ok=True)
     zip_file.extractall(addon_dir)
 
@@ -40,13 +35,6 @@ def ensure_addon(name: str, zip_url: str):
 
     importlib.invalidate_caches()
 
-PRPEE_URL = r'https://github.com/kergalym/PRPEE/archive/7a11e066e99735229284beca830c95f33385e5ce.zip'
-ensure_addon('prpee', PRPEE_URL)
-
-import addon_utils
-addon_utils.enable("prpee", persistent = True)
-
-from prpee import egg_writer # type: ignore
 
 def call_anyway(func, kwargs: dict, sentinel = object()):
     new_kwargs = {}
@@ -66,15 +54,32 @@ def call_anyway(func, kwargs: dict, sentinel = object()):
 
     return func(**new_kwargs)
 
-job = get_job() # type: ignore
-errors = call_anyway(egg_writer.write_out, job)
 
-if errors:
-    rep_msg = ''
-    if 'ERR_UNEXPECTED' in errors:
-        rep_msg += 'Unexpected error during export! See console for traceback.\n'
-    if 'ERR_MK_HIERARCHY' in errors:
-        rep_msg += 'Error while creating hierarchy. Check parent objects and armatures.'
-    if 'ERR_MK_OBJ' in errors:
-        rep_msg += 'Unexpected error while creating object. See console for traceback.'
-    raise BaseException(rep_msg)
+def export_egg(settings: dict):
+
+    import bpy
+
+    bpy.context.preferences.use_preferences_save = False
+
+    url = r'https://github.com/kergalym/PRPEE/archive/7a11e066e99735229284beca830c95f33385e5ce.zip'
+    ensure_addon('prpee', url)
+
+    def handle_error(exc):
+        raise exc
+
+    import addon_utils
+    addon_utils.enable(module_name = 'prpee', default_set = True, persistent = True, handle_error = handle_error)
+
+    from prpee import egg_writer  # type: ignore
+
+    errors = call_anyway(egg_writer.write_out, settings)
+
+    if errors:
+        rep_msg = ''
+        if 'ERR_UNEXPECTED' in errors:
+            rep_msg += 'Unexpected error during export! See console for traceback.\n'
+        if 'ERR_MK_HIERARCHY' in errors:
+            rep_msg += 'Error while creating hierarchy. Check parent objects and armatures.'
+        if 'ERR_MK_OBJ' in errors:
+            rep_msg += 'Unexpected error while creating object. See console for traceback.'
+        raise Exception(rep_msg)

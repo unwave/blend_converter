@@ -1,22 +1,21 @@
-import os
+import typing
 
-from . import common
-from . import utils
+from ... import tool_settings
+from . import export_obj
+from .. import common
 
-class Settings_Obj(common.Settings):
+
+if typing.TYPE_CHECKING:
+    import dataclasses
+else:
+    class dataclasses:
+        dataclass = lambda x: x
+
+
+@dataclasses.dataclass
+class Settings_Obj(tool_settings.Settings):
     """ The built-in C based Wavefront OBJ exporter. """
 
-    filepath: str
-    """
-    File Path
-
-    Path to file
-
-    #### Required.
-    Subtype: `FILEPATH`
-
-    #### Default: `''`
-    """
 
     export_animation: bool
     """
@@ -224,90 +223,18 @@ class Settings_Obj(common.Settings):
     """
 
 
-def export():
-    import bpy
-
-    settings = get_job() # type: ignore
-
-    bpy.ops.wm.obj_export(**settings) 
-
-class Obj(common.Blend, common.Pre_Post_Args_Mixin):
+class Obj(common.Generic_Exporter):
 
     _file_extension = 'obj'
+    settings: Settings_Obj
 
-    def __init__(self, blend_path: str, target_dir: str):
-        """
-        Parameters
-        ----------
-        blend_path: `.blend` file path
 
-        target_dir: directory where `.obj` files will be placed
-        """
-
-        common.Blend.__init__(self, blend_path, target_dir)
-        common.Pre_Post_Args_Mixin.__init__(self)
+    def __init__(self, source_path: str, result_dir: str, **kwargs):
+        super().__init__(source_path, result_dir, **kwargs)
 
         self.settings = Settings_Obj()
         """ Official Blender Built-In OBJ Exporter"""
 
 
-    def _write_json(self):
-        super()._write_json({
-            'settings': self._set_to_list(self.settings._dict),
-            'args_pre': self.args_pre,
-            'args_post': self.args_post,
-        })
-
-    def _set_to_list(self, settings: dict):
-        for key, value in settings.items():
-            if type(value) is set:
-                settings[key] = list(value)
-        return settings
-
-    @property
-    def needs_update(self):
-
-        if not os.path.exists(self.os_path_target):
-            return True
-
-        settings = self.file_settings
-
-        if settings.get('blend_stat') != self._get_blend_stat():
-            return True
-
-        if settings.get('settings') != self._set_to_list(self.settings._dict):
-            return True
-
-        if settings.get('args_pre') != self.args_pre:
-            return True
-        
-        if settings.get('args_post') != self.args_post:
-            return True
-
-        return False
-
-    def _get_job(self):
-        job = self.settings._dict
-        job['filepath'] = self.os_path_target
-        return job
-
-    def _get_commands(self):
-        
-        return [
-            self.blend_path,
-
-            '--python-expr',
-            self._get_job_expr(self._get_job()),
-
-            *self.args_pre,
-
-            '--python-expr',
-            utils.get_expr(export),
-
-            *self.args_post,
-        ]
-
-    def update(self, forced = False):
-        if self.needs_update or forced:
-            utils.run_blender(self._get_commands(), stdout = self.blender_stdout, blender_binary = self.blender_binary)
-            self._write_json()
+    def get_export_script(self):
+        return self._get_function_script(export_obj.export_obj, dict(filepath = self.result_path, **self.settings._to_dict()))

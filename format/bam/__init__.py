@@ -2,171 +2,41 @@ import typing
 import uuid
 import tempfile
 import os
-
-from . import common
-from . import utils
-
-
-
-DIR = os.path.dirname(__file__)
-BLENDER_EXPORT_GLTF = os.path.join(DIR, 'scripts', 'blender_export_gltf.py')
+import json
+import traceback
+import sys
 
 
-class Settings_Blender_GLTF(common.Settings):
-    """
-    The arguments for `bpy.ops.export_scene.gltf()` 
-    Version: `1.8.19`
-    
-    These are used if only explicitly specified.
-    """
+from .. import common
+from ... import utils
+from .. import gltf
+from ... import tool_settings
 
-    filepath: str
-    """
-    File Path, Filepath used for exporting the file
 
-    #### Default:
-    * `blender`: `""`
-    """
+if typing.TYPE_CHECKING:
+    import dataclasses
+else:
+    class dataclasses:
+        dataclass = lambda x: x
 
-    check_existing: bool
-    """
-    Check Existing, Check and warn on overwriting existing files
 
-    #### Default:
-    * `blender`: `True`
-    """
+BLENDER_EXPORT_GLTF = os.path.join(os.path.dirname(__file__), 'export_gltf.py')
+
+
+@dataclasses.dataclass
+class Settings_Blender_Gltf(gltf.Settings_GLTF):
+
 
     export_format: typing.Union[int, str]
     """
-    Format, Output format and embedding options. Binary is most efficient, but JSON (embedded or separate) may be easier to edit later 
-    * `GLB` glTF Binary (.glb) -- Exports a single file, with all data packed in binary form. Most efficient and portable, but more difficult to edit later. 
-    * `GLTF_SEPARATE` glTF Separate (.gltf + .bin + textures) -- Exports multiple files, with separate JSON, binary and texture data. Easiest to edit later. 
+    Format, Output format and embedding options. Binary is most efficient, but JSON (embedded or separate) may be easier to edit later
+    * `GLB` glTF Binary (.glb) -- Exports a single file, with all data packed in binary form. Most efficient and portable, but more difficult to edit later.
+    * `GLTF_SEPARATE` glTF Separate (.gltf + .bin + textures) -- Exports multiple files, with separate JSON, binary and texture data. Easiest to edit later.
     * `GLTF_EMBEDDED` glTF Embedded (.gltf) -- Exports a single file, with all data packed in JSON. Less efficient than binary, but easier to edit later.
 
     #### Default:
     * `blender`: `'GLB'`
-    * `blend2bam`: `'GLTF_EMBEDDED' if settings['textures'] == 'embed' else 'GLTF_SEPARATE'`
-    """
-
-    ui_tab: typing.Union[int, str]
-    """
-    ui_tab, Export setting categories 
-    * `GENERAL` General -- General settings. 
-    * `MESHES` Meshes -- Mesh settings. 
-    * `OBJECTS` Objects -- Object settings. 
-    * `ANIMATION` Animation -- Animation settings.
-
-    #### Default:
-    * `blender`: `'GENERAL'`
-    """
-
-    export_copyright: str
-    """
-    Copyright, Legal rights and conditions for the model
-
-    #### Default:
-    * `blender`: `""`
-    """
-
-    export_image_format: typing.Union[int, str]
-    """
-    Images, Output format for images. PNG is lossless and generally preferred, but JPEG might be preferable for web applications due to the smaller file size. Alternatively they can be omitted if they are not needed
-    * `AUTO` Automatic -- Save PNGs as PNGs and JPEGs as JPEGs. If neither one, use PNG. 
-    * `JPEG` JPEG Format (.jpg) -- Save images as JPEGs. (Images that need alpha are saved as PNGs though.) Be aware of a possible loss in quality.
-    * `NONE` None -- Don't export images.
-
-    #### Default:
-    * `blender`: `'AUTO'`
-    """
-
-    export_texture_dir: str
-    """
-    Textures, Folder to place texture files in. Relative to the .gltf file
-
-    #### Default:
-    * `blender`: `""`
-    """
-
-    export_keep_originals: bool
-    """
-    Keep original, Keep original textures files if possible. 
-    
-    #### WARNING: if you use more than one texture, where pbr standard requires only one, only one texture will be used. This can lead to unexpected results
-
-    #### Default:
-    * `blender`: `False`
-    """
-
-    export_texcoords: bool
-    """
-    UVs, Export UVs (texture coordinates) with meshes
-
-    #### Default:
-    * `blender`: `True`
-    """
-
-    export_normals: bool
-    """
-    Normals, Export vertex normals with meshes
-
-    #### Default:
-    * `blender`: `True`
-    """
-
-    export_draco_mesh_compression_enable: bool
-    """
-    Draco mesh compression, Compress mesh using Draco
-
-    #### Default:
-    * `blender`: `False`
-    """
-
-    export_draco_mesh_compression_level: int
-    """
-    Compression level, Compression level (0 = most speed, 6 = most compression, higher values currently not supported)
-
-    #### Default:
-    * `blender`: `6`
-    """
-
-    export_draco_position_quantization: int
-    """
-    Position quantization bits, Quantization bits for position values (0 = no quantization)
-
-    #### Default:
-    * `blender`: `14`
-    """
-
-    export_draco_normal_quantization: int
-    """
-    Normal quantization bits, Quantization bits for normal values (0 = no quantization)
-
-    #### Default:
-    * `blender`: `10`
-    """
-
-    export_draco_texcoord_quantization: int
-    """
-    Texcoord quantization bits, Quantization bits for texture coordinate values (0 = no quantization)
-
-    #### Default:
-    * `blender`: `12`
-    """
-
-    export_draco_color_quantization: int
-    """
-    Color quantization bits, Quantization bits for color values (0 = no quantization)
-
-    #### Default:
-    * `blender`: `10`
-    """
-
-    export_draco_generic_quantization: int
-    """
-    Generic quantization bits, Quantization bits for generic coordinate values like weights or joints (0 = no quantization)
-
-    #### Default:
-    * `blender`: `12`
+    * `panda3d-gltf`: `'GLTF_EMBEDDED' if settings['textures'] == 'embed' else 'GLTF_SEPARATE'`
     """
 
     export_tangents: bool
@@ -175,42 +45,7 @@ class Settings_Blender_GLTF(common.Settings):
 
     #### Default:
     * `blender`: `False`
-    * `blend2bam`: `True`
-    """
-
-    export_materials: typing.Union[int, str]
-    """
-    Materials, Export materials 
-    * `EXPORT` Export -- Export all materials used by included objects. 
-    * `PLACEHOLDER` Placeholder -- Do not export materials, but write multiple primitive groups per mesh, keeping material slot information. 
-    * `NONE` No export -- Do not export materials, and combine mesh primitive groups, losing material slot information.
-
-    #### Default:
-    * `blender`: `'EXPORT'`
-    """
-
-    export_colors: bool
-    """
-    Vertex Colors, Export vertex colors with meshes
-
-    #### Default:
-    * `blender`: `True`
-    """
-
-    use_mesh_edges: bool
-    """
-    Loose Edges, Export loose edges as lines, using the material from the first material slot
-
-    #### Default:
-    * `blender`: `False`
-    """
-
-    use_mesh_vertices: bool
-    """
-    Loose Points, Export loose points as glTF points, using the material from the first material slot
-
-    #### Default:
-    * `blender`: `False`
+    * `panda3d-gltf`: `True`
     """
 
     export_cameras: bool
@@ -219,39 +54,7 @@ class Settings_Blender_GLTF(common.Settings):
 
     #### Default:
     * `blender`: `False`
-    * `blend2bam`: `True`
-    """
-
-    use_selection: bool
-    """
-    Selected Objects, Export selected objects only
-
-    #### Default:
-    * `blender`: `False`
-    """
-
-    use_visible: bool
-    """
-    Visible Objects, Export visible objects only
-
-    #### Default:
-    * `blender`: `False`
-    """
-
-    use_renderable: bool
-    """
-    Renderable Objects, Export renderable objects only
-
-    #### Default:
-    * `blender`: `False`
-    """
-
-    use_active_collection: bool
-    """
-    Active Collection, Export objects in the active collection only
-
-    #### Default:
-    * `blender`: `False`
+    * `panda3d-gltf`: `True`
     """
 
     export_extras: bool
@@ -260,27 +63,27 @@ class Settings_Blender_GLTF(common.Settings):
 
     #### Default:
     * `blender`: `False`
-    * `blend2bam`: `True`
+    * `panda3d-gltf`: `True`
     """
 
     export_yup: bool
     """
     +Y Up, Export using glTF convention, +Y up
 
-    #### Default: 
+    #### Default:
     * `blender`: `True`
-    * `blend2bam`: `False`
+    * `panda3d-gltf`: `False`
     """
 
     export_apply: bool
     """
-    Apply Modifiers, Apply modifiers (excluding Armatures) to mesh objects 
-    
+    Apply Modifiers, Apply modifiers (excluding Armatures) to mesh objects
+
     #### WARNING: prevents exporting shape keys
 
     #### Default:
     * `blender`: `False`
-    * `blend2bam`: `True`
+    * `panda3d-gltf`: `True`
     """
 
     export_animations: bool
@@ -290,23 +93,7 @@ class Settings_Blender_GLTF(common.Settings):
 
     #### Default:
     * `blender`: `True`
-    * `blend2bam`: `settings['animations'] != 'skip'`
-    """
-
-    export_frame_range: bool
-    """
-    Limit to Playback Range, Clips animations to selected playback range
-
-    #### Default:
-    * `blender`: `True`
-    """
-
-    export_frame_step: int
-    """
-    Sampling Rate, How often to evaluate animated values (in frames)
-
-    #### Default:
-    * `blender`: `1`
+    * `panda3d-gltf`: `settings['animations'] != 'skip'`
     """
 
     export_force_sampling: bool
@@ -315,79 +102,7 @@ class Settings_Blender_GLTF(common.Settings):
 
     #### Default:
     * `blender`: `True`
-    * `blend2bam`: `True`
-    """
-
-    export_nla_strips: bool
-    """
-    Group by NLA Track, When on, multiple actions become part of the same glTF animation if they're pushed onto NLA tracks with the same name. When off, all the currently assigned actions become one glTF animation
-
-    #### Default:
-    * `blender`: `True`
-    """
-
-    export_def_bones: bool
-    """
-    Export Deformation Bones Only, Export Deformation bones only (and needed bones for hierarchy)
-
-    #### Default:
-    * `blender`: `False`
-    """
-
-    optimize_animation_size: bool
-    """
-    Optimize Animation Size, Reduce exported file-size by removing duplicate keyframes Can cause problems with stepped animation
-    
-    #### Default:
-    * `blender`: `False`
-    """
-
-    export_current_frame: bool
-    """
-    Use Current Frame, Export the scene in the current animation frame
-
-    #### Default:
-    * `blender`: `False`
-    """
-
-    export_skins: bool
-    """
-    Skinning, Export skinning (armature) data
-
-    #### Default:
-    * `blender`: `True`
-    """
-
-    export_all_influences: bool
-    """
-    Include All Bone Influences, Allow >4 joint vertex influences. Models may appear incorrectly in many viewers
-
-    #### Default:
-    * `blender`: `False`
-    """
-
-    export_morph: bool
-    """
-    Shape Keys, Export shape keys (morph targets)
-
-    #### Default:
-    * `blender`: `True`
-    """
-
-    export_morph_normal: bool
-    """
-    Shape Key Normals, Export vertex normals with shape keys (morph targets)
-
-    #### Default:
-    * `blender`: `True`
-    """
-
-    export_morph_tangent: bool
-    """
-    Shape Key Tangents, Export vertex tangents with shape keys (morph targets)
-
-    #### Default:
-    * `blender`: `False`
+    * `panda3d-gltf`: `True`
     """
 
     export_lights: bool
@@ -396,95 +111,89 @@ class Settings_Blender_GLTF(common.Settings):
 
     #### Default:
     * `blender`: `False`
-    * `blend2bam`: `True`
-    """
-
-    export_displacement: bool
-    """
-    Displacement Textures (EXPERIMENTAL)
-    
-    #### EXPERIMENTAL: Export displacement textures. Uses incomplete "KHR_materials_displacement" glTF extension
-
-    #### Default:
-    * `blender`: `False`
-    """
-
-    will_save_settings: bool
-    """
-    Remember Export Settings, Store glTF export settings in the Blender project
-
-    #### Default:
-    * `blender`: `False`
-    """
-
-    filter_glob: str
-    """
-    filter_glob, Blender's file dialog setting
-
-    #### Default:
-    * `blender`: `"*.glb;*.gltf"`
+    * `panda3d-gltf`: `True`
     """
 
 
-class Settings_GLTF(common.Settings):
-    """ `blend2bam`'s .blend to .bam settings """
+@dataclasses.dataclass
+class Settings_Gltf_2_Bam(tool_settings.Settings):
+    """ `panda3d-gltf`'s .gltf to .bam settings """
 
-    physics_engine = 'builtin' 
+
+    collision_shapes: str = 'builtin'
     """
-    The physics engine to build collision solids for: `builtin` or `bullet`.
+    The physics engine to build collision solids for: `'builtin'` or `'bullet'`.
 
-    #### Default: `builtin`
+    #### Default: `'builtin'`
+    `cmd`: `--collision-shapes`
     """
 
-    print_scene = False 
+    print_scene: bool = False
     """
     Print the converted scene graph to stdout.
 
     #### Default: `False`
+    `cmd`: `--print-scene`
     """
 
-    skip_axis_conversion = True 
+    skip_axis_conversion: bool = False
     """
     Do not perform axis-conversion (useful if glTF data is already Z-Up).
 
-    #### Default: `True`
+    #### Default: `False`
+    `cmd`: `--skip-axis-conversion`
     """
 
-    no_srgb = False 
+    no_srgb: bool = False
     """
     Do not load textures as sRGB textures (only for glTF pipelines).
 
     If `False`: do not load textures as sRGB.
 
     #### Default: `False`
+    `cmd`: `--no-srgb`
     """
 
-    textures = 'ref' 
+    textures: str = 'ref'
     """
-    How to handle external textures: `ref` or `copy` or `embed`.
+    How to handle external textures: `'ref'` or `'copy'`.
 
-    If `ref`: reference external textures.
+    * `ref`: ref — reference external textures
+    * `copy`: copy — copy textures
 
-    #### Default: `ref`
+    embedded textures will remain embedded
+
+    #### Default: `'ref'`
+    `cmd`: `--textures`
     """
 
-    legacy_materials = False 
+    legacy_materials: bool = False
     """
     If `False`, use PBR materials.
 
     #### Default: `False`
+    `cmd`: `--legacy-materials`
     """
 
-    animations = 'embed' 
+    animations: str = 'embed'
     """
-    How to handle animation data: `embed` or `separate` or `skip`.
+    How to handle animation data: `'embed'` or `'separate'` or `'skip'`.
 
     If `embed`: keep animations in the same BAM file.
 
-    #### Default: `embed`
+    #### Default: `'embed'`
+    `cmd`: `--animations`
     """
 
-    invisible_collisions_collection = 'InvisibleCollisions' 
+    flatten_nodes: bool = False
+    """
+    Attempt to flatten resulting node structure.
+
+    #### Default: `False`
+    `cmd`: `--flatten-nodes`
+    """
+
+    invisible_collisions_collection: str = 'InvisibleCollisions'
     """
     Name of a collection in blender whose collision objects will be exported without a visible geom node.
 
@@ -492,186 +201,240 @@ class Settings_GLTF(common.Settings):
     """
 
 
-class Bam(common.Blend):
-    """ Lazy evaluated `.blend` to `.bam` handler """
+    def _get_cli_command(self):
+
+        command: typing.List[str] = []
+
+        for key, value in self._to_dict().items():
+
+            if key in ('invisible_collisions_collection', 'allow_double_sided_materials'):
+                continue
+
+            argument = f"--{key.replace('_', '-')}"
+
+            if isinstance(value, bool):
+                if value:
+                    command.append(argument)
+            elif isinstance(value, str):
+                command.append(argument)
+                command.append(value)
+            else:
+                raise Exception(f"Unexpected attribute: {key} {value}")
+
+        return command
+
+
+
+class Panda3D_Path_Mixin(object if not typing.TYPE_CHECKING else typing.Protocol):
+
+    @property
+    def result_path(args) -> str: ...
+
+    @property
+    def path_panda(self):
+        """ Panda 3D style path """
+        from panda3d.core import Filename
+        return Filename.from_os_specific(self.result_path)
+
+    def get_relpath_panda(self, start: str):
+        """ Panda 3D style relative path """
+        from panda3d.core import Filename
+        return Filename.from_os_specific(self.result_path).make_relative_to(Filename.from_os_specific(start))
+
+
+class Bam_Edit:
+
+    def __init__(self, bam_path: str):
+        self.bam_path = bam_path
+
+    def __enter__(self):
+
+        from panda3d import core
+
+        loader: core.Loader = core.Loader.get_global_ptr()
+        flags = core.LoaderOptions(core.LoaderOptions.LF_no_cache)
+
+        bam_path = core.Filename.from_os_specific(self.bam_path)
+        panda_node = loader.load_sync(bam_path, flags)
+
+        self.root_node = core.NodePath(panda_node)
+
+        return self.root_node
+
+    def __exit__(self , type, value, traceback):
+
+        from panda3d import core
+
+        is_success = self.root_node.write_bam_file(core.Filename.from_os_specific(self.bam_path))
+        if not is_success:
+            raise Exception(f'Error writing file: {self.bam_path}')
+
+
+class Bam(common.Generic_Exporter, Panda3D_Path_Mixin):
+    """ `.blend` to `.bam` handler """
 
     _file_extension = 'bam'
 
-    def __init__(self, blend_path: str, target_dir: str):
+
+    @property
+    def _gltf_file_extension(self):
+        if getattr(self.gltf_settings, 'export_format', 'GLB') == 'GLB':
+            return 'glb'
+        else:
+            return 'gltf'
+
+
+    def __init__(self, source_path: str, result_dir: str, **kwargs):
+        super().__init__(source_path, result_dir, **kwargs)
+
+        self.gltf2bam_settings = Settings_Gltf_2_Bam()
+        """ `panda3d-gltf`'s `.gltf` to `.bam` settings """
+
+        self.gltf2bam_settings.skip_axis_conversion = True
+
+
+        self.gltf_settings = Settings_Blender_Gltf()
         """
-        Parameters
-        ----------
-        blend_path: `.blend` file path
-
-        target_dir: directory where `.bam` files will be placed
-        """
-
-        super().__init__(blend_path, target_dir)
-
-        self.settings_gltf = Settings_GLTF()
-        """ `blend2bam`'s .blend to .bam settings """
-
-        self.settings_blender_gltf = Settings_Blender_GLTF()
-        """
-        The arguments for `bpy.ops.export_scene.gltf()` 
+        The arguments for `bpy.ops.export_scene.gltf()`
         Version: `1.8.19`
-        
-        These are used if only are explicitly specified.
         """
 
-        self._args_pre_gltf = []
-        self._args_post_gltf = []
+        self.gltf_settings.export_format = 'GLTF_SEPARATE'
+        self.gltf_settings.export_cameras = True
+        self.gltf_settings.export_extras = True
+        self.gltf_settings.export_yup = False
+        self.gltf_settings.export_lights = True
+        self.gltf_settings.export_force_sampling = True
+        self.gltf_settings.export_apply = True
+        self.gltf_settings.export_tangents = True
 
-        self._scripts_post_bam: typing.List[common.Script] = []
-        
-
-    @property
-    def args_pre_gltf(self):
-        """ Blender's command line arguments before the glTF export """
-        return self._unwrap_args(self._args_pre_gltf)
-
-    @property
-    def args_post_gltf(self):
-        """ Blender's command line arguments after the glTF export before the `.bam` file export """
-        return self._unwrap_args(self._args_post_gltf)
-
-    @property
-    def scripts_post_bam(self):
-        """ The scripts that run after the `.bam` file export """
-        return [script._script for script in self._scripts_post_bam]
+        self.bam_scripts = []
+        """ Scripts added with `run_bam_function`. """
 
 
-    def attach_pre_gltf_script(self, func: typing.Callable, *args, **kwargs):
+    def run_bam_function(self, func: typing.Callable, *args, **kwargs):
         """
-        The scrip will be executed before the glTF export.
+        The function will be executed after the `.bam` file export.
 
-        By default:
-        `func` must not use the scope where it was declared, as it will be evaluated in isolation.
         `args` and `kwargs` must be JSON serializable.
-        Set `script.use_dill = True` to use `uqfoundation/dill` to bypass that.
+
+        The function should have one first positional parameter reserved for `panda3d.core.ModelRoot`.
         """
 
-        script = common.Script(func, args, kwargs)
-        self._args_pre_gltf.append(script)
+        script = self._get_function_script(func, *args, **kwargs)
+
+        self.bam_scripts.append(script)
 
         return script
 
-    def attach_post_gltf_script(self, func: typing.Callable, *args, **kwargs):
-        """
-        The scrip will be executed after the glTF export before the `.bam` file export.
-
-        By default:
-        `func` must not use the scope where it is declared, as it will be evaluated in isolation.
-        `args` and `kwargs` must be JSON serializable.
-        Set `script.use_dill = True` to use `uqfoundation/dill` to bypass that.
-        """
-
-        script = common.Script(func, args, kwargs)
-        self._args_post_gltf.append(script)
-
-        return script
-
-    def attach_post_bam_script(self, func: typing.Callable, *args, **kwargs):
-        """
-        The scrip will be executed after the `.bam` file export.
-
-        `func` must not use the scope where it is declared. As it will be evaluated in isolation.
-
-        `args` and `kwargs` must be JSON serializable.
-        """
-
-        script = common.Script(func, args, kwargs)
-        self._scripts_post_bam.append(script)
-
-        return script
-
-
-    def _get_gltf_os_path(self, temp_dir: str):
-        return os.path.join(temp_dir, self.stem + str(uuid.uuid4()) + '.gltf')
 
     @property
     def needs_update(self):
 
-        if not os.path.exists(self.os_path_target):
+        if not os.path.exists(self.result_path):
             return True
 
-        settings = self.file_settings
+        info = self.get_json()
 
-        if settings.get('blend_stat') != self._get_blend_stat():
+        if info.get('blend_stat') != common.get_file_stat(self.blend_path):
             return True
 
-        if settings.get('settings_gltf') != self.settings_gltf._dict:
+        if info.get('blender_executable_stat') != common.get_file_stat(self.blender_executable):
             return True
 
-        if settings.get('settings_blender_gltf') != self.settings_blender_gltf._dict:
+        if info.get('scripts') != self._get_scripts():
             return True
 
-        if settings.get('args_pre_gltf') != self.args_pre_gltf:
-            return True
-
-        if settings.get('args_post_gltf') != self.args_post_gltf:
-            return True
-
-        if settings.get('scripts_post_bam') != self.scripts_post_bam:
+        if info.get('bam_scripts') != self.bam_scripts:
             return True
 
         return False
 
 
-    def _get_job_gltf(self, gltf_path):
-        return {
-            'dst': gltf_path,
-            'bam_dst': self.os_path_target,
-            'settings_gltf': self.settings_gltf._dict,
-            'settings_blender_gltf': self.settings_blender_gltf._dict
-        }
-
-    def _get_gltf_commands(self, gltf_path):
-        return [
-            self.blend_path,
-
-            '--python-expr',
-            self._get_job_expr(self._get_job_gltf(gltf_path)),
-
-            *self.args_pre_gltf,
-
-            '--python',
+    def get_export_script(self):
+        return self._get_module_script(
             BLENDER_EXPORT_GLTF,
+            bam_path = self.result_path,
+            gltf2bam_settings = self.gltf2bam_settings,
+            gltf_settings = self.gltf_settings,
+        )
 
-            *self.args_post_gltf,
-        ]
-
-    def _write_json(self):
-        super()._write_json({
-            'settings_gltf': self.settings_gltf._dict,
-            'settings_blender_gltf': self.settings_blender_gltf._dict,
-            'args_pre_gltf': self.args_pre_gltf,
-            'args_post_gltf': self.args_post_gltf,
-            'scripts_post_bam': self.scripts_post_bam
-        })
 
     def update(self, forced = False):
 
-        if not (self.needs_update or forced):
+        if not (forced or self.needs_update):
             return
-            
-        with tempfile.TemporaryDirectory() as temp_dir:
 
-            gltf_path = self._get_gltf_os_path(temp_dir)
-            arguments = self._get_gltf_commands(gltf_path)
-            utils.run_blender(arguments, stdout = self.blender_stdout, blender_binary = self.blender_binary)
+        if self.blender_executable is None:
+            raise Exception('Blender executable is not specified.')
 
-            os.makedirs(os.path.dirname(self.os_path_target), exist_ok = True)
 
-            from gltf import converter
-            settings = converter.GltfSettings(**utils.get_common_attrs(self.settings_gltf, converter.GltfSettings))
+        os.makedirs(os.path.dirname(self.result_path), exist_ok = True)
+
+        with tempfile.TemporaryDirectory(prefix = self.stem, dir = utils.get_same_drive_tmp_dir(self.result_path)) as temp_dir:
+
+            # The gltf path is different every time. Passed as a builtin value.
+            gltf_path = os.path.join(temp_dir, self.stem + '_' + str(uuid.uuid1()) + '.' + self._gltf_file_extension)
+
+            self.return_values_file = os.path.join(temp_dir, uuid.uuid1().hex)
+
+            self._run_blender(__GLTF_PATH__ = gltf_path)
 
             # prevents :express(warning): Filename is incorrect case: and writing extra .bam.pz if the file exists
-            os_path_target = os.path.realpath(self.os_path_target)
+            bam_path = os.path.realpath(self.result_path)
 
-            converter.convert(gltf_path, os_path_target, settings)
+            cmd = ['gltf2bam', gltf_path, bam_path, *self.gltf2bam_settings._get_cli_command()]
 
-        for script in self._scripts_post_bam:
-            script.execute()
+            print("CMD:", utils.get_command_from_list(cmd))
 
-        self._write_json()
+            import subprocess
+            subprocess.run(cmd, text=True, check=True)
+
+
+        bam_scripts_results = {}
+
+        def set_result(args: typing.Union[list, dict]):
+            """ Substitute previous function return values. """
+
+            args = args.copy()
+
+            if isinstance(args, list):
+                for arg in args:
+                    if arg in self.scripts:
+                        args[args.index(arg)] = self.result[self.scripts.index(arg)]
+                    elif arg in self.bam_scripts:
+                        args[args.index(arg)] = bam_scripts_results[self.bam_scripts.index(arg)]
+            elif isinstance(args, dict):
+                for key, arg in args.items():
+                    if arg in self.scripts:
+                        args[key] = self.result[self.scripts.index(arg)]
+                    elif arg in self.bam_scripts:
+                        args[key] = bam_scripts_results[self.bam_scripts.index(arg)]
+            else:
+                raise Exception(f"Unexpected args type: {args}")
+
+            return args
+
+        if self.bam_scripts:
+            print('Editing the bam file. If panda3d.bullet is not imported in the editing process the bam will be written with losses.')
+            with Bam_Edit(self.result_path) as model_root:
+                for index, script in enumerate(self.bam_scripts):
+
+                    try:
+                        utils.print_in_color(utils.get_color_code(256,256,256, 0, 150, 255), 'SCRIPT:', script['name'], "...", flush=True)
+                        module = utils.import_module_from_file(script['filepath'])
+                        result = getattr(module, script['name'])(model_root, *set_result(script['args']), **set_result(script['kwargs']))
+                    except Exception as e:
+
+                        error_type, error_value, error_tb = sys.exc_info()
+
+                        utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"Fail at script: {script['name']}", file=sys.stderr)
+                        utils.print_in_color(utils.get_color_code(180,0,0,0,0,0,), ''.join(traceback.format_tb(error_tb)), file=sys.stderr)
+                        utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), ''.join(traceback.format_exception_only(error_type, error_value)), file=sys.stderr)
+
+                        raise SystemExit(1)
+
+
+                    bam_scripts_results[index] = result
+
+        self._write_json(scripts = self._get_scripts(), bam_scripts = self.bam_scripts)

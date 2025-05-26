@@ -1,0 +1,1177 @@
+from __future__ import annotations
+
+import os
+import contextlib
+import typing
+import time
+import uuid
+import threading
+import sys
+import re
+
+import bpy
+
+from . import utils
+from . import bpy_node
+from . import bpy_context
+from . import bpy_utils
+from . import tool_settings
+from . import bpy_uv
+from . import bake_settings
+
+
+
+
+def print_error(*args):
+    utils.print_in_color(utils.CONSOLE_COLOR.BG_RED, 'ERROR:', *args)
+
+def print_warning(*args):
+    utils.print_in_color(utils.CONSOLE_COLOR.RED, 'WARNING:',*args)
+
+def print_ok(*args):
+    utils.print_in_color(utils.CONSOLE_COLOR.BOLD + utils.CONSOLE_COLOR.GREEN, 'OK:',*args)
+
+def print_notion(*args):
+    utils.print_in_color(utils.CONSOLE_COLOR.BOLD + utils.CONSOLE_COLOR.MAGENTA, 'LOOK:', *args)
+
+def print_bold(*args):
+    utils.print_in_color(utils.CONSOLE_COLOR.BOLD, *args)
+
+def print_accent(*args):
+    utils.print_in_color(utils.CONSOLE_COLOR.BOLD + utils.CONSOLE_COLOR.YELLOW, *args)
+
+def print_done(*args):
+    utils.print_in_color(utils.CONSOLE_COLOR.BOLD + utils.CONSOLE_COLOR.BG_GREEN, *args)
+
+
+def do_error(*args, settings: tool_settings.Bake):
+    print_error(*args)
+    if settings.raise_errors:
+        raise Exception("ERROR: " + ' '.join(str(arg) for arg in args))
+
+
+def do_warning(*args, settings: tool_settings.Bake):
+    print_warning(*args)
+    if settings.raise_warnings:
+        raise Exception("WARNING: " + ' '.join(str(arg) for arg in args))
+
+
+def is_property_missing(object: bpy.types.Object, attribute_type: str, attribute_name: str, SENTINEL = object()):
+    if attribute_type == 'GEOMETRY':
+        return False # do not check anything
+    elif attribute_type == 'OBJECT':
+        if object.data:
+            return object.get(attribute_name, SENTINEL) == SENTINEL and object.data.get(attribute_name, SENTINEL) == SENTINEL
+        else:
+            return object.get(attribute_name, SENTINEL) == SENTINEL
+    elif attribute_type == 'INSTANCER':
+        return is_property_missing(object, 'OBJECT', attribute_name) # not correct if has the instancer
+
+
+def report_missing_attributes(node_tree: bpy.types.NodeTree, object: bpy.types.Object):
+    """ does not check if the node is connect or not """
+
+    tree = bpy_node.Shader_Tree_Wrapper(node_tree)
+
+    root_node = tree.root
+    if not root_node:
+        return
+
+    for node in root_node.descendants:
+
+        if node.be('ShaderNodeAttribute'):
+
+            if not node.attribute_name:
+                continue
+
+            if is_property_missing(object, node.attribute_type, node.attribute_name):
+                print_warning(f"An attribute node refers to the property '{node.attribute_name}' that does not exist in object '{object.name}'.")
+
+        elif node.be('ShaderNodeGroup'):
+            if node.node_tree:
+                report_missing_attributes(node.node_tree, object)
+
+
+def get_images(bl_tree: bpy.types.NodeTree):
+
+    images: typing.List[bpy.types.Image] = []
+
+    tree = bpy_node.Shader_Tree_Wrapper(bl_tree)
+
+    root_node = tree.root
+    if not root_node:
+        return images
+
+    for node in root_node.descendants:
+
+        if node.be('ShaderNodeTexImage') and node.image:
+            images.append(node.image)
+
+        elif node.be('ShaderNodeGroup'):
+            if node.node_tree:
+                images.extend(get_images(node.node_tree))
+
+    return images
+
+def report_missing_files(node_tree: bpy.types.NodeTree):
+
+    for image in utils.deduplicate(get_images(node_tree)):
+        if not image.packed_file and not os.path.exists(bpy_utils.get_block_abspath(image)):
+            print_warning(f"Image is missing in path: {image.filepath}.")
+
+
+
+
+
+
+NORMAL_SOCKETS = {
+    'Normal',
+    'Tangent',
+
+    'Clearcoat Normal',
+
+    'Coat Normal',
+}
+
+SRGB_SOCKETS = {
+    'Base Color',
+
+    'Emission',
+    'Subsurface Color',
+
+    'Specular Tint',
+    'Coat Tint',
+    'Sheen Tint',
+    'Emission Color',
+}
+
+
+
+
+class Baked_Image:
+
+
+    def __init__(self, bake_types: typing.Union[bake_settings._Bake_Type, typing.List[bake_settings._Bake_Type]], name_prefix: str, settings: tool_settings.Bake):
+
+        if not isinstance(bake_types, typing.Iterable):
+            bake_types = [bake_types]
+
+        self.bake_types = bake_types
+        self.settings = settings
+        self.name_prefix = name_prefix
+        self.image_name = utils.ensure_valid_basename(name_prefix + '_' + '_'.join([type._identifier for type in bake_types]).replace(' ', '_').lower())
+
+        self.sub_images: typing.List[bpy.types.Image] = []
+
+        self.final_image: typing.Optional[bpy.types.Image] = None
+
+
+    @property
+    def bakeable_tasks(self) -> typing.List[typing.List[bake_settings._Bake_Type]]:
+
+        if len(self.bake_types) == 1:
+            return [
+                [self.bake_types[0]],
+            ]
+
+        elif len(self.bake_types) == 2:
+            if self.bake_types[0]._socket_type in (bake_settings._Socket_Type.COLOR, bake_settings._Socket_Type.VALUE):
+                return [
+                    [self.bake_types[0]],
+                    [self.bake_types[1]],
+                ]
+            elif any(type._socket_type == bake_settings._Socket_Type.SHADER for type in self.bake_types):
+                return [
+                    [self.bake_types[0]],
+                    [self.bake_types[1]],
+                ]
+            else:
+                return [
+                    [self.bake_types[0], self.bake_types[1], bake_settings.Fill_Color()],
+                ]
+
+        elif len(self.bake_types) in (3, 4):
+
+            alpha = [[self.bake_types[3]]] if len(self.bake_types) == 4 else []
+
+            if all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:3]):
+                return [
+                    [self.bake_types[0], self.bake_types[1], self.bake_types[2]],
+                    *alpha,
+                ]
+            elif self.bake_types[0]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[1:3]):
+                return [
+                    [self.bake_types[0]],
+                    [bake_settings.Fill_Color(), self.bake_types[1], self.bake_types[2]],
+                    *alpha,
+                ]
+            elif self.bake_types[1]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:3:2]):
+                return [
+                    [self.bake_types[0], bake_settings.Fill_Color(), self.bake_types[2]],
+                    [self.bake_types[1]],
+                    *alpha,
+                ]
+            elif self.bake_types[2]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:2]):
+                return [
+                    [self.bake_types[0], self.bake_types[1], bake_settings.Fill_Color()],
+                    [self.bake_types[2]],
+                    *alpha,
+                ]
+            else:
+                return [
+                    [self.bake_types[0]],
+                    [self.bake_types[1]],
+                    [self.bake_types[2]],
+                    *alpha,
+                ]
+        else:
+            raise ValueError(f"Unexpected identifier length: {self.bake_types}")
+
+
+    def append_sub_image(self, bake_task: typing.List[bake_settings._Bake_Type]):
+
+        name = self.name_prefix + '_' + '_'.join(bake_type._identifier for bake_type in bake_task).replace(' ', '_').lower() + '_' + uuid.uuid1().hex
+
+        image = bpy.data.images.new(name, width = self.settings._bake_width, height = self.settings._bake_height, float_buffer = True, is_data = not self.is_srgb_image, alpha = True)
+        image.alpha_mode = 'CHANNEL_PACKED'
+
+        if len(bake_task) == 1:
+            image.generated_color = [ *bake_task[0]._default_color, 0.0 ]
+        else:
+            image.generated_color = [ *(sub_task._default_value for sub_task in bake_task), 0.0 ]
+
+        image[self.settings._MAP_IDENTIFIER_KEY] = {sub_task._identifier: bool(sub_task) for sub_task in bake_task}
+
+        self.sub_images.append(image)
+
+        return image
+
+
+    @property
+    def is_srgb_image(self):
+        return any(bake_type._socket_type == bake_settings._Socket_Type.COLOR for bake_type in self.bake_types)
+
+
+    default_map_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '8', compression = 15, color_mode = 'RGB')
+    """ Default: PNG 8-bit RGB """
+
+    normal_map_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '16', compression = 15, color_mode = 'RGB')
+    """ Default: PNG 16-bit RGB """
+
+    displacement_map_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '16', compression = 15, color_mode = 'BW')
+    """ Default: PNG 16-bit BW """
+
+
+    @property
+    def image_file_settings(self):
+        if self.bake_types[0]._identifier in NORMAL_SOCKETS:
+            return self.normal_map_settings
+        else:
+            return self.default_map_settings
+
+
+    def save(self):
+        print()
+        print('Composing and saving...')
+
+        with bpy_context.State() as state, bpy_context.Bpy_State() as bpy_state:
+
+            ## set color space
+            state.set(bpy.context.scene.display_settings, 'display_device', 'sRGB')
+            if self.is_srgb_image:
+                state.set(bpy.context.scene.view_settings, 'view_transform', 'Standard')
+            else:
+                state.set(bpy.context.scene.view_settings, 'view_transform', 'Raw')
+
+
+            state.set(bpy.context.scene.view_settings, 'exposure', 0)
+            state.set(bpy.context.scene.view_settings, 'look', 'None')
+            state.set(bpy.context.scene.view_settings, 'gamma', 1)
+            state.set(bpy.context.scene.view_settings, 'use_curve_mapping', False)
+
+
+            ## set nodes
+            bpy_state.set(bpy.context.scene, 'use_nodes', True)
+
+            bpy_state.set(bpy.context.scene.render, 'use_file_extension', False)
+            bpy_state.set(bpy.context.scene.render, 'dither_intensity', self.settings.dither_intensity)
+
+            tree = bpy_node.Compositor_Tree_Wrapper(bpy.context.scene.node_tree)
+
+            for node in tree.get_by_bl_idname({'CompositorNodeRLayers', 'CompositorNodeComposite', 'CompositorNodeOutputFile', 'CompositorNodeViewer'}):
+                bpy_state.set(node.bl_node, 'mute', True)
+
+            file_node = tree.new('CompositorNodeOutputFile')
+
+            for key, value in self.image_file_settings._to_dict().items():
+                setattr(file_node.format, key, value)
+
+            file_node.base_path = self.settings.image_dir
+
+            file_slot: bpy.types.NodeOutputFileSlotFile = file_node.file_slots[0]
+            try:
+                file_slot.save_as_render = True
+            except AttributeError:
+                # Blender 2.83 does not have save_as_render but uses the render color transform
+                pass
+
+            file_name = self.image_name + '.' + self.image_file_settings.file_format.lower()
+            # https://docs.blender.org/manual/en/latest/compositing/types/output/file_output.html#properties
+            file_name = file_name.replace('#', '_')
+
+            file_slot.path = file_name
+
+            file_node_input = file_node.inputs[0]
+            file_node.format.color_mode = 'RGB'
+
+            ## downsample
+            if self.settings.resolution_multiplier != 1:
+
+                scale_node = file_node_input.insert_new('CompositorNodeScale')
+                scale_node.space = 'RENDER_SIZE'
+
+                blur_node = scale_node.inputs[0].insert_new('CompositorNodeBlur')
+
+                blur_node.size_x = 1
+                blur_node.size_y = 1
+
+                aspect_ratio = self.settings._aspect_ratio
+                if aspect_ratio > 1:
+                    blur_node.size_x = aspect_ratio
+                elif aspect_ratio < 1:
+                    blur_node.size_y = 1/aspect_ratio
+
+                blur_node.filter_type = 'FLAT'
+                blur_node.inputs[1].default_value = self.settings.resolution_multiplier - 1
+
+                if bpy.app.version >= (2, 93):
+                    target_input = blur_node.inputs[0].insert_new('CompositorNodeAntiAliasing').inputs[0]
+                else:
+                    target_input = blur_node.inputs[0]
+            else:
+                if bpy.app.version >= (2, 93):
+                    target_input = file_node_input.insert_new('CompositorNodeAntiAliasing').inputs[0]
+                else:
+                    target_input = file_node_input
+
+
+            ## set images
+            combine_rgba: bpy_node._Compositor_Node_Wrapper
+
+            def get_combined_input(channel: str):
+                return combine_rgba.inputs[channel].new('CompositorNodeSepRGBA', channel).inputs[0]
+
+
+            with contextlib.ExitStack() as context_stack:
+
+                if len(self.bake_types) == 1:
+                    print('[RGB]')
+
+                    context_stack.enter_context(self.bake_types[0]._get_composer_context(target_input, self.sub_images[0]))
+
+                elif len(self.bake_types) == 2:
+                    if self.bake_types[0]._socket_type in (bake_settings._Socket_Type.COLOR, bake_settings._Socket_Type.VALUE):
+                        print('[RGB] + [A]')
+
+                        file_node.format.color_mode = 'RGBA'
+
+                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+
+                        split_rgba = combine_rgba.inputs['R'].new('CompositorNodeSepRGBA', 'R')
+                        split_rgba.outputs['G'].join(combine_rgba.inputs['G'], move=False)
+                        split_rgba.outputs['B'].join(combine_rgba.inputs['B'], move=False)
+
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(split_rgba.inputs[0], self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs[3], self.sub_images[1]))
+
+
+                    elif any(type._socket_type == bake_settings._Socket_Type.SHADER for type in self.bake_types):
+                        print('[R] + [G]')
+
+                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs['R'], self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs['G'], self.sub_images[1]))
+
+                    else:
+                        print('[R + G + None]')
+
+                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input('R'), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input('G'), self.sub_images[0]))
+
+
+                elif len(self.bake_types) in (3, 4):
+                    if all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:3]):
+                        print('[R + G + B]')
+
+                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+
+                        # TODO: this is inefficient
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input('R'), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input('G'), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input('B'), self.sub_images[0]))
+
+
+                    elif self.bake_types[0]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[1:3]):
+                        print('[R] + [None + G + B]')
+
+                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs['R'], self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input('G'), self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input('B'), self.sub_images[1]))
+
+
+                    elif self.bake_types[1]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:3:2]):
+                        print('[R + None + B] + [G]')
+
+                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input('R'), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs['G'], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input('B'), self.sub_images[0]))
+
+
+                    elif self.bake_types[2]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:2]):
+                        print('[R + G + None] + [B]')
+
+                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input('R'), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input('G'), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[2]._get_composer_context(combine_rgba.inputs['B'], self.sub_images[1]))
+
+                    else:
+                        print('[R] + [G] + [B]')
+
+                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs['R'], self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs['G'], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[2]._get_composer_context(combine_rgba.inputs['B'], self.sub_images[2]))
+
+                    if len(self.bake_types) == 4:
+                        print('_ + [A]')
+
+                        file_node.format.color_mode = 'RGBA'
+
+                        context_stack.enter_context(self.bake_types[3]._get_composer_context(combine_rgba.inputs['A'], self.sub_images[3]))
+
+                else:
+                    raise ValueError(f"Unexpected identifier length: {self.bake_types}")
+
+
+                bpy_state.set(bpy.context.scene.render, 'resolution_y', self.settings._actual_height)
+                bpy_state.set(bpy.context.scene.render, 'resolution_x', self.settings._actual_width)
+                bpy_state.set(bpy.context.scene.render, 'resolution_percentage', 100)
+
+
+
+                if self.settings.inspect_compositor_pre:
+                    bpy_utils.inspect_blend()
+
+                if not self.settings.fake_bake:
+                    with utils.Capture_Stdout() as capture:
+                        bpy.ops.render.render()
+
+                final_path = os.path.join(self.settings.image_dir, file_name)
+                if not self.settings.fake_bake:
+                    os.replace(final_path + str(bpy.context.scene.frame_current).zfill(4), final_path)
+
+                if self.settings.fake_bake:
+                    image = bpy.data.images.new(name=self.image_name, width=4, height=4)
+                    image.filepath_raw = final_path
+                else:
+                    image = bpy.data.images.load(final_path, check_existing=True)
+
+                image[self.settings._MAP_IDENTIFIER_KEY] = {bake_type._identifier: bool(bake_type) for bake_type in self.bake_types}
+                image.name = self.image_name
+
+                image.colorspace_settings.name = 'sRGB' if self.is_srgb_image else 'Non-Color'
+
+                tree.delete_new_nodes()
+
+                self.final_image = image
+
+                return image
+
+
+def get_conformed_pass_filter():
+
+    bake = bpy.context.scene.render.bake
+    bake_type = bpy.context.scene.cycles.bake_type
+
+    if bake_type == 'COMBINED':
+        pass_filter = set()
+
+        if bake.use_pass_direct:
+            pass_filter.add('DIRECT')
+
+        if bake.use_pass_indirect:
+            pass_filter.add('INDIRECT')
+
+        if bake.use_pass_diffuse:
+            pass_filter.add('DIFFUSE')
+
+        if bake.use_pass_glossy:
+            pass_filter.add('GLOSSY')
+
+        if bake.use_pass_transmission:
+            pass_filter.add('TRANSMISSION')
+
+        if bake.use_pass_emit:
+            pass_filter.add('EMIT')
+
+        return pass_filter
+
+    elif bake_type in ('DIFFUSE', 'GLOSSY', 'TRANSMISSION'):
+        pass_filter = set()
+
+        if bake.use_pass_direct:
+            pass_filter.add('DIRECT')
+
+        if bake.use_pass_indirect:
+            pass_filter.add('INDIRECT')
+
+        if bake.use_pass_color:
+            pass_filter.add('COLOR')
+
+        return pass_filter
+
+    else:
+        return {'NONE'}
+
+
+def set_all_image_nodes_interpolation_to_smart(bl_tree: bpy.types.NodeTree):
+    # TODO: make a context manager
+    for node in bl_tree.nodes:
+        if node.bl_idname == 'ShaderNodeTexImage':
+            node.interpolation = 'Smart'  # type: ignore
+        elif node.bl_idname == 'ShaderNodeGroup':
+            if node.node_tree:  # type: ignore
+                set_all_image_nodes_interpolation_to_smart(node.node_tree)  # type: ignore
+
+
+def ensure_unique_name(name, taken_names = set()):
+
+    init_name = name
+    index = 2
+
+    while name in taken_names:
+        name = f"{init_name}_{index}"
+        index += 1
+
+    taken_names.add(name)
+
+    return name
+
+
+def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings: tool_settings.Bake):
+
+    materials_to_bake: typing.List[bpy.types.Material] = []
+    objects_by_material = bpy_utils.group_objects_by_material(objects)
+
+    material_name = ensure_unique_name(get_common_name(objects_by_material.keys(), objects[0].name))
+
+    baking_images = [Baked_Image(map, material_name, settings) for map in settings.bake_types]
+
+
+    print()
+
+    for material, _objects in objects_by_material.items():
+
+        if not material:
+            continue
+
+        if settings.material_key and not material.get(settings.material_key):
+            continue
+
+        print_bold('Preparing material:', material.name_full)
+
+        if not material.use_nodes:
+            print_warning(f'Material does not use nodes: {material.__repr__()}')
+            continue
+
+        for object in _objects:
+            report_missing_attributes(material.node_tree, object)
+
+        report_missing_files(material.node_tree)
+
+        if settings.use_smart_texture_interpolation:
+            set_all_image_nodes_interpolation_to_smart(material.node_tree)
+
+        tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+        tree.convert_to_pbr()
+
+        shader_node = tree.output['Surface']
+
+        if shader_node is None:
+            raise Exception(f'No shader in {material.__repr__()}')
+
+        if not shader_node.be('ShaderNodeBsdfPrincipled'):
+            raise Exception(f'Only Principled BSDF is supported: {material.__repr__()}')
+
+        materials_to_bake.append(material)
+
+
+    for baking_image in baking_images:
+
+        for bake_task in baking_image.bakeable_tasks:
+
+            print()
+            print_bold('Bake task:', str(bake_task), f"{settings._bake_width}x{settings._bake_height}")
+
+            # creating shared image
+            image = baking_image.append_sub_image(bake_task)
+            settings._raw_images.append(image)
+
+            # set up the bake image for all the materials
+            for material in materials_to_bake:
+
+                for node in material.node_tree.nodes:
+                    node.select = False
+
+                image_node: bpy.types.ShaderNodeTexImage = material.node_tree.nodes.new('ShaderNodeTexImage')
+                image_node.name = image.name
+                image_node.image = image
+                image_node.select = True
+                material.node_tree.nodes.active = image_node
+
+            with contextlib.ExitStack() as context_stack:
+
+                bpy_state = context_stack.enter_context(bpy_context.Bpy_State())
+
+                for object in objects:
+                    bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer])
+
+
+                for sub_task in bake_task:
+                    context_stack.enter_context(sub_task._get_setup_context())
+
+
+                def enter_output_context(material: bpy.types.Material, bake_task: typing.List[bake_settings._Bake_Type]):
+                    if len(bake_task) == 1:
+                        output_socket = context_stack.enter_context(bake_task[0]._get_material_context(material))
+                        context_stack.enter_context(bpy_context.Output_Override(material, output_socket))
+                    else:
+                        r_g_b = [context_stack.enter_context(bake_task[i]._get_material_context(material)) for i in range(3)]
+                        context_stack.enter_context(bpy_context.Output_Override_Combine_RGB(material, *r_g_b))
+
+
+                is_global_bake_type = any(isinstance(task, bake_settings.AO_Diffuse) for task in bake_task)
+                if is_global_bake_type:
+                    for material in materials_to_bake:
+                        enter_output_context(material, bake_task)
+
+                    for material in bpy_utils.get_view_layer_materials():
+                        if material not in materials_to_bake:
+                            context_stack.enter_context(bpy_context.No_Active_Image(material))
+                else:
+                    for material in materials_to_bake:
+                        enter_output_context(material, bake_task)
+
+                    disable_material_state = context_stack.enter_context(bpy_context.Bpy_State())
+                    for object in objects:
+                        for slot in object.material_slots:
+                            if not slot.material in materials_to_bake:
+                                disable_material_state.set(slot, 'material', None)
+
+
+                if settings.inspect_bake_pre:
+                    bpy_utils.inspect_blend()
+
+                def capturing():
+                    last_updated = 0
+
+                    for _ in iter(capture.lines.get, None):
+
+                        current_time = time.time()
+                        if current_time - last_updated > 2:
+                            print('.', sep='', end='', flush=True, file=sys.stderr)
+                            last_updated = current_time
+
+
+                if bpy.context.scene.cycles.bake_type in ('COMBINED', 'DIFFUSE', 'GLOSSY', 'TRANSMISSION'):
+                    kwargs = dict(
+                        type = bpy.context.scene.cycles.bake_type,
+                        pass_filter = get_conformed_pass_filter(),
+                    )
+                else:
+                    kwargs = dict()
+
+
+                if not settings.fake_bake:
+
+                    print()
+                    print('Baking...')
+
+                    def the_bake():
+                        bpy_context.call_with_object_override(
+                            objects[0],
+                            objects,
+                            bpy.ops.object.bake,
+                            # uv_layer = uv_layer,  # TODO: set it active instead
+                            **kwargs,
+                        )
+
+
+                    with utils.Capture_Stdout() as capture:
+                        threading.Thread(target=capturing, daemon=True).start()
+                        the_bake()
+                        capture.lines.put_nowait(None)
+
+
+            if settings.inspect_bake_after:
+                bpy_utils.inspect_blend()
+
+        if settings.save_images:
+            baking_image.save()
+
+
+    return [image.final_image for image in baking_images]
+
+
+def get_gltf_settings_node_tree():
+    node_tree = bpy.data.node_groups.get('glTF Settings')
+    if node_tree:
+        return node_tree
+
+    node_tree: bpy.types.ShaderNodeTree = bpy.data.node_groups.new('glTF Settings', 'ShaderNodeTree')
+
+    if hasattr(node_tree, 'interface'):
+        node_tree.interface.new_socket(name='Occlusion', in_out='INPUT', socket_type='NodeSocketFloat')
+        node_tree.interface.items_tree['Occlusion'].default_value = 0.5
+    else:
+        node_tree.inputs.new('NodeSocketFloatFactor', 'Occlusion')
+        node_tree.inputs['Occlusion'].default_value = 0.5
+
+    return node_tree
+
+
+def create_material(name: str, uv_layer: str, images: typing.Iterable[bpy.types.Image], material: typing.Optional[bpy.types.Material] = None, map_identifier_key = tool_settings.Bake._MAP_IDENTIFIER_KEY):
+
+    do_reset = False
+
+    if not material:
+        material = bpy.data.materials.new(name)
+        material.use_nodes = True
+    else:
+        do_reset = True
+
+    tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+    if do_reset:
+        tree.reset_nodes()
+
+    principled = tree.output['Surface']
+
+    uv_node = tree.new('ShaderNodeUVMap')
+    uv_node.uv_map = uv_layer
+    x, y = uv_node.location
+    uv_node.location = (x - 500, y)
+
+
+    def get_gltf_settings_node():
+        node = tree.bl_tree.nodes.get('glTF Settings')
+        if node:
+            return tree[node]
+
+        node = tree.new('ShaderNodeGroup', node_tree = get_gltf_settings_node_tree())
+        node.name = 'glTF Settings'
+        return node
+
+
+    def get_input(identifier):
+        if identifier == bake_settings._AO._identifier:
+            return get_gltf_settings_node().inputs[0]
+        else:
+            socket = principled.inputs.get(identifier)
+            if socket is None:
+                print("Unexpected image type:", map_identifier)
+                return tree.new('NodeReroute').inputs[0]
+            else:
+                return socket
+
+
+    for image in images:
+
+        map_identifier = list(image[map_identifier_key].keys())
+
+        if len(map_identifier) in (1,2):
+            input = get_input(map_identifier[0])
+
+            image_node = input.new('ShaderNodeTexImage', image = image)
+
+            uv_node.outputs[0].join(image_node.inputs['Vector'], False)
+
+            if map_identifier[0] in NORMAL_SOCKETS:
+                normal_map_node = image_node.outputs[0].new('ShaderNodeNormalMap', 'Color')
+                normal_map_node.uv_map = uv_layer
+                normal_map_node.outputs[0].join(input)
+
+        elif len(map_identifier) in (3, 4):
+
+            for index, _identifier in enumerate(map_identifier[:3]):
+                if _identifier:
+                    non_none_index = index
+                    break
+            else:
+                continue
+
+            input = get_input(map_identifier[non_none_index])
+
+            separate_rgb = input.new('ShaderNodeSeparateRGB')
+
+            image_node = separate_rgb.inputs[non_none_index].new('ShaderNodeTexImage', image = image)
+            uv_node.outputs[0].join(image_node.inputs['Vector'], False)
+
+            for index, _identifier in enumerate(map_identifier):
+
+                if not _identifier:
+                    continue
+
+                separate_rgb.outputs[index].join(get_input(_identifier), move = False)
+
+        if len(map_identifier) in (2, 4):
+            image_node.outputs[1].join(get_input(map_identifier[-1]))
+
+    if principled['Alpha']:
+        material.blend_method = 'HASHED'
+
+    if principled[bpy_node.Socket_Identifier.EMISSION]:
+        if 'Emission Strength' in principled.inputs.identifiers and not principled['Emission Strength']:
+            principled['Emission Strength'] = 1
+
+
+    return material
+
+
+def get_common_name(id_blocks: typing.Iterable[bpy.types.ID], default: typing.Optional[str] = None):
+
+    name = utils.get_longest_substring((re.sub(r'\.\d+$', '', _object.name) for _object in id_blocks))
+
+    if len(name) < 1:
+        if default is None:
+            if id_blocks:
+                name = id_blocks[0].name
+            else:
+                name = 'UNNAMED'
+        else:
+            name = default
+
+    # https://docs.blender.org/manual/en/latest/compositing/types/output/file_output.html
+    # https://docs.blender.org/manual/en/latest/render/output/properties/output.html
+    name = name.replace('#', '_')
+
+    return name
+
+
+def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
+
+    uv_layer_name = settings.uv_layer_name
+
+    if settings.merge_materials and not settings.material_key:
+
+        images = bake_images(objects, uv_layer_name, settings)
+        settings._images.extend(images)
+
+        if settings.create_materials:
+            bpy_uv.clear_uv_layers_from_objects(objects, uv_layer_name, 'UVMap')
+
+            material = create_material(get_common_name(objects), 'UVMap', images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+            for object in objects:
+                mesh: bpy.types.Mesh = object.data
+
+                mesh.materials.clear()
+                mesh.materials.append(material)
+
+    elif settings.merge_materials and settings.material_key:
+
+        materials_to_bake = [m for m in bpy.data.materials if m.get(settings.material_key)]
+
+        # collect objects with at least one material from the group
+        objects_in_group: typing.List[bpy.types.Object] = []
+        for _object in objects:
+            for slot in _object.material_slots:
+                if slot.material in materials_to_bake:
+                    objects_in_group.append(_object)
+                    break
+
+        if not objects_in_group:
+            print_warning(f"No objects found for specified materials to be baked:\n\tmaterials_to_bake={materials_to_bake}\n\tobjects={objects}")
+            return
+
+        print_bold('\nMaterial Baking: ', [m.name_full for m in materials_to_bake], '\nfor objects:', [o.name_full for o in objects_in_group])
+        images = bake_images(objects_in_group, uv_layer_name, settings)
+        settings._images.extend(images)
+
+        if settings.create_materials:
+            material = create_material(get_common_name(materials_to_bake), uv_layer_name, images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+
+            for object in objects_in_group:
+
+                object.data.uv_layers.active = object.data.uv_layers[uv_layer_name]
+
+                for slot in object.material_slots:
+                    if slot.material in materials_to_bake:
+                        slot.material = material
+
+    else:
+        objects_by_material = bpy_utils.group_objects_by_material(objects)
+
+        for material, _objects in objects_by_material.items():
+
+            print_bold('\nMaterial Baking: ', material.name_full, '\nfor objects:', [o.name_full for o in _objects])
+
+            images = bake_images(_objects, uv_layer_name, settings)
+            settings._images.extend(images)
+
+            if settings.create_materials:
+                create_material(material.name, uv_layer_name, images, material, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+
+        if settings.create_materials:
+            bpy_uv.clear_uv_layers_from_objects(objects, uv_layer_name, 'UVMap')
+
+
+
+def get_default_material() -> bpy.types.Material:
+
+    material = bpy.data.materials.get('__bc_default_material')
+    if not material:
+        material = bpy.data.materials.new('__bc_default_material')
+        material.use_nodes = True
+
+    return material
+
+
+
+def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
+
+    start_time = time.perf_counter()
+
+    print_accent('Start baking:\n', '\n'.join((o.name_full for o in objects)))
+
+
+    # bpy.ops.object.make_local(type='ALL')
+    # bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+
+    # remove unused materials
+    if settings.remove_unused_material_slot:
+        bpy.ops.object.material_slot_remove_unused()
+
+
+    # assign a default material to empty material slots and mesh with not materials
+    for object in objects:
+
+        if not object.material_slots:
+            mesh: bpy.types.Mesh = object.data
+            mesh.materials.append(get_default_material())
+            continue
+
+        for slot in object.material_slots:
+
+            if slot.material:
+                continue
+
+            print_warning(f"The material socket {slot.__repr__()} of the object {object.__repr__()} does not have a material assigned.")
+
+            slot.material = get_default_material()
+
+    # convert all non-node materials to nodes
+    for object in objects:
+
+        for slot in object.material_slots:
+
+            material: bpy.types.Material = slot.material
+
+            if material.use_nodes:
+                continue
+
+            material.use_nodes = True
+
+            tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+
+            tree.reset_nodes()
+
+            principled = tree.output[0]
+
+            principled.set_input('Base Color', material.diffuse_color)
+            principled.set_input('Metallic', material.metallic)
+            principled.set_input('Specular', material.specular_intensity)
+            principled.set_input('Roughness', material.roughness)
+
+
+    # make all material unique
+    if settings.make_materials_single_user:
+        if settings.material_key:
+            bpy_utils.make_all_material_unique(objects, lambda material: material.get(settings.material_key))
+        else:
+            bpy_utils.make_all_material_unique(objects)
+
+
+    with contextlib.ExitStack() as exit_stack:
+
+        state = exit_stack.enter_context(bpy_context.Bpy_State())
+
+        # hide other object in render
+        if settings.isolate_objects:
+            for object in bpy.data.objects:
+                state.set(object, 'hide_render', object not in objects)
+
+        for object in objects:
+
+            # disable the object's particle systems
+            for modifier in object.modifiers:
+                if modifier.type == 'PARTICLE_SYSTEM':
+                    state.set(modifier, 'show_render', False)
+
+            # use modifiers that are only visible in viewport
+            if settings.use_modifiers_as_in_viewport:
+                for modifier in object.modifiers:
+                    state.set(modifier, 'show_render', modifier.show_viewport)
+
+            # disable geometry order changing modifiers
+            if settings.turn_off_vertex_changing_modifiers:
+                for modifier in object.modifiers:
+                    if modifier.show_render and modifier.type in bpy_context.VERTEX_CHANGING_MODIFIER_TYPES:
+                        state.set(modifier, 'show_render', False)
+
+            # disable armature
+            if settings.do_disable_armature:
+                exit_stack.enter_context(bpy_context.Armature_Disabled(object))
+
+        bake_materials(objects, settings)
+
+
+    print()
+    print_ok(f'Done baking in {round(time.perf_counter() - start_time, 2)} secs.')
+    utils.print_separator(char='▓')
+
+
+def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
+
+
+    bake_start_time = time.perf_counter()
+    baked_objects_count = 0
+
+    utils.print_separator(char='░')
+    utils.print_in_color(utils.get_color_code(0,0,0,128,128,0), f"Preparing bake...")
+
+
+    # filter invalid objects
+    view_layer_objects = bpy_utils.get_view_layer_objects()
+
+    _objects = []
+    for object in objects:
+
+        if object.type != 'MESH':
+            do_warning(object.name_full, 'is not a mesh object. Skipped.', settings=settings)
+            continue
+
+        if len(object.data.polygons) == 0:
+            do_warning(object.name_full, 'has no polygons. Skipped.', settings=settings)
+            continue
+
+        if object not in view_layer_objects:
+            do_warning(object.name_full, 'is not in the scene. Skipped.', settings=settings)
+            continue
+
+        if object.display_type in ('BOUNDS', 'WIRE'):
+            do_warning(object.name_full, 'is a supporting object. Displayed as bounds or wire. Skipped.', settings=settings)
+            continue
+
+        _objects.append(object)
+
+    objects = _objects
+    if not objects:
+        print_warning('No valid objects found for the baking.')
+        return
+
+
+    with bpy_context.Bake_Settings(settings), bpy_context.Global_Bake_Optimizations(), bpy_context.Focus_Objects(objects) as focus_context, bpy_context.Bpy_State() as bpy_state, bpy_context.State() as state:
+
+        # ensure object render visibility
+        objects_in_temp_collection = set(focus_context.hidden_by_hierarchy_collection.objects)
+        for object in objects:
+
+            if object.animation_data:
+                for driver in object.animation_data.drivers:
+                    # ValueError: FCurve.path_from_id() does not support path creation for this type
+                    state.set(driver, 'mute', True)
+
+            bpy_state.set(object, 'hide_render', False)
+
+            if not objects_in_temp_collection:
+                # object might be hidden for render by a hierarchy
+                focus_context.hidden_by_hierarchy_collection.objects.link(object)
+
+
+        # for object in objects:
+        #     for modifier in object.modifiers:
+        #         bpy_state.set(modifier, 'show_viewport', False)
+
+
+        if settings.duplicates_make_real:
+            prev_objects = set(bpy.data.objects)
+            bpy.ops.object.duplicates_make_real(use_base_parent=False, use_hierarchy=True)
+            objects = list(set(bpy.data.objects).difference(prev_objects))
+
+
+        # convert to mesh
+        if settings.convert_to_mesh:
+
+            if settings.do_convert_to_mesh_only_non_mesh_object:
+                _objects_to_convert = [object for object in objects if object.type != 'MESH']
+            else:
+                _objects_to_convert = objects
+
+            if _objects_to_convert:
+                try:
+                    bpy_utils.convert_to_mesh(_objects_to_convert)
+                except Exception as e:
+                    message = f"Conversion to mesh failed: {_objects_to_convert}"
+                    if settings.raise_errors:
+                        raise Exception(message) from e
+                    else:
+                        print_error(message)
+
+
+        settings._images = []
+        settings._raw_images = []
+
+
+        # bake objects
+        if settings.merge_materials_between_objects:
+
+            if len(objects) > 1:
+                # ⚓ T83971 Blender baking's margin overlap if multiple meshes are selected
+                # https://developer.blender.org/T83971
+                bpy_state.set(bpy.context.scene.render.bake, 'margin', min(1, settings.margin))
+
+            if objects:
+
+                with bpy_context.Focus_Objects(objects):
+                    bake_objects(objects, settings)
+
+                baked_objects_count += len(objects)
+        else:
+            for object in objects:
+
+                with bpy_context.Focus_Objects(object):
+                    bake_objects([object], settings)
+
+                baked_objects_count += 1
+
+
+        return settings._images
+
+
+
+    # overall report
+    print_done(f'Baking of {baked_objects_count}/{len(objects)} objects is done in {round(time.perf_counter() - bake_start_time, 2)} secs.')
+
+    skipped_count = len(objects) - baked_objects_count
+    if skipped_count:
+        print_warning(f'{skipped_count} objects are skipped.')
