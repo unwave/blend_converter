@@ -1362,7 +1362,8 @@ def get_texture_resolution(object: 'bpy.types.Object', uv_layer_name: str, mater
     face_areas = []
     face_uv_areas = []
 
-    material_indexes = [index for index, material in enumerate(object.data.materials) if material in materials]
+    if materials is not None:
+        material_indexes = set(index for index, material in enumerate(object.data.materials) if material in materials)
 
     for face in bm.faces:
 
