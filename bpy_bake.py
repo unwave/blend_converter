@@ -1006,9 +1006,9 @@ def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings
     # make all material unique
     if settings.make_materials_single_user:
         if settings.material_key:
-            bpy_utils.make_all_material_unique(objects, lambda material: material.get(settings.material_key))
+            bpy_utils.make_materials_unique(objects, lambda material: material.get(settings.material_key))
         else:
-            bpy_utils.make_all_material_unique(objects)
+            bpy_utils.make_materials_unique(objects)
 
 
     with contextlib.ExitStack() as exit_stack:

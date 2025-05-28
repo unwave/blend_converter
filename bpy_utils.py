@@ -1,89 +1,31 @@
 import typing
+import os
 import sys
+import traceback
+import math
+import collections
+import tempfile
+import subprocess
+import random
+import uuid
+import operator
+
+import bpy
+import mathutils
+
+from . import bpy_bake
+from . import tool_settings
+from . import bpy_context
+from . import bake_settings as tool_settings_bake
+from . import bpy_node
+from . import bpy_uv
+from . import utils
 
 
-if 'bpy' in sys.modules:
-
-    import os
-    import re
-    import traceback
-    import math
-    import collections
-    import tempfile
-    import subprocess
-    import random
-    import uuid
-    import operator
-
-    import bpy
-    import mathutils
-
-    if __package__:
-        from . import bpy_bake
-        from . import tool_settings
-        from . import bpy_context
-        from . import bake_settings as tool_settings_bake
-        from . import bpy_node
-        from . import bpy_uv
-        from . import utils
-    else:
-        from blend_converter import bpy_bake
-        from blend_converter import tool_settings
-        from blend_converter import bpy_context
-        from blend_converter import bake_settings as tool_settings_bake
-        from blend_converter import bpy_node
-        from blend_converter import bpy_uv
-        from blend_converter import utils
+T_Objects = typing.TypeVar('T_Objects', bpy.types.Object, typing.List[bpy.types.Object], typing.Iterable[bpy.types.Object])
 
 
-
-if typing.TYPE_CHECKING:
-    from typing_extensions import TypeAlias as _TypeAlias
-    Objects_Like: _TypeAlias = typing.Union[None, str, typing.Tuple[str, str], bpy.types.Object, typing.Iterable[typing.Union[str, typing.Sequence[str], bpy.types.Object]]]
-    T_Objects = typing.TypeVar('T_Objects', bpy.types.Object, typing.List[bpy.types.Object], typing.Iterable[bpy.types.Object])
-else:
-    Objects_Like = type
-    T_Objects = type
-
-
-def get_objects(objects: Objects_Like) -> typing.List['bpy.types.Object']:
-    """
-    Get a list of `bpy.types.Object` from different kinds of notations.
-
-    `str`: an object name.
-    `bpy.types.Object`: a Blender's Object class instance.
-    `typing.Tuple[str, str]`: an object name and a library path.
-    """
-
-    if isinstance(objects, str):
-        return [bpy.data.objects[objects]]
-    elif isinstance(objects, tuple) and objects and isinstance(objects[0], str):
-        return [bpy.data.objects[objects[0], objects[1]]]
-    elif isinstance(objects, bpy.types.Object):
-        return [objects]
-    elif objects is None:
-        return []
-    else:
-
-        bpy_objects: typing.List[bpy.types.Object] = []
-
-        for object in objects:
-            if isinstance(object, str):
-                bpy_objects.append(bpy.data.objects[object])
-            elif isinstance(object, typing.Sequence):
-                bpy_objects.append(bpy.data.objects[object[0], object[1]])  # type: ignore
-            elif isinstance(object, bpy.types.Object):
-                bpy_objects.append(object)
-            elif object is None:
-                # bpy.context.view_layer.objects can return list containing None
-                pass
-            else:
-                raise Exception(f"Not supported object identity notation: {object}")
-
-        return bpy_objects
-
-
-def get_view_layer_objects(view_layer: typing.Optional['bpy.types.ViewLayer'] = None) -> typing.List['bpy.types.Object']:
+def get_view_layer_objects(view_layer: typing.Optional[bpy.types.ViewLayer] = None) -> typing.List[bpy.types.Object]:
     """
     #113378 - Regression: Deleting Objects in a View Layer leaves None in the View Layer's .objects for the script duration
     https://projects.blender.org/blender/blender/issues/113378
@@ -94,27 +36,7 @@ def get_view_layer_objects(view_layer: typing.Optional['bpy.types.ViewLayer'] = 
         return list(filter(None, view_layer.objects))
 
 
-def get_objects_fallback(objects: Objects_Like = None, func: typing.Optional[typing.Callable[['bpy.types.Object'], bool]] = None, view_layer: typing.Optional['bpy.types.ViewLayer'] = None):
-    """
-    Get a list of `bpy.types.Object` from different kinds of notations.
-
-    Same as `get_objects` but with a fallback to `get_view_layer_objects` if `objects` is `None`.
-
-    If `func` is specified the objects will be filtered using it.
-    """
-    if objects is None:
-        if func is None:
-            return get_view_layer_objects(view_layer)
-        else:
-            return list(filter(func, get_view_layer_objects(view_layer)))
-    else:
-        if func is None:
-            return get_objects(objects)
-        else:
-            return list(filter(func,  get_objects(objects)))
-
-
-def iter_bone_names(action: 'bpy.types.Action'):
+def iter_bone_names(action: bpy.types.Action):
     """ Iterate through bones names associated with the action. """
 
     import re
@@ -146,32 +68,7 @@ def duplicates_make_real():
         bpy.ops.object.duplicates_make_real()
 
 
-def apply_scale(objects: Objects_Like = None):
-    """ Apply object scale, non uniform scale cause bugs in bullet physics. """
-
-    objects = get_objects_fallback(objects)
-
-    if bpy.app.version > (4, 0, 0):  # supports multi-user meshes, but result can be different
-        with bpy_context.Focus_Objects(objects):
-            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-        return
-
-    for object in objects:
-
-        translation, rotation, scale = object.matrix_basis.decompose()
-
-        scale_matrix = mathutils.Matrix.Diagonal(scale).to_4x4()
-
-        if hasattr(object.data, "transform"):
-            object.data.transform(scale_matrix)
-
-        for child in object.children:
-            child.matrix_local = scale_matrix @ child.matrix_local
-
-        object.matrix_basis = mathutils.Matrix.Translation(translation) @ rotation.to_matrix().to_4x4()
-
-
-def get_visible_armature_bones(armature: 'bpy.types.Object'):
+def get_visible_armature_bones(armature: bpy.types.Object):
     """ Get a set of visible bones. """
 
     if bpy.app.version >= (4, 0, 0):
@@ -182,7 +79,7 @@ def get_visible_armature_bones(armature: 'bpy.types.Object'):
         return {bone.name for bone in armature.pose.bones if any(a and b for a, b in zip(armature_layers, bone.bone.layers))}
 
 
-def get_armature(object: 'bpy.types.Object'):
+def get_armature(object: bpy.types.Object):
     """ Get an armature associated with the object. """
 
     if object.type == 'ARMATURE':
@@ -191,51 +88,7 @@ def get_armature(object: 'bpy.types.Object'):
         return object.find_armature()
 
 
-def add_actions_to_nla(regex: typing.Optional[str] = None):
-    """
-    Add all associated with the visible armature bones actions to NLA.
-
-    `regex`: `re.search` on `bpy.types.Action.name`
-    """
-
-    for object in bpy.data.objects:
-
-        armature = get_armature(object)
-        if not armature:
-            return
-
-        if armature.animation_data is None:
-            armature.animation_data_create()
-
-        if armature.animation_data.nla_tracks:
-            return
-
-        armature_bones_names = get_visible_armature_bones(armature)
-        if not armature_bones_names:
-            return
-
-        actions: typing.List[bpy.types.Action] = [action for action in bpy.data.actions if not armature_bones_names.isdisjoint(iter_bone_names(action))]
-
-        nla_tracks = armature.animation_data.nla_tracks
-
-        for action in actions:
-
-            if regex is not None and not re.search(regex, action.name):
-                continue
-
-            track = nla_tracks.new()
-            track.name = action.name
-            track.strips.new(action.name, 0, action)
-
-
-def use_backface_culling():
-    """ Set `use_backface_culling` to `True` for all materials. """
-
-    for material in bpy.data.materials:
-        material.use_backface_culling = True
-
-
-def get_actions(armature: 'bpy.types.Object') -> typing.List['bpy.types.Action']:
+def get_actions(armature: bpy.types.Object) -> typing.List[bpy.types.Action]:
     """ Get actions associated with the armature object. """
 
     armature_bones_names = get_visible_armature_bones(armature)
@@ -243,65 +96,6 @@ def get_actions(armature: 'bpy.types.Object') -> typing.List['bpy.types.Action']
         return []
 
     return [action for action in bpy.data.actions if not armature_bones_names.isdisjoint(iter_bone_names(action))]
-
-
-def create_default_root_bone():
-    """ Create a default root bone and an according weight group to prevent a faulty armature handling by the gltf exporter. """
-
-    def get_armatures(object: bpy.types.Object):
-        return  [modifier.object for modifier in object.modifiers if isinstance(modifier, bpy.types.ArmatureModifier) and modifier.object]
-
-    def are_all_vertices_have_groups(object: bpy.types.Object, bone_names: set[str]):
-        return all(not set(object.vertex_groups[group.group].name for group in v.groups).isdisjoint(bone_names) for v in object.data.vertices)
-
-    def get_bone_names(armature: bpy.types.Object):
-        return {bone.name for bone in armature.pose.bones}
-
-    def create_root_vertex_group(object: bpy.types.Object, bone_names: set[str], root_bone_name: str):
-        default_group = object.vertex_groups.new(name = root_bone_name)
-        default_group.add([v.index for v in object.data.vertices if set(object.vertex_groups[group.group].name for group in v.groups).isdisjoint(bone_names)], 1, 'ADD')
-
-    def deselect_all():
-        for object in filter(None, bpy.context.view_layer.objects):
-            object.select_set(False)
-
-    for object in filter(None, bpy.context.view_layer.objects):
-
-        if not isinstance(object.data, bpy.types.Mesh):
-            continue
-
-        armatures = get_armatures(object)
-        if not armatures:
-            continue
-
-        for armature in armatures:
-
-            bone_names = get_bone_names(armature)
-
-            if are_all_vertices_have_groups(object, bone_names):
-                continue
-
-            root_bone_name = f"{armature.name}_default_root_bone"
-
-            create_root_vertex_group(object, bone_names, root_bone_name)
-
-            deselect_all()
-            armature.select_set(True)
-            bpy.context.view_layer.objects.active =armature
-
-            bpy.ops.object.mode_set(mode='EDIT', toggle=False)
-
-            edit_bones = armature.data.edit_bones
-
-            root_bone = edit_bones.new(root_bone_name)
-            root_bone.head = (0, 0, 1)
-            root_bone.tail = (0, 0, 0)
-
-            for bone in edit_bones:
-                if not bone.parent:
-                    bone.parent = root_bone
-
-            bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
 
 
 TO_MESH_COMPATIBLE_OBJECT_TYPES = {
@@ -329,21 +123,17 @@ TO_MESH_INCOMPATIBLE_OBJECT_TYPES = {
 }
 
 
-def get_meshable_objects(objects: Objects_Like = None):
+def get_meshable_objects(objects: typing.List[bpy.types.Object]):
     """
     Filter out objects that cannot be directly converted to meshes.
     See `TO_MESH_COMPATIBLE_OBJECT_TYPES`.
 
     If `objects` is `None` then `view_layer.objects` is used.
     """
-    return [object for object in get_objects_fallback(objects) if object.type in TO_MESH_COMPATIBLE_OBJECT_TYPES]
+    return [object for object in objects if object.type in TO_MESH_COMPATIBLE_OBJECT_TYPES]
 
 
-def convert_to_mesh(objects: T_Objects) -> T_Objects:
-    """ Convert objects to mesh objects using `bpy.ops.object.convert`. """
-
-    is_multiple_objects_input = isinstance(objects, typing.Iterable) and not isinstance(objects, tuple)
-    objects = get_objects(objects)
+def _convert_to_mesh(objects: typing.List[bpy.types.Object]):
 
     # prevent modifying the data of the not included objects
     object_by_data = utils.list_by_key(objects, operator.attrgetter('data'))
@@ -359,7 +149,7 @@ def convert_to_mesh(objects: T_Objects) -> T_Objects:
         for _object in _objects:
             _object.data = data_copy
 
-    with bpy_context.Focus_Objects(objects) as context:
+    with bpy_context.Focus_Objects(objects):
 
         try:
             result = bpy.ops.object.convert(target = 'MESH', keep_original = False)
@@ -371,18 +161,21 @@ def convert_to_mesh(objects: T_Objects) -> T_Objects:
         # TODO: metaball conversion keeps the metaball object despite `keep_original = False`
         # init_objects = context.init_objects
 
-        converted_objects = bpy.context.selected_objects
-
-        if is_multiple_objects_input:
-            return converted_objects
-        else:
-            return converted_objects[0]
+        return bpy.context.selected_objects
 
 
-def make_all_material_unique(objects: Objects_Like, filter_func: typing.Optional[typing.Callable[['bpy.types.Material'], bool]] = None):
+def convert_to_mesh(objects: T_Objects) -> T_Objects:
+    """ Convert objects to mesh objects using `bpy.ops.object.convert`. """
+    if isinstance(objects, typing.Iterable):
+        return _convert_to_mesh(objects)
+    else:
+        return _convert_to_mesh([objects])[0]
+
+
+def make_materials_unique(objects: typing.List[bpy.types.Object], filter_func: typing.Optional[typing.Callable[[bpy.types.Material], bool]] = None):
     """ Make a unique copy of a material for each material slot of an object. """
 
-    for object in get_objects(objects):
+    for object in objects:
         for slot in object.material_slots:
 
             if not slot.material:
@@ -398,10 +191,10 @@ def make_all_material_unique(objects: Objects_Like, filter_func: typing.Optional
             slot.material = slot.material.copy()
 
 
-def make_all_meshes_unique(objects: Objects_Like):
+def make_meshes_unique(objects: typing.List[bpy.types.Object]):
     """ Make a unique copy of a mesh data for each mesh object. """
 
-    for object in get_objects(objects):
+    for object in objects:
 
         if object.type != 'MESH':
             continue
@@ -415,26 +208,9 @@ def make_all_meshes_unique(objects: Objects_Like):
         object.data = object.data.copy()
 
 
-def focus(objects: Objects_Like = None, func: typing.Optional[typing.Callable[['bpy.types.Object'], bool]] = None, view_layer: 'bpy.types.ViewLayer' = None):
-    """
-    Deselect, unhide, select and make active the objects according to `view_layer`.
-
-    If `view_layer` is `None` — `bpy.context.view_layer` is used.
-
-    If `objects` is `None` then all objects will be used.
-
-    You can provide a `func` function to filter the selection.
-
-    Returns the focused objects.
-    """
-
-    if view_layer is None:
-        view_layer = bpy.context.view_layer
+def _focus(objects: typing.List[bpy.types.Object], view_layer: bpy.types.ViewLayer):
 
     view_layer.update()
-
-    objects = get_objects_fallback(objects, func, view_layer)
-
     view_layer_objects = get_view_layer_objects(view_layer)
 
     for object in view_layer_objects:
@@ -455,6 +231,24 @@ def focus(objects: Objects_Like = None, func: typing.Optional[typing.Callable[['
     return objects
 
 
+def focus(objects: T_Objects, view_layer: bpy.types.ViewLayer = None) -> T_Objects:
+    """
+    Deselect, unhide, select and make active the objects according to `view_layer`.
+
+    If `view_layer` is `None` — `bpy.context.view_layer` is used.
+
+    Returns the focused objects (the input).
+    """
+
+    if view_layer is None:
+        view_layer = bpy.context.view_layer
+
+    if isinstance(objects, typing.Iterable):
+        return _focus(objects, view_layer)
+    else:
+        return _focus([objects], view_layer)[0]
+
+
 def get_all_data_blocks():
 
     blocks = []
@@ -466,31 +260,15 @@ def get_all_data_blocks():
     return blocks
 
 
-def delete_other_objects(objects: Objects_Like):
-    """ Delete objects that are not mentioned. """
-    bpy.data.batch_remove(set(bpy.data.objects) - set(get_objects(objects)))
+def get_joinable_objects(objects: typing.List[bpy.types.Object]):
+    return [object for object in objects if object.data and (object.type != 'OBJECT' or object.data.vertices)]
 
 
-def get_joinable_objects(objects: Objects_Like = None):
-    """
-    Get objects that can be joined.
-
-    If `objects` is `None` then `view_layer.objects` is used.
-    """
-    return [object for object in get_objects_fallback(objects) if object.data and (object.type != 'OBJECT' or object.data.vertices)]
-
-
-def merge_objects(objects: Objects_Like = None, object_name: str = None):
-    """
-    `bpy.ops.object.join` the objects.
-
-    If `objects` is `None` then `view_layer.objects` is used.
-    """
+def merge_objects(objects: typing.List[bpy.types.Object], object_name: str = None):
 
     objects = get_joinable_objects(objects)
     if not objects:
         return
-
 
     def make_data_unique(objects: bpy.types.Object):
 
@@ -534,19 +312,19 @@ def merge_objects(objects: Objects_Like = None, object_name: str = None):
     return merged_object
 
 
-def abspath(path, library: typing.Union['bpy.types.Library', None] = None):
+def abspath(path, library: typing.Union[bpy.types.Library, None] = None):
     return os.path.realpath(bpy.path.abspath(path, library = library))  # type: ignore
 
 
-def get_block_abspath(block: typing.Union['bpy.types.Library', 'bpy.types.Image']):
+def get_block_abspath(block: typing.Union[bpy.types.Library, bpy.types.Image]):
     return abspath(block.filepath, block.library)  # type: ignore
 
 
-def inspect_blend(exit_after = False, executable: typing.Optional[str] = None):
+def inspect_blend(blender_executable: typing.Optional[str] = None, exit_after = False,):
     """ Blocking blend file inspection. """
 
-    if executable is None:
-        executable = bpy.app.binary_path
+    if blender_executable is None:
+        blender_executable = bpy.app.binary_path
 
     with tempfile.TemporaryDirectory() as temp_dir:
         filepath = os.path.join(temp_dir, f'DEBUG_{utils.ensure_valid_basename(bpy.context.scene.name)}.blend')
@@ -558,17 +336,15 @@ def inspect_blend(exit_after = False, executable: typing.Optional[str] = None):
         try:
             bpy.ops.wm.save_as_mainfile(filepath = filepath, copy = True)
         except RuntimeError as e:
-            print(e)
+            print(e, file=sys.stderr)
 
-        subprocess.run([executable, filepath])
+        subprocess.run([blender_executable, filepath])
 
     if exit_after:
         raise SystemExit('DEBUG EXIT')
 
 
-def group_objects_by_material(objects: Objects_Like = None, view_layer: typing.Optional['bpy.types.ViewLayer'] = None):
-
-    objects = get_objects_fallback(objects=objects, view_layer=view_layer)
+def group_objects_by_material(objects: typing.List[bpy.types.Object]):
 
     objects_by_material: typing.Dict[bpy.types.Material, typing.List[bpy.types.Object]] = collections.defaultdict(list)
 
@@ -579,7 +355,7 @@ def group_objects_by_material(objects: Objects_Like = None, view_layer: typing.O
     return dict((material, list(dict.fromkeys(objects))) for material, objects in objects_by_material.items())
 
 
-def copy_action_range(action: 'bpy.types.Action', from_frame: float, to_frame: float, from_fps: typing.Optional[float] = None, to_fps: typing.Optional[float] = None, name: typing.Optional[str] = None):
+def copy_action_range(action: bpy.types.Action, from_frame: float, to_frame: float, from_fps: typing.Optional[float] = None, to_fps: typing.Optional[float] = None, name: typing.Optional[str] = None):
     """ Copy the action from the specified range and fps and move to the zero frame. """
 
     action = action.copy()
@@ -616,10 +392,10 @@ def copy_action_range(action: 'bpy.types.Action', from_frame: float, to_frame: f
     return action
 
 
-def get_compatible_armature_actions(objects: Objects_Like = None) -> typing.List['bpy.types.Action']:
+def get_compatible_armature_actions(objects: typing.List[bpy.types.Object]) -> typing.List[bpy.types.Action]:
     """ Get actions compatible with visible armature bones. """
 
-    armatures = set(filter(None, (get_armature(object) for object in get_objects_fallback(objects))))
+    armatures = set(filter(None, (get_armature(object) for object in objects)))
 
     actions = []
     for armature in armatures:
@@ -628,7 +404,7 @@ def get_compatible_armature_actions(objects: Objects_Like = None) -> typing.List
     return actions
 
 
-def unwrap_ministry_of_flat_with_fallback(objects: typing.List['bpy.types.Object'], settings: 'tool_settings.UVs'):
+def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object], settings: 'tool_settings.UVs'):
 
     ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(vertex_weld=False, rasterization_resolution=1, packing_iterations=1)
 
@@ -655,7 +431,7 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List['bpy.types.Object
                     bpy.ops.uv.smart_project(island_margin = settings._uv_island_margin_fraction / 0.8, angle_limit = math.radians(settings.smart_project_angle_limit))
 
 
-def create_uvs(objects: typing.List['bpy.types.Object'], resolution: int, material_keys: typing.Optional[typing.List[str]] = None):
+def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material_keys: typing.Optional[typing.List[str]] = None):
     print(f"{create_uvs.__name__}...")
 
     settings = tool_settings.UVs(resolution=resolution)
@@ -700,8 +476,6 @@ def create_uvs(objects: typing.List['bpy.types.Object'], resolution: int, materi
 
         bpy_uv.ensure_pixel_per_island(objects, settings)
 
-
-
 class Material_Bake_Type:
     PREFIX = '__bc_'
     HAS_BASE_COLOR = PREFIX + 'has_base_color'
@@ -712,7 +486,7 @@ class Material_Bake_Type:
     HAS_EMISSION =  PREFIX + 'has_emission'
 
 
-def convert_materials_to_principled(objects: typing.List['bpy.types.Object'], remove_unused = True):
+def convert_materials_to_principled(objects: typing.List[bpy.types.Object], remove_unused = True):
     print(f"{convert_materials_to_principled.__name__}...")
 
 
@@ -777,7 +551,7 @@ def convert_materials_to_principled(objects: typing.List['bpy.types.Object'], re
         material[Material_Bake_Type.HAS_NORMALS] = bool(principled['Normal'])
 
 
-def split_into_alpha_and_non_alpha_groups(objects: typing.List['bpy.types.Object']):
+def split_into_alpha_and_non_alpha_groups(objects: typing.List[bpy.types.Object]):
 
     alpha_material_key = f"__bc_alpha_material_{uuid.uuid1().hex}"
     opaque_material_key = f"__bc_non_alpha_material_{uuid.uuid1().hex}"
@@ -791,9 +565,7 @@ def split_into_alpha_and_non_alpha_groups(objects: typing.List['bpy.types.Object
     return alpha_material_key, opaque_material_key
 
 
-def bake_materials(objects: Objects_Like, image_dir: str, resolution: int, **bake_kwargs):
-
-    objects = get_objects(objects)
+def bake_materials(objects: typing.List[bpy.types.Object], image_dir: str, resolution: int, **bake_kwargs):
 
     with bpy_context.Global_Bake_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
 
@@ -820,46 +592,6 @@ def bake_materials(objects: Objects_Like, image_dir: str, resolution: int, **bak
         merge_material_slots_with_the_same_materials(objects)
 
 
-
-def remove_all_node_groups_from_materials():
-    """
-    the gltf exporter's method of nodes inspection takes an absurd amount of time
-    https://github.com/KhronosGroup/glTF-Blender-IO/issues/2356
-    Finished glTF 2.0 export in 294.57832312583923 s
-    Finished glTF 2.0 export in 0.05988144874572754 s
-
-    > TODO: cache these searches
-    https://github.com/KhronosGroup/glTF-Blender-IO/blob/cee66f781491c0e65ea3d65f465a445333788bd7/addons/io_scene_gltf2/blender/exp/material/search_node_tree.py#L71
-
-    > For now, not caching it. If we encounter performance issue, we will see later
-    https://github.com/KhronosGroup/glTF-Blender-IO/blob/cee66f781491c0e65ea3d65f465a445333788bd7/addons/io_scene_gltf2/blender/exp/material/search_node_tree.py#L159
-    """
-
-    for material in bpy.data.materials:
-
-        if not material.node_tree:
-            continue
-
-        nodes = material.node_tree.nodes
-
-        for node in nodes:
-            if node.bl_idname == 'ShaderNodeGroup' and not 'glTF Settings' in node.name:
-                nodes.remove(node)
-
-
-def remove_vertex_colors(objects: Objects_Like = None):
-
-    for object in get_objects_fallback(objects):
-
-        data = object.data
-        if not isinstance(data, bpy.types.Mesh):
-            continue
-
-        vertex_color_names = [vertex_color.name for vertex_color in data.vertex_colors]
-        for name in vertex_color_names:
-            data.vertex_colors.remove(data.vertex_colors[name])  # type: ignore
-
-
 def open_homefile(blend_file):
 
     blend_dir = os.path.dirname(blend_file)
@@ -867,7 +599,7 @@ def open_homefile(blend_file):
     try:
         bpy.ops.wm.read_homefile(filepath=blend_file, load_ui=False)
     except RuntimeError:
-        traceback.print_exc()
+        traceback.print_exc(file=sys.stderr)
 
     for library in bpy.data.libraries:
         if library.filepath.startswith('//'):
@@ -890,24 +622,24 @@ def open_homefile(blend_file):
             bone.scale = (1, 1, 1)
 
 
-def is_single_user(block: 'bpy.types.ID'):
+def is_single_user(block: bpy.types.ID):
     return block.users - block.use_fake_user == 1
 
 
-def get_unique_mesh_objects(objects: typing.List['bpy.types.Object']):
+def get_unique_mesh_objects(objects: typing.List[bpy.types.Object]):
     return [objects_of_data[0] for data, objects_of_data in utils.list_by_key(objects, operator.attrgetter('data')).items() if isinstance(data, bpy.types.Mesh)]
 
 
-def get_unique_meshes(objects: typing.List['bpy.types.Object']) -> typing.List['bpy.types.Mesh']:
+def get_unique_meshes(objects: typing.List[bpy.types.Object]) -> typing.List[bpy.types.Mesh]:
     return [object.data for object in get_unique_mesh_objects(objects)]
 
 
-def get_view_layer_materials(view_layer: typing.Optional['bpy.types.ViewLayer'] = None):
-    return [material for material in group_objects_by_material(view_layer=view_layer).keys() if material and not material.is_grease_pencil]
+def get_view_layer_materials(view_layer: typing.Optional[bpy.types.ViewLayer] = None):
+    return [material for material in group_objects_by_material(get_view_layer_objects(view_layer)).keys() if material and not material.is_grease_pencil]
 
 
 
-def get_property_rgba(object: 'bpy.types.Object', name: str):
+def get_property_rgba(object: bpy.types.Object, name: str):
     """
     find_rna_property_rgba
     https://github.com/blender/blender/blob/ce0b3d98205dabaed87f6212aa0f0f1f2656092b/source/blender/blenkernel/intern/object_dupli.cc#L1866
@@ -932,7 +664,7 @@ def get_property_rgba(object: 'bpy.types.Object', name: str):
             return None
 
 
-def find_attribute_rgba(object: 'bpy.types.Object', name: str):
+def find_attribute_rgba(object: bpy.types.Object, name: str):
     """
     BKE_object_dupli_find_rgba_attribute
     https://github.com/blender/blender/blob/ce0b3d98205dabaed87f6212aa0f0f1f2656092b/source/blender/blenkernel/intern/object_dupli.cc#L1942
@@ -968,13 +700,13 @@ def get_empty():
     return empty
 
 
-def get_texture_coordinates_object_empty(object: 'bpy.types.Object'):
+def get_texture_coordinates_object_empty(object: bpy.types.Object):
     empty = get_empty()
     empty.matrix_world = object.matrix_world
     return empty
 
 
-def get_texture_coordinates_generated_empty(object: 'bpy.types.Object'):
+def get_texture_coordinates_generated_empty(object: bpy.types.Object):
     """
     BKE_mesh_texspace_calc
     https://github.com/blender/blender/blob/ce0b3d98205dabaed87f6212aa0f0f1f2656092b/source/blender/blenkernel/intern/mesh.cc#L934
@@ -1017,19 +749,17 @@ GENERATED_COORDINATES_TEXTURE_NODE = {
 }
 
 
-def merge_objects_respect_materials(objects: Objects_Like):
+def merge_objects_respect_materials(objects: typing.List[bpy.types.Object]):
     """
     Try to modify materials so when the objects are joined the materials look the same.
 
     The main use case is speedup texture baking.
     """
 
-    objects = get_objects(objects)
-
     objects = get_meshable_objects(objects)
 
     objects_with_materials = [object for object in objects if hasattr(object, 'material_slots') and any(slot.material for slot in object.material_slots)]
-    make_all_material_unique(objects_with_materials)
+    make_materials_unique(objects_with_materials)
 
     warning_color = utils.get_color_code(217, 69, 143, 0,0,0)
 
@@ -1203,7 +933,7 @@ def merge_objects_respect_materials(objects: Objects_Like):
     return merge_objects(objects)
 
 
-def merge_material_slots_with_the_same_materials(objects: typing.List['bpy.types.Object']):
+def merge_material_slots_with_the_same_materials(objects: typing.List[bpy.types.Object]):
 
     for mesh in get_unique_meshes(objects):
 
@@ -1222,7 +952,7 @@ def merge_material_slots_with_the_same_materials(objects: typing.List['bpy.types
                 polygon.material_index = index_to_new_index[index]
 
 
-def bake_object_by_material_key(objects: typing.List['bpy.types.Object'], alpha_material_key: str, opaque_material_key: str, bake_settings: 'tool_settings.Bake'):
+def bake_object_by_material_key(objects: typing.List[bpy.types.Object], alpha_material_key: str, opaque_material_key: str, bake_settings: 'tool_settings.Bake'):
 
     for material_key in (alpha_material_key, opaque_material_key):
 
@@ -1248,7 +978,7 @@ def bake_object_by_material_key(objects: typing.List['bpy.types.Object'], alpha_
         bpy_bake.bake(objects, bake_settings)
 
 
-def set_out_of_range_material_indexes_to_zero(objects: typing.List['bpy.types.Object']):
+def set_out_of_range_material_indexes_to_zero(objects: typing.List[bpy.types.Object]):
 
     for object in get_unique_mesh_objects(objects):
         max_index = len(object.data.materials) - 1
@@ -1257,9 +987,7 @@ def set_out_of_range_material_indexes_to_zero(objects: typing.List['bpy.types.Ob
                 polygon.material_index = 0
 
 
-def merge_objects_and_bake_materials(objects: Objects_Like, image_dir: str, resolution: int, **extra_settings):
-
-    objects = get_objects(objects)
+def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], image_dir: str, resolution: int, **extra_settings):
 
     if not get_meshable_objects(objects):
         raise Exception(f"No valid objects provided, object types must be MESH or convertible to MESH: {[o.name_full for o in objects]}")
@@ -1335,14 +1063,7 @@ def merge_objects_and_bake_materials(objects: Objects_Like, image_dir: str, reso
         merge_material_slots_with_the_same_materials(merged_objects)
 
 
-def ensure_debugpy():
-
-    from . import ensure_site_packages
-    import site
-    ensure_site_packages.ensure_site_packages([('debugpy', 'debugpy')], directory=site.getusersitepackages())
-
-
-def get_texture_resolution(object: 'bpy.types.Object', uv_layer_name: str, materials: typing.Optional[typing.List['bpy.types.Material']] = None, px_per_meter = 1024, min_res = 64, max_res = 4096):
+def get_texture_resolution(object: bpy.types.Object, uv_layer_name: str, materials: typing.Optional[typing.List[bpy.types.Material]] = None, px_per_meter = 1024, min_res = 64, max_res = 4096):
     """ Get a texture resolution needed to achieve the given textel density. """
 
     import bmesh

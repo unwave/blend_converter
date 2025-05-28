@@ -16,12 +16,10 @@ if 'bpy' in sys.modules:
     import bpy
 
 
-def assign_curve_placeholders(objects: bpy_utils.Objects_Like = None):
+def assign_curve_placeholders():
     """ Collect curves data information to be late recrated inside panda3d."""
 
-    objects = bpy_utils.get_objects_fallback(objects)
-
-    for object in objects:
+    for object in bpy_utils.get_view_layer_objects():
 
         if not isinstance(object.data, bpy.types.Curve):
             continue
