@@ -963,6 +963,10 @@ class Appendable_Dict(dict):
 
         return name
 
+    def extend(self, values: typing.Iterable):
+        for value in values:
+            self.append(value)
+
 
 def ensure_unique_path(path: typing.Union[str, os.PathLike]):
 

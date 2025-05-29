@@ -4,16 +4,15 @@ import json
 import sys
 
 
-if __spec__.name == __name__:
-    from blend_converter import bpy_utils
-    from blend_converter.format.bam import keys
-else:
-    from ... import bpy_utils
-    from . import keys
-
-
 if 'bpy' in sys.modules:
     import bpy
+
+    if __spec__.name == __name__:
+        from blend_converter import bpy_utils
+        from blend_converter.format.bam import keys
+    else:
+        from ... import bpy_utils
+        from . import keys
 
 
 def assign_curve_placeholders():

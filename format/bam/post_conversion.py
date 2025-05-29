@@ -3,15 +3,14 @@ import json
 import sys
 
 
-if __spec__.name == __name__:
-    from blend_converter.format.bam import keys
-else:
-    from . import keys
-
-
 if 'panda3d' in sys.modules:
     from panda3d import core
     from panda3d import bullet
+
+    if __spec__.name == __name__:
+        from blend_converter.format.bam import keys
+    else:
+        from . import keys
 
 
 def convert_curve_placeholders(node_path: 'core.NodePath'):
