@@ -482,6 +482,9 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         self.updater = updater.Updater.from_files(files)
 
+        if not self.updater.entries:
+            raise Exception("Nothing to do. No models provided in __blends__.")
+
         blender_executable = collections.Counter([entry.model.blender_executable for entry in self.updater.entries.values()]).most_common(1)[0][0]
 
         self.blender_server = blender_server.Blender_Server(blender_executable)
