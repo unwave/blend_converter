@@ -1140,6 +1140,7 @@ def set_clipboard_text(text: str):
         return None
 
     wx.TheClipboard.SetData(wx.TextDataObject(text))
+    wx.TheClipboard.Flush()
     wx.TheClipboard.Close()
 
 

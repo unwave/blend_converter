@@ -49,7 +49,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         self.Bind(wx.EVT_KEY_DOWN, self.on_key)
 
-        self.double_click_function: typing.Callable[[updater.Model_Entry]] = self.on_default_double_click
+        self.double_click_function: typing.Optional[typing.Callable[[updater.Model_Entry]]] = self.on_empty_double_click_function
 
 
     def set_columns(self, columns):
@@ -58,15 +58,8 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             self.SetColumnWidth(i, column[1])
 
 
-    def on_default_double_click(self, entry: updater.Model_Entry):
-
-        ext = entry.model._file_extension
-
-        if ext == 'bam':
-            self.on_open_result(entry)
-        else:
-            self.GetTopLevelParent().blender_server.ensure()
-            self.GetTopLevelParent().blender_server.open_mainfile(entry.model.blend_path)
+    def on_empty_double_click_function(self, entry):
+        pass
 
 
     def set_item_attrs(self):
@@ -131,8 +124,41 @@ class Model_List(wxp_utils.Item_Viewer_Native):
     def OnGetItemTextColour(self, item: int, col: int):
         return None
 
+
     def on_left_double_click(self, index: int, event: wx.MouseEvent):
-        self.double_click_function(self.data[index])
+
+        entry = self.data[index]
+
+        mask = (event.ControlDown(), event.AltDown(), event.ShiftDown())
+
+        # (ctrl, alt, shift)
+        # alt - result
+        # ctrl - source
+        # shift - open
+
+        if mask == (True, False, True):
+            self.on_open_source(entry)
+        elif mask == (True, False, False):
+            self.on_show_source_in_explorer(entry)
+
+        elif mask == (False, True, True):
+            self.on_open_result(entry)
+        elif mask == (False, True, False):
+            if os.path.exists(entry.model.result_path):
+                self.on_show_result_in_explorer(entry)
+            else:
+                utils.os_open(entry.model.result_dir)
+
+        elif mask == (True, True, True):
+            self.on_compare_model(entry)
+
+        elif mask == (True, True, False):
+            utils.os_show([entry.model.blend_path, entry.model.result_path if os.path.exists(entry.model.result_path) else entry.model.result_dir])
+
+        else:
+            if self.double_click_function:
+                self.double_click_function(entry)
+
 
     def on_right_click(self, event: wx.ListEvent):
         index: int = event.GetIndex()
@@ -151,7 +177,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         menu_item = menu.append_item(f"Show Blend", get_func(utils.os_show, blend_path))
         menu_item.Enable(os.path.exists(blend_path))
 
-        menu_item = menu.append_item(f"Open Blend", get_func(self.on_open_blend, entry))
+        menu_item = menu.append_item(f"Open Blend", get_func(self.on_open_source, entry))
         menu_item.Enable(os.path.exists(blend_path))
 
         menu.append_separator()
@@ -233,25 +259,32 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         wxp_utils.set_clipboard_text(command)
 
 
-    def on_show_blend(self, entry: updater.Model_Entry):
+    def on_show_source_in_explorer(self, entry: updater.Model_Entry):
         utils.os_show(entry.model.blend_path)
 
-    def on_open_blend(self, entry: updater.Model_Entry):
+    def on_open_source(self, entry: updater.Model_Entry):
         self.GetTopLevelParent().blender_server.ensure()
         self.GetTopLevelParent().blender_server.open_mainfile(entry.model.blend_path)
 
-    def on_show_result(self, entry: updater.Model_Entry):
+    def on_show_result_in_explorer(self, entry: updater.Model_Entry):
         utils.os_show(entry.model.result_path)
 
     def on_open_result(self, entry: updater.Model_Entry):
         path = entry.model.result_path
 
+        if not os.path.exists(path):
+            with wx.MessageDialog(None, f"{path}", 'File does not exist.', wx.OK | wx.ICON_ERROR) as dialog:
+                dialog.ShowModal()
+            return
+
         if path.endswith('.bam'):
             panda_viewer_path = utils.get_script_path('panda3d_viewer')
             subprocess.Popen([sys.executable, panda_viewer_path, path])
+        elif path.endswith('.blend'):
+            cmd = [entry.model.blender_executable, path]
+            utils.open_blender_detached(*cmd)
         else:
-            with wx.MessageDialog(None, f"file not supported: {path}", 'File Type Not Supported.', wx.OK | wx.ICON_ERROR) as dialog:
-                dialog.ShowModal()
+            utils.os_open(path)
 
 
     def on_show_item(self, item):
@@ -291,7 +324,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         utils.open_blender_detached(*cmd)
 
 
-    def on_open_blend(self, entry: updater.Model_Entry):
+    def on_open_source(self, entry: updater.Model_Entry):
 
         cmd = [entry.model.blender_executable, entry.model.blend_path]
 
@@ -340,6 +373,32 @@ class Output_Lines(wxp_utils.Item_Viewer_Native):
         )
 
         self.set_columns(columns)
+
+        self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
+
+
+    def on_key_down(self, event: wx.Event):
+
+        event.Skip()
+
+        if not event.ControlDown():
+            return
+
+        key_code = event.GetKeyCode()
+
+        if key_code == ord('C'):
+            wxp_utils.set_clipboard_text('\n'.join(row[1].rstrip() for row in self.get_selected_items_text()))
+
+        elif key_code == ord('A'):
+
+            # this ensures that no side effects triggered
+            prev_func = self.on_item_selected
+            self.on_item_selected = lambda a, b: None
+
+            for index in range(self.GetItemCount()):
+                self.Select(index)
+
+            self.on_item_selected = prev_func
 
 
     def set_data(self, data: typing.List[dict]):
@@ -644,11 +703,11 @@ class Main_Frame(wxp_utils.Generic_Frame):
         settings = {
             'double_click_action': (
                 {
-                    'show_blend': self.result_panel.model_list.on_show_blend,
-                    'open_blend': self.result_panel.model_list.on_open_blend,
-                    'show_result': self.result_panel.model_list.on_show_result,
+                    'show_source_in_explorer': self.result_panel.model_list.on_show_source_in_explorer,
+                    'open_source': self.result_panel.model_list.on_open_source,
+                    'show_result_in_explorer': self.result_panel.model_list.on_show_result_in_explorer,
                     'open_result': self.result_panel.model_list.on_open_result,
-                    'default': self.result_panel.model_list.on_default_double_click,
+                    'nothing': self.result_panel.model_list.on_empty_double_click_function,
                 },
                 self.result_panel.model_list.double_click_function
             ),
