@@ -36,4 +36,13 @@ model._profile = 'profile' in other_args
 model._debug = 'debug' in other_args
 model._inspect_all = 'inspect_all' in other_args
 
-model.update(forced='check' not in other_args)
+if 'help' in other_args or '-h' in other_args or '--help' in other_args or '/h' in other_args:
+    print()
+    print(f"inspect: save and open the final blend file")
+    print(f"profile: profile the execution and open snakeviz")
+    print(f"debug: connect to the process with debugpy")
+    print(f"inspect_all: inspect_blend after each script")
+    print()
+    input('Press Enter to exit...')
+else:
+    model.update(forced='check' not in other_args)
