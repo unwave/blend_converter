@@ -329,8 +329,8 @@ def merge_objects_respect_materials(objects: Objects_Like):
     return bpy_utils.merge_objects_respect_materials(get_objects(objects))
 
 
-def merge_objects_and_bake_materials(objects: Objects_Like, image_dir: str, resolution: int, **extra_settings):
-    bpy_utils.merge_objects_and_bake_materials(get_objects(objects), image_dir, resolution, **extra_settings)
+def merge_objects_and_bake_materials(objects: Objects_Like, image_dir: str, *, px_per_meter = 1024, min_res = 64, max_res = 4096, resolution = 0, uv_layer_bake = '_bc_bake', uv_layer_reuse = '_bc_bake', additional_bake_settings: typing.Optional[dict] = None):
+    bpy_utils.merge_objects_and_bake_materials(get_objects(objects), image_dir, px_per_meter = px_per_meter, min_res = min_res, max_res = max_res, resolution = resolution, uv_layer_bake = uv_layer_bake, uv_layer_reuse = uv_layer_reuse, additional_bake_settings = additional_bake_settings)
 
 
 def ensure_debugpy():

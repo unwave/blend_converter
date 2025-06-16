@@ -36,7 +36,7 @@ def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, do_init =
             continue
 
         if len(mesh.uv_layers) >= 8:
-            raise Exception(f"Only 8 UV maps maximum per mesh. The mesh already has the maximum: {mesh}")
+            raise Exception(f"Fail to create uv layer: '{name}'. Only 8 UV maps maximum per mesh is allowed. The mesh already has the maximum: {mesh.name_full}")
 
         uvs = mesh.uv_layers.new(name = name, do_init = do_init)
 

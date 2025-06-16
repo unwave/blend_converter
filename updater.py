@@ -137,12 +137,12 @@ class Model_Entry:
         def read_stdout():
             for line in iter(self.stdout_queue.get, None):
                 self.stdout_lines.append(line)
-                stdout_line_printed()
+                stdout_line_printed(self)
 
         def read_stderr():
             for line in iter(self.stderr_queue.get, None):
                 self.stderr_lines.append(line)
-                stderr_line_printed()
+                stderr_line_printed(self)
 
 
         read_stdout_thread = threading.Thread(target=read_stdout, daemon=True)

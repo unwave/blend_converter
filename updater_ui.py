@@ -412,8 +412,10 @@ class Output_Lines(wxp_utils.Item_Viewer_Native):
     def update(self):
 
         if self.data:
+            do_scroll = self.IsVisible(self.GetItemCount() - 1)
             self.SetItemCount(len(self.data))
-            self.Focus(len(self.data) - 1)
+            if do_scroll:
+                self.Focus(self.GetItemCount() - 1)
 
 
     def OnGetItemText(self, row: int, col: int):
@@ -480,11 +482,13 @@ class Result_Panel(wx.Panel):
 
 
     def on_stdout_need_update(self, event):
-        self.stdout_need_update = True
+        if event.entry.stdout_lines == self.stdout_viewer.data:
+            self.stdout_need_update = True
 
 
     def on_stderr_need_update(self, event):
-        self.stderr_need_update = True
+        if event.entry.stderr_lines == self.stderr_viewer.data:
+            self.stderr_need_update = True
 
 
     def get_search_result(self, query: str):
@@ -565,8 +569,8 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         updater.update_ui = refresh
 
-        updater.stdout_line_printed = lambda: wx.PostEvent(self, Event_Stdout_Line_Printed())
-        updater.stderr_line_printed = lambda: wx.PostEvent(self, Event_Stderr_Line_Printed())
+        updater.stdout_line_printed = lambda entry: wx.PostEvent(self, Event_Stdout_Line_Printed(entry=entry))
+        updater.stderr_line_printed = lambda entry: wx.PostEvent(self, Event_Stderr_Line_Printed(entry=entry))
 
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)

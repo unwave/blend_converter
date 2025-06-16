@@ -498,15 +498,14 @@ def convert_materials_to_principled(objects: typing.List[bpy.types.Object], remo
                 bpy.ops.object.material_slot_remove_unused()
 
 
-    # assign a default material to empty material slots and mesh with not materials
+    # assign a default material to empty material slots and objects with no materials
     for object in objects:
 
-        object_data = object.data
-        if not isinstance(object_data, bpy.types.Mesh):
+        if not hasattr(object, 'material_slots'):
             continue
 
         if not object.material_slots:
-            object_data.materials.append(bpy_bake.get_default_material())
+            object.data.materials.append(bpy_bake.get_default_material())
             continue
 
         for slot in object.material_slots:
@@ -898,8 +897,19 @@ def merge_objects_respect_materials(objects: typing.List[bpy.types.Object]):
                             replacement_node.object = get_texture_coordinates_object_empty(evaluated_object)
 
                         elif output.identifier == 'UV':
-                            replacement_node = tree.new('ShaderNodeUVMap')
-                            replacement_node.uv_map = object.data.uv_layers.active.name
+
+                            if object.data and hasattr(object.data, 'uv_layers') and object.data.uv_layers.active:
+                                replacement_node = tree.new('ShaderNodeUVMap')
+                                replacement_node.uv_map = object.data.uv_layers.active.name
+                            elif object.type == 'MESH':
+                                # TODO: add a warning
+                                # if a mesh object does not have any uv layers the output of the UV socket is (0, 0, 0)
+                                replacement_node = tree.new('ShaderNodeCombineXYZ')
+                            else:
+                                # this should work for curves
+                                replacement_node = tree.new('ShaderNodeUVMap')
+                                replacement_node.uv_map = 'UVMap'
+
 
                             for other_socket in output.connections:
                                 replacement_node.outputs[0].join(other_socket, move=False)
@@ -987,10 +997,13 @@ def set_out_of_range_material_indexes_to_zero(objects: typing.List[bpy.types.Obj
                 polygon.material_index = 0
 
 
-def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], image_dir: str, resolution: int, **extra_settings):
+def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], image_dir: str, *, px_per_meter = 1024, min_res = 64, max_res = 4096, resolution = 0, uv_layer_bake = '_bc_bake', uv_layer_reuse = '_bc_bake', additional_bake_settings: typing.Optional[dict] = None):
 
     if not get_meshable_objects(objects):
         raise Exception(f"No valid objects provided, object types must be MESH or convertible to MESH: {[o.name_full for o in objects]}")
+
+
+    objects = get_meshable_objects(objects)
 
 
     with bpy_context.Global_Bake_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
@@ -1001,7 +1014,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
                 bpy_state_0.set(o.pose, 'ik_solver', 'LEGACY')
 
 
-        convert_materials_to_principled(objects)
+        convert_materials_to_principled(objects, remove_unused=False)
 
         set_out_of_range_material_indexes_to_zero(objects)
 
@@ -1009,58 +1022,113 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
 
 
         ## unwrap
-        settings = tool_settings.UVs(resolution=resolution, do_unwrap=False, average_uv_scale=False)
+        settings = tool_settings.UVs(resolution = 1024 if resolution == 0 else resolution, do_unwrap=False, average_uv_scale=False)
         settings._set_suggested_padding()
+        settings.uv_layer_name = uv_layer_reuse
 
-        unique_mesh_objects = get_unique_mesh_objects(objects)
+        # TODO: check results for non mesh objects, they supposed to have valid auto-generated UVs, like curves do
+        objects_to_unwrap = get_unique_mesh_objects([object for object in objects if hasattr(object.data, 'uv_layers') and not uv_layer_reuse in object.data.uv_layers])
 
         with bpy_context.State() as state, bpy_context.Bpy_State() as bpy_state:
 
-            for object in unique_mesh_objects:
+            for object in objects_to_unwrap:
                 if object.animation_data:
                     for driver in object.animation_data.drivers:
                         state.set(driver, 'mute', True)
 
-            for object in unique_mesh_objects:
+            for object in objects_to_unwrap:
                 for modifier in object.modifiers:
                     bpy_state.set(modifier, 'show_viewport', False)
 
-            bpy_uv.ensure_uv_layer(unique_mesh_objects, settings.uv_layer_name)
+            bpy_uv.ensure_uv_layer(objects_to_unwrap, settings.uv_layer_name)
 
-            for object in unique_mesh_objects:
-                # bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
-                object.data.uv_layers.active = object.data.uv_layers[settings.uv_layer_name]
+            for object in objects_to_unwrap:
+                bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
+                # object.data.uv_layers.active = object.data.uv_layers[settings.uv_layer_name]
 
-            unwrap_ministry_of_flat_with_fallback(unique_mesh_objects, settings)
+            unwrap_ministry_of_flat_with_fallback(objects_to_unwrap, settings)
 
-            bpy_uv.scale_uv_to_world_per_uv_layout(unique_mesh_objects)
-
+            bpy_uv.scale_uv_to_world_per_uv_layout(objects_to_unwrap)
 
         ## merge
         bpy.context.view_layer.update()
-        merged_objects = [merge_objects_respect_materials(objects)]
+        merged_object = merge_objects_respect_materials(objects)
 
 
         ## pack
-        for material_key in (alpha_material_key, opaque_material_key):
-            settings.material_key = material_key
-            bpy_uv.unwrap_and_pack(merged_objects, settings)
+        merged_uvs_settings = settings._get_copy()
+        merged_uvs_settings.uv_layer_name = uv_layer_bake
+        bpy_uv.ensure_uv_layer([merged_object], merged_uvs_settings.uv_layer_name, do_init = True)
 
-        bpy_uv.ensure_pixel_per_island(merged_objects, settings)
+
+        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
+
+            bpy_state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[uv_layer_bake])
+
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.uv.reveal()
+            bpy.ops.uv.select_all(action='SELECT')
+
+            bpy.ops.uv.average_islands_scale()
+
+        for material_key in (alpha_material_key, opaque_material_key):
+            merged_uvs_settings.material_key = material_key
+            merged_uvs_settings.average_uv_scale = False
+            merged_uvs_settings.uvp_rescale = True
+            bpy_uv.unwrap_and_pack([merged_object], merged_uvs_settings)
+
+
+        bpy_uv.ensure_pixel_per_island([merged_object], settings)
 
 
         ## bake
-        bake_settings = tool_settings.Bake(image_dir = image_dir, resolution=resolution, **extra_settings)
+        bake_settings = tool_settings.Bake(image_dir = image_dir, make_materials_single_user=False)
 
-        bake_object_by_material_key(merged_objects, alpha_material_key, opaque_material_key, bake_settings)
+        if additional_bake_settings:
+            for key, value in additional_bake_settings.items():
+                setattr(bake_settings, key, value)
+
+        bake_settings.uv_layer_name = uv_layer_bake
+
+        for material_key in (opaque_material_key, alpha_material_key):
+
+            material_group = [m for m in bpy.data.materials if m.get(material_key)]
+            if not material_group:
+                continue
+
+            bake_types = [[tool_settings_bake.AO_Diffuse(), tool_settings_bake.Roughness(), tool_settings_bake.Metallic()]]
+
+            if any(material[Material_Bake_Type.HAS_EMISSION] for material in material_group):
+                bake_types.append(tool_settings_bake.Emission())
+
+            if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
+                bake_types.append(tool_settings_bake.Normal(uv_layer=bake_settings.uv_layer_name))
+
+            if material_key == alpha_material_key:
+                bake_types.append([tool_settings_bake.Base_Color(), tool_settings_bake.Alpha()])
+            else:
+                bake_types.append(tool_settings_bake.Base_Color())
+
+            bake_settings.material_key = material_key
+            bake_settings.bake_types = bake_types
+
+            if resolution == 0:
+                bake_settings.resolution = get_texture_resolution(merged_object, uv_layer_bake, material_group, px_per_meter, min_res, max_res)
+            else:
+                bake_settings.resolution = resolution
+
+            bpy_bake.bake([merged_object], bake_settings)
 
         ## delete temp objects
         temp_collection = bpy.data.collections.get('__texture_coordinate__')
         if temp_collection:
             bpy.data.batch_remove(set(temp_collection.objects))
+            bpy.data.collections.remove(temp_collection)
+
+        merge_material_slots_with_the_same_materials([merged_object])
 
 
-        merge_material_slots_with_the_same_materials(merged_objects)
+        return merged_object
 
 
 def get_texture_resolution(object: bpy.types.Object, uv_layer_name: str, materials: typing.Optional[typing.List[bpy.types.Material]] = None, px_per_meter = 1024, min_res = 64, max_res = 4096):

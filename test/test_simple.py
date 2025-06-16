@@ -18,6 +18,7 @@ def get_result_dir(blend_dir):
 
 @pytest.mark.parametrize('blend_dir', BLEND_DIRS)
 def test_simple_gltf(blend_dir, blender_executable):
+    """ this test is not meant for evaluating the quality of the results, just for code being executed without errors """
 
     from blend_converter.format import gltf
     from blend_converter import utils
