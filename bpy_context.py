@@ -7,6 +7,7 @@ import uuid
 import operator
 import json
 import re
+import math
 
 import bpy
 import mathutils
@@ -832,15 +833,18 @@ class Output_Socket_Diffuse_AO:
     node_tree_name = '__blend_converter_diffuse_ao_bake'
 
 
-    def __init__(self, material: bpy.types.Material, ignore_backface = False):
+    def __init__(self, material: bpy.types.Material, ignore_backface = False, faster = False, environment_has_alpha = True):
         """ Assumes a Principled BSDF material. """
 
         self.tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
 
         self.ignore_backface = ignore_backface
 
+        self.faster = faster
+        self.environment_has_alpha = environment_has_alpha
 
-    def get_diffuse_mixin_node_tree(self):
+
+    def get_diffuse_mixin_node_tree(self, has_alpha: bool):
 
         bl_tree = bpy.data.node_groups.get(self.node_tree_name)
         if bl_tree:
@@ -861,10 +865,16 @@ class Output_Socket_Diffuse_AO:
         mix_shader = output.inputs[0].new('ShaderNodeMixShader')
 
         mix_shader.inputs[0].new('ShaderNodeLightPath', 'Is Camera Ray')
-        node_group_input = mix_shader.inputs[1].new('NodeGroupInput')
         diffuse_node = mix_shader.inputs[2].new('ShaderNodeBsdfDiffuse')
         diffuse_node.set_input('Color', (1,1,1,1))
-        diffuse_node.inputs['Normal'].join(node_group_input.outputs[1], move = False)
+
+        node_group_input = mix_shader.inputs[1].new('NodeGroupInput')  # this is expensive
+
+        if not self.faster:
+            diffuse_node.inputs['Normal'].join(node_group_input.outputs[1], move = False)
+
+        if self.faster and not (self.environment_has_alpha or has_alpha):
+            diffuse_node.outputs[0].join(mix_shader.inputs[1])
 
         if self.ignore_backface:
             mix_shader_2 = mix_shader.inputs[1].insert_new('ShaderNodeMixShader', new_node_identifier = 1)
@@ -888,7 +898,9 @@ class Output_Socket_Diffuse_AO:
 
         principled = self.tree.output[0]
 
-        node_group = principled.outputs[0].new('ShaderNodeGroup', node_tree = self.get_diffuse_mixin_node_tree())
+        has_alpha = principled.inputs['Alpha'].connections or not principled.inputs['Alpha'].is_close(1)
+
+        node_group = principled.outputs[0].new('ShaderNodeGroup', node_tree = self.get_diffuse_mixin_node_tree(has_alpha))
 
         if principled['Normal']:
             node_group.inputs[1].join(principled.inputs['Normal'].as_output(), move = False)
@@ -905,7 +917,7 @@ class Diffuse_AO_Bake_Settings(Bpy_State):
     ao_bake_world_name = '__blend_converter_ao_bake_world_name'
 
 
-    def __init__(self, samples = 16):
+    def __init__(self, samples = 16, faster = False):
         super().__init__()
 
         context = bpy.context
@@ -914,20 +926,46 @@ class Diffuse_AO_Bake_Settings(Bpy_State):
         render = context.scene.render
 
         self.set(render, 'engine', 'CYCLES')
-        self.set(cycles, 'samples', samples)
 
-        if bpy.app.version >= (2, 93):
-            self.set(cycles, 'use_fast_gi', False)
+        if faster:
 
-        self.set(cycles, 'caustics_refractive', True)
-        self.set(cycles, 'caustics_reflective', True)
+            self.set(cycles, 'samples', int(math.sqrt(samples)))
 
-        self.set(cycles, 'max_bounces', 12)
-        self.set(cycles, 'diffuse_bounces', 8)
-        self.set(cycles, 'glossy_bounces', 4)
-        self.set(cycles, 'transmission_bounces', 12)
-        self.set(cycles, 'volume_bounces', 0)
-        self.set(cycles, 'transparent_max_bounces', 8)
+            if bpy.app.version >= (2, 93):
+                self.set(cycles, 'use_fast_gi', True)
+                self.set(cycles, 'ao_bounces', 2)
+                self.set(cycles, 'ao_bounces_render', 2)
+                self.set(scene.world.light_settings, 'ao_factor', 1)
+                self.set(scene.world.light_settings, 'distance', 10)
+                self.set(cycles, 'fast_gi_method', 'REPLACE')
+
+            self.set(cycles, 'caustics_refractive', False)
+            self.set(cycles, 'caustics_reflective', False)
+
+            self.set(cycles, 'max_bounces', 8)
+            self.set(cycles, 'diffuse_bounces', 4)
+            self.set(cycles, 'glossy_bounces', 2)
+            self.set(cycles, 'transmission_bounces', 8)
+            self.set(cycles, 'volume_bounces', 0)
+            self.set(cycles, 'transparent_max_bounces', 8)
+
+        else:
+
+            self.set(cycles, 'samples', samples)
+
+            if bpy.app.version >= (2, 93):
+                self.set(cycles, 'use_fast_gi', False)
+
+            self.set(cycles, 'caustics_refractive', True)
+            self.set(cycles, 'caustics_reflective', True)
+
+            self.set(cycles, 'max_bounces', 12)
+            self.set(cycles, 'diffuse_bounces', 8)
+            self.set(cycles, 'glossy_bounces', 4)
+            self.set(cycles, 'transmission_bounces', 12)
+            self.set(cycles, 'volume_bounces', 0)
+            self.set(cycles, 'transparent_max_bounces', 8)
+
 
         self.set(scene, 'world', self.get_world())
 

@@ -997,7 +997,17 @@ def set_out_of_range_material_indexes_to_zero(objects: typing.List[bpy.types.Obj
                 polygon.material_index = 0
 
 
-def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], image_dir: str, *, px_per_meter = 1024, min_res = 64, max_res = 4096, resolution = 0, uv_layer_bake = '_bc_bake', uv_layer_reuse = '_bc_bake', additional_bake_settings: typing.Optional[dict] = None):
+def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], image_dir: str, *,
+        px_per_meter = 1024,
+        min_res = 64,
+        max_res = 4096,
+        resolution = 0,
+        uv_layer_bake = '_bc_bake',
+        uv_layer_reuse = '_bc_bake',
+        faster_ao_bake = False,
+        denoise_all = False,
+        additional_bake_settings: typing.Optional[dict] = None
+    ):
 
     if not get_meshable_objects(objects):
         raise Exception(f"No valid objects provided, object types must be MESH or convertible to MESH: {[o.name_full for o in objects]}")
@@ -1090,24 +1100,27 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
 
         bake_settings.uv_layer_name = uv_layer_bake
 
+        has_alpha_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))
+
         for material_key in (opaque_material_key, alpha_material_key):
 
             material_group = [m for m in bpy.data.materials if m.get(material_key)]
             if not material_group:
                 continue
 
-            bake_types = [[tool_settings_bake.AO_Diffuse(), tool_settings_bake.Roughness(), tool_settings_bake.Metallic()]]
+            bake_types = [[tool_settings_bake.AO_Diffuse(faster=faster_ao_bake, environment_has_alpha = has_alpha_materials), tool_settings_bake.Roughness(use_denoise=denoise_all), tool_settings_bake.Metallic(use_denoise=denoise_all)]]
 
             if any(material[Material_Bake_Type.HAS_EMISSION] for material in material_group):
-                bake_types.append(tool_settings_bake.Emission())
+                bake_types.append(tool_settings_bake.Emission(use_denoise=denoise_all))
 
             if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
+                # TODO: denoising the normals destroys details
                 bake_types.append(tool_settings_bake.Normal(uv_layer=bake_settings.uv_layer_name))
 
             if material_key == alpha_material_key:
-                bake_types.append([tool_settings_bake.Base_Color(), tool_settings_bake.Alpha()])
+                bake_types.append([tool_settings_bake.Base_Color(use_denoise=denoise_all), tool_settings_bake.Alpha(use_denoise=denoise_all)])
             else:
-                bake_types.append(tool_settings_bake.Base_Color())
+                bake_types.append(tool_settings_bake.Base_Color(use_denoise=denoise_all))
 
             bake_settings.material_key = material_key
             bake_settings.bake_types = bake_types

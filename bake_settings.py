@@ -361,6 +361,22 @@ class AO_Diffuse(_AO):
     #### Default: `16`
     """
 
+    faster: bool = False
+    """
+    A faster AO bake, sacrificing quality.
+
+    `samples` will set to a square root of the value.
+
+    #### Default: `False`
+    """
+
+    environment_has_alpha: bool = False
+    """
+    Assume the environment has alpha materials.
+
+    #### Default: `True`
+    """
+
     ignore_backface: bool = False
     """
     Ignore backfacing.
@@ -370,11 +386,11 @@ class AO_Diffuse(_AO):
 
 
     def _get_setup_context(self):
-        return bpy_context.Diffuse_AO_Bake_Settings(self.samples)
+        return bpy_context.Diffuse_AO_Bake_Settings(self.samples, self.faster)
 
 
     def _get_material_context(self, material: 'bpy.types.Material'):
-        return bpy_context.Output_Socket_Diffuse_AO(material, self.ignore_backface)
+        return bpy_context.Output_Socket_Diffuse_AO(material, self.ignore_backface, self.faster, self.environment_has_alpha)
 
 
     def _get_composer_context(self, input_socket, images):
