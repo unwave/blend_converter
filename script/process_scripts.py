@@ -249,6 +249,15 @@ if __name__ == '__main__':
     warnings.simplefilter('error')
 
 
+    if ARGS['ignore_inspect']:
+        from blend_converter import bpy_utils
+
+        def dummy_inspect(*args, **kwargs):
+            pass
+
+        bpy_utils.inspect_blend = dummy_inspect
+
+
     if ARGS['profile']:
         with Profiled() as prof:
             prof.profile.runcall(process)

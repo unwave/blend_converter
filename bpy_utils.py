@@ -748,6 +748,26 @@ GENERATED_COORDINATES_TEXTURE_NODE = {
 }
 
 
+def unify_color_attributes_format(objects: typing.List[bpy.types.Object]):
+
+    color_attributes = {}
+
+    for object in objects:
+        if object.data and hasattr(object.data, 'color_attributes'):
+            for color_attribute in object.data.color_attributes:
+                format = (color_attribute.data_type, color_attribute.domain)
+                color_attributes.setdefault(color_attribute.name, set(format)).add(format)
+
+    for color_attribute_name, formats in color_attributes.items():
+
+        if len(formats) <= 1:
+            continue
+
+        for object in objects:
+            if object.data and hasattr(object.data, 'color_attributes') and color_attribute_name in object.data.color_attributes.keys():
+                bpy_context.call_with_object_override(object, [object], bpy.ops.geometry.color_attribute_convert, domain='POINT', data_type='FLOAT_COLOR')
+
+
 def merge_objects_respect_materials(objects: typing.List[bpy.types.Object]):
     """
     Try to modify materials so when the objects are joined the materials look the same.
@@ -764,6 +784,9 @@ def merge_objects_respect_materials(objects: typing.List[bpy.types.Object]):
 
     def warn(*args):
          utils.print_in_color(warning_color, 'WARNING:', *args)
+
+
+    unify_color_attributes_format(objects_with_materials)
 
 
     depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -875,6 +898,30 @@ def merge_objects_respect_materials(objects: typing.List[bpy.types.Object]):
                         for other_socket in output.connections:
                             replacement_node.outputs[0].join(other_socket, move=False)
 
+                elif node.be('ShaderNodeUVMap'):
+
+                    if object.data and hasattr(object.data, 'uv_layers') and object.data.uv_layers.active:
+                        node.uv_map = object.data.uv_layers.active.name
+                    elif object.type == 'MESH':
+                        warn(f"A mesh does not have any uv layers the output of the UV socket is (0, 0, 0): {object.data.name_full}")
+                        replacement_node = tree.new('ShaderNodeCombineXYZ')
+                        for other_socket in node.outputs[0].connections.copy():
+                            replacement_node.outputs[0].join(other_socket, move=False)
+                    else:
+                        # TODO: to test, this should work for curves
+                        node.uv_map = 'UVMap'
+
+                elif node.be('ShaderNodeNormalMap') and node.space == 'TANGENT':
+
+                    if object.data and hasattr(object.data, 'uv_layers') and object.data.uv_layers.active:
+                        node.uv_map = object.data.uv_layers.active.name
+                    elif object.type == 'MESH':
+                        # TODO: undefined behavior
+                        warn(f"A mesh does not have any uv layers for tangent space: {object.data.name_full}")
+                    else:
+                        # TODO: to test, this should work for curves
+                        node.uv_map = 'UVMap'
+
                 elif node.be('ShaderNodeTexCoord') and node.object is None:
 
                     if node.from_instancer:
@@ -902,11 +949,10 @@ def merge_objects_respect_materials(objects: typing.List[bpy.types.Object]):
                                 replacement_node = tree.new('ShaderNodeUVMap')
                                 replacement_node.uv_map = object.data.uv_layers.active.name
                             elif object.type == 'MESH':
-                                # TODO: add a warning
-                                # if a mesh object does not have any uv layers the output of the UV socket is (0, 0, 0)
+                                warn(f"A mesh does not have any uv layers the output of the UV socket is (0, 0, 0): {object.data.name_full}")
                                 replacement_node = tree.new('ShaderNodeCombineXYZ')
                             else:
-                                # this should work for curves
+                                # TODO: to test, this should work for curves
                                 replacement_node = tree.new('ShaderNodeUVMap')
                                 replacement_node.uv_map = 'UVMap'
 
