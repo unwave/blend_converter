@@ -248,7 +248,7 @@ def make_materials_unique(objects: Objects_Like):
 
 def make_meshes_unique(objects: Objects_Like = None):
     """ Make a unique copy of a mesh data for each mesh object. """
-    bpy_utils.make_meshes_unique(get_objects_fallback(objects))
+    bpy_utils.make_object_data_unique([object for object in get_objects_fallback(objects) if object.type == 'MESH'])
 
 
 def focus(objects: Objects_Like = None):
@@ -326,7 +326,9 @@ def remove_vertex_colors(objects: Objects_Like = None):
 
 
 def merge_objects_respect_materials(objects: Objects_Like):
-    return bpy_utils.merge_objects_respect_materials(get_objects(objects))
+    objects = get_objects(objects)
+    bpy_utils.make_material_independent_from_object(objects)
+    return bpy_utils.merge_objects(objects)
 
 
 def merge_objects_and_bake_materials(objects: Objects_Like, image_dir: str, *, px_per_meter = 1024, min_res = 64, max_res = 4096, resolution = 0, uv_layer_bake = '_bc_bake', uv_layer_reuse = '_bc_bake', additional_bake_settings: typing.Optional[dict] = None):

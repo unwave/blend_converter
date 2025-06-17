@@ -435,7 +435,9 @@ def uv_to_world_scale(operator: bpy.types.Operator, context: bpy.types.Context):
     bl_options = {'REGISTER', 'UNDO'},
 )
 def merge_objects_respect_materials(operator: bpy.types.Operator, context: bpy.types.Context):
-    bpy_utils.merge_objects_respect_materials(context.selected_objects)
+    objects = context.selected_objects
+    bpy_utils.make_material_independent_from_object(objects)
+    bpy_utils.merge_objects(objects)
 
 
 @operator_factory.operator(

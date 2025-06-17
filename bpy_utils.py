@@ -9,6 +9,7 @@ import subprocess
 import random
 import uuid
 import operator
+import hashlib
 
 import bpy
 import mathutils
@@ -135,31 +136,18 @@ def get_meshable_objects(objects: typing.List[bpy.types.Object]):
 
 def _convert_to_mesh(objects: typing.List[bpy.types.Object]):
 
-    # prevent modifying the data of the not included objects
-    object_by_data = utils.list_by_key(objects, operator.attrgetter('data'))
-    for data, _objects in object_by_data.items():
-
-        if not data:
-            continue
-
-        if data.users - data.use_fake_user == 1:
-            continue
-
-        data_copy = _objects[0].data.copy()
-        for _object in _objects:
-            _object.data = data_copy
+    make_object_data_independent_from_other(objects)
 
     with bpy_context.Focus_Objects(objects):
 
         try:
             result = bpy.ops.object.convert(target = 'MESH', keep_original = False)
             if 'CANCELLED' in result:
-                raise Exception(f"Converting to mesh has been cancelled: {objects}")
+                raise Exception(f"Conversion to mesh has been cancelled.")
         except Exception as e:
             raise Exception(f"Cannot convert to meshes: {objects}") from e
 
         # TODO: metaball conversion keeps the metaball object despite `keep_original = False`
-        # init_objects = context.init_objects
 
         return bpy.context.selected_objects
 
@@ -191,13 +179,10 @@ def make_materials_unique(objects: typing.List[bpy.types.Object], filter_func: t
             slot.material = slot.material.copy()
 
 
-def make_meshes_unique(objects: typing.List[bpy.types.Object]):
-    """ Make a unique copy of a mesh data for each mesh object. """
+def make_object_data_unique(objects: bpy.types.Object):
+    """ Make all data block unique. """
 
     for object in objects:
-
-        if object.type != 'MESH':
-            continue
 
         if not object.data:
             continue
@@ -206,6 +191,26 @@ def make_meshes_unique(objects: typing.List[bpy.types.Object]):
             continue
 
         object.data = object.data.copy()
+
+
+def make_object_data_independent_from_other(objects: bpy.types.Object):
+    """ Make the data independent from not included objects. """
+
+    objects_by_data = utils.list_by_key(objects, operator.attrgetter('data'))
+
+    for data, objects in objects_by_data.items():
+
+        if not data:
+            continue
+
+        assert not data.users - data.use_fake_user < len(objects)
+
+        if data.users - data.use_fake_user == len(objects):
+            continue
+
+        data_copy = data.copy()
+        for object in objects:
+            object.data = data_copy
 
 
 def _focus(objects: typing.List[bpy.types.Object], view_layer: bpy.types.ViewLayer):
@@ -264,23 +269,38 @@ def get_joinable_objects(objects: typing.List[bpy.types.Object]):
     return [object for object in objects if object.data and (object.type != 'OBJECT' or object.data.vertices)]
 
 
+K_MERGED_OBJECTS_INFO = 'bc_merged_objects_info'
+DO_GENERATE_MERGED_OBJECTS_INFO = False
+
+
+def get_object_info_key(object: bpy.types.Object):
+    return hashlib.sha256(object.name_full.encode()).hexdigest()[:63]
+
+
+def get_object_info(object: bpy.types.Object):
+    return dict(
+        name = object.name,
+        name_full = object.name_full,
+        location = list(object.location),
+        scale = list(object.scale),
+        rotation_euler = list(object.rotation_euler),
+    )
+
+
 def merge_objects(objects: typing.List[bpy.types.Object], object_name: str = None):
 
-    objects = get_joinable_objects(objects)
-    if not objects:
-        return
 
-    def make_data_unique(objects: bpy.types.Object):
+    incompatible_objects = set(objects) - set(get_joinable_objects(objects))
+    if incompatible_objects:
+        raise ValueError(f"Specified objects cannot be merged: {[o.name_full for o in objects]}\nIncompatible: {[o.name_full for o in incompatible_objects]}")
+
+
+    if DO_GENERATE_MERGED_OBJECTS_INFO:
+        current_merge_objects_info = {}
 
         for object in objects:
+            current_merge_objects_info[get_object_info_key(object)] = get_object_info(object)
 
-            if not object.data:
-                continue
-
-            if object.data.users - object.data.use_fake_user == 1:
-                continue
-
-            object.data = object.data.copy()
 
     metaball_family = f"__metaball_family_{uuid.uuid1().hex}"
 
@@ -293,9 +313,15 @@ def merge_objects(objects: typing.List[bpy.types.Object], object_name: str = Non
                 for index, metaball in enumerate(objects_of_type):
                     metaball.name = f"{metaball_family}_{index}"
             else:
-                make_data_unique(objects)
+                make_object_data_unique(objects)
 
         objects = convert_to_mesh(objects)
+
+
+    if DO_GENERATE_MERGED_OBJECTS_INFO:
+        for object in objects:
+            vertex_group = object.vertex_groups.new(name=get_object_info_key(object))
+            vertex_group.add(range(len(object.data.vertices)), 1, 'REPLACE')
 
 
     with bpy_context.Focus_Objects(objects):
@@ -308,6 +334,15 @@ def merge_objects(objects: typing.List[bpy.types.Object], object_name: str = Non
 
     if object_name is not None:
         merged_object.name = object_name
+
+
+    if DO_GENERATE_MERGED_OBJECTS_INFO:
+        bc_merged_objects_info = merged_object.get(K_MERGED_OBJECTS_INFO)
+        if bc_merged_objects_info is None:
+            bc_merged_objects_info = merged_object[K_MERGED_OBJECTS_INFO] = {}
+        bc_merged_objects_info.update(current_merge_objects_info)
+        merged_object[K_MERGED_OBJECTS_INFO] = bc_merged_objects_info
+
 
     return merged_object
 
@@ -768,7 +803,7 @@ def unify_color_attributes_format(objects: typing.List[bpy.types.Object]):
                 bpy_context.call_with_object_override(object, [object], bpy.ops.geometry.color_attribute_convert, domain='POINT', data_type='FLOAT_COLOR')
 
 
-def merge_objects_respect_materials(objects: typing.List[bpy.types.Object]):
+def make_material_independent_from_object(objects: typing.List[bpy.types.Object]):
     """
     Try to modify materials so when the objects are joined the materials look the same.
 
@@ -986,9 +1021,6 @@ def merge_objects_respect_materials(objects: typing.List[bpy.types.Object]):
                     mapping.inputs['Rotation'].set_default_value(evaluated_object.matrix_world.to_euler())
 
 
-    return merge_objects(objects)
-
-
 def merge_material_slots_with_the_same_materials(objects: typing.List[bpy.types.Object]):
 
     for mesh in get_unique_meshes(objects):
@@ -1108,7 +1140,8 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
 
         ## merge
         bpy.context.view_layer.update()
-        merged_object = merge_objects_respect_materials(objects)
+        make_material_independent_from_object(objects)
+        merged_object = merge_objects(objects)
 
 
         ## pack
