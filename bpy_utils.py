@@ -277,6 +277,24 @@ def get_object_info_key(object: bpy.types.Object):
     return hashlib.sha256(object.name_full.encode()).hexdigest()[:63]
 
 
+def copy_custom_properties(object: bpy.types.Object):
+
+    properties = {}
+
+    for key, value in object.items():
+
+        if hasattr(value, 'to_dict'):
+            properties[key] = value.to_dict()
+        elif hasattr(value, 'to_list'):
+            properties[key] = value.to_list()
+        elif isinstance(value, typing.Iterable):
+            properties[key] = tuple(value)
+        else:
+            properties[key] = value
+
+    return properties
+
+
 def get_object_info(object: bpy.types.Object):
     return dict(
         name = object.name,
@@ -284,6 +302,7 @@ def get_object_info(object: bpy.types.Object):
         location = list(object.location),
         scale = list(object.scale),
         rotation_euler = list(object.rotation_euler),
+        custom_properties = copy_custom_properties(object),
     )
 
 
