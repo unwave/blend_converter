@@ -996,6 +996,12 @@ class Fallback(Exception):
     pass
 
 
+def attempt(func: typing.Callable[[typing.Any], T], *args, **kwargs) -> T:
+    try:
+        return func(*args, **kwargs)
+    except Exception:
+        traceback.print_exc()
+
 class Console_Shown:
     """ Not on Windows does nothing. """
 

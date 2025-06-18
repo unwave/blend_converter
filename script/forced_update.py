@@ -49,8 +49,16 @@ if 'help' in other_args or '-h' in other_args or '--help' in other_args or '/h' 
     print(f"show\n\tshow the result in the explorer")
     print(f"where\n\tshow the source file in the explorer")
     print(f"ignore_inspect\n\tignore inspect_blend calls")
+    print(f"open\n\topen the result after")
+
 elif 'where' in other_args:
     utils.os_show(model.blend_path)
+
 else:
     model.update(forced='check' not in other_args)
-    utils.os_show(model.result_path)
+
+    if 'show' in other_args:
+        utils.os_show(model.result_path)
+
+    if 'open' in other_args:
+        utils.open_blender_detached(model.blender_executable, model.result_path)

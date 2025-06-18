@@ -679,6 +679,10 @@ def is_single_user(block: bpy.types.ID):
     return block.users - block.use_fake_user == 1
 
 
+def get_unique_data_objects(objects: typing.List[bpy.types.Object]):
+    return [objects_of_data[0] for data, objects_of_data in utils.list_by_key(objects, operator.attrgetter('data')).items() if data is not None]
+
+
 def get_unique_mesh_objects(objects: typing.List[bpy.types.Object]):
     return [objects_of_data[0] for data, objects_of_data in utils.list_by_key(objects, operator.attrgetter('data')).items() if isinstance(data, bpy.types.Mesh)]
 
@@ -803,14 +807,16 @@ GENERATED_COORDINATES_TEXTURE_NODE = {
 
 
 def unify_color_attributes_format(objects: typing.List[bpy.types.Object]):
+    """ Workaround inconsistent results when merging objects with color attributes of different data formats. """
+
+    objects = [object for object in get_unique_data_objects(objects) if hasattr(object.data, 'color_attributes')]
 
     color_attributes = {}
 
     for object in objects:
-        if object.data and hasattr(object.data, 'color_attributes'):
-            for color_attribute in object.data.color_attributes:
-                format = (color_attribute.data_type, color_attribute.domain)
-                color_attributes.setdefault(color_attribute.name, set(format)).add(format)
+        for color_attribute in object.data.color_attributes:
+            format = (color_attribute.data_type, color_attribute.domain)
+            color_attributes.setdefault(color_attribute.name, set(format)).add(format)
 
     for color_attribute_name, formats in color_attributes.items():
 
@@ -818,7 +824,7 @@ def unify_color_attributes_format(objects: typing.List[bpy.types.Object]):
             continue
 
         for object in objects:
-            if object.data and hasattr(object.data, 'color_attributes') and color_attribute_name in object.data.color_attributes.keys():
+            if color_attribute_name in object.data.color_attributes.keys():
                 bpy_context.call_with_object_override(object, [object], bpy.ops.geometry.color_attribute_convert, domain='POINT', data_type='FLOAT_COLOR')
 
 
@@ -913,7 +919,7 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
                             replacement_node = tree.new('ShaderNodeValue')
                             replacement_node.outputs[0].set_default_value(rgba[3])
                         else:
-                            raise Exception("Unexpected identifier: {output.identifier}")
+                            raise Exception(f"Unexpected identifier: {output.identifier}")
 
                         for other_socket in output.connections:
                             replacement_node.outputs[0].join(other_socket, move=False)
@@ -947,7 +953,7 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
                             replacement_node = tree.new('ShaderNodeValue')
                             replacement_node.outputs[0].set_default_value(random.random())
                         else:
-                            raise Exception("Unexpected identifier: {output.identifier}")
+                            raise Exception(f"Unexpected identifier: {output.identifier}")
 
                         for other_socket in output.connections:
                             replacement_node.outputs[0].join(other_socket, move=False)
