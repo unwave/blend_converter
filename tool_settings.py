@@ -913,7 +913,7 @@ class Bake(Settings):
     The not composed baked images.
     """
 
-    dither_intensity = 1.0
+    dither_intensity: float = 1.0
     """
     Dither to apply when saving textures to avoid banding artifacts but introduce noise.
 
@@ -1643,20 +1643,20 @@ class Bake_Materials(Settings):
     #### Default: `0`
     """
 
-    texel_density: int = 512
+    texel_density: int = 1024
     """
     Texel density in pixels per meter.
 
     https://www.beyondextent.com/deep-dives/deepdive-texeldensity
 
-    #### Default: `512`
+    #### Default: `1024`
     """
 
-    is_same_resolution: bool = True
+    min_resolution: int = 64
     """
-    All UDIM images have the same resolution.
+    Minimum resolution per image.
 
-    #### Default: `True`
+    #### Default: `64`
     """
 
     max_resolution: int = 4096
@@ -1666,12 +1666,63 @@ class Bake_Materials(Settings):
     #### Default: `4096`
     """
 
+    uv_layer_bake: str = '_bc_bake'
+    """
+    The name of a uv layer that will be used for baking.
+
+    #### Default: `'_bc_bake'`
+    """
+
+    uv_layer_reuse: str = '_bc_bake'
+    """
+    The name of a uv layer that will not be re-unwrapped, only packed.
+
+    #### Default: `'_bc_bake'`
+    """
+
+    faster_ao_bake: bool = False
+    """
+    Optimizations to make the AO baking faster sacrificing quality.
+
+    #### Default: `False`
+    """
+
+    denoise_all: bool = False
+    """
+    Use denoise for all types of maps.
+
+    #### Currently excluding normal maps.
+
+    #### Default: `False`
+    """
+
+    space_out: bool = False
+    """
+    Space out objects, aka exploded bake.
+
+    #### Default: `False`
+    """
+
+
+@dataclasses.dataclass
+class Future_Bake_Materials(Settings):
+
+    is_same_resolution: bool = True
+    """
+    All UDIM images have the same resolution.
+
+    #### Default: `True`
+    """
+
     max_udim_amount: int = 4
     """
     Maximum amount of images per UDIM set.
 
     #### Default: `4`
     """
+
+
+
 
 
 if __name__ == '__main__':

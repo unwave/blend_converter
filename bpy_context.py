@@ -1138,7 +1138,7 @@ class Focus_Objects:
     SELECT_KEY = '__bc_init_select_'
     HIDE_KEY = '__bc_init_hide_'
     MODE_KEY = '__bc_init_mode_'
-    VISIBLE_KEY = '__bc_visible'
+    VISIBLE_KEY = '__bc_visible_'
     HIDE_VIEWPORT_KEY = '__bc_init_hide_viewport_'
 
 

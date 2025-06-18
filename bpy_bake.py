@@ -667,7 +667,8 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
 
                     for material in bpy_utils.get_view_layer_materials():
                         if material not in materials_to_bake:
-                            context_stack.enter_context(bpy_context.No_Active_Image(material))
+                            if material.node_tree:
+                                context_stack.enter_context(bpy_context.No_Active_Image(material))
                 else:
                     for material in materials_to_bake:
                         enter_output_context(material, bake_task)

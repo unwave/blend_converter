@@ -344,3 +344,15 @@ def ensure_debugpy():
 
 def save_blend_as_copy(filepath: str, compress=True):
     bpy.ops.wm.save_as_mainfile(filepath=filepath, copy=True, compress=compress)
+
+
+def reset_ui_layout():
+    """ A workaround to reset the blend file UI layout. """
+
+    filepath = bpy.data.filepath
+    bpy.ops.wm.read_homefile(app_template="")
+    bpy.ops.wm.open_mainfile(filepath = filepath, load_ui=False)
+
+
+def get_visible_objects():
+    return bpy_utils.get_visible_objects()

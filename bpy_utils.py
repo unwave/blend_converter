@@ -136,9 +136,18 @@ def get_meshable_objects(objects: typing.List[bpy.types.Object]):
 
 def _convert_to_mesh(objects: typing.List[bpy.types.Object]):
 
-    make_object_data_independent_from_other(objects)
+    metaball_family = f"__metaball_family_{uuid.uuid1().hex}"
 
     with bpy_context.Focus_Objects(objects):
+
+        bpy.ops.object.make_local(type='SELECT_OBDATA')
+
+        for object_type, objects_of_type in utils.list_by_key(objects, lambda x: x.type).items():
+            if object_type == 'META':
+                for index, metaball in enumerate(objects_of_type):
+                    metaball.name = f"{metaball_family}_{index}"
+            else:
+                make_object_data_independent_from_other(objects_of_type)
 
         try:
             result = bpy.ops.object.convert(target = 'MESH', keep_original = False)
@@ -270,7 +279,6 @@ def get_joinable_objects(objects: typing.List[bpy.types.Object]):
 
 
 K_MERGED_OBJECTS_INFO = 'bc_merged_objects_info'
-DO_GENERATE_MERGED_OBJECTS_INFO = False
 
 
 def get_object_info_key(object: bpy.types.Object):
@@ -287,7 +295,7 @@ def copy_custom_properties(object: bpy.types.Object):
             properties[key] = value.to_dict()
         elif hasattr(value, 'to_list'):
             properties[key] = value.to_list()
-        elif isinstance(value, typing.Iterable):
+        elif isinstance(value, mathutils.Vector):
             properties[key] = tuple(value)
         else:
             properties[key] = value
@@ -306,7 +314,7 @@ def get_object_info(object: bpy.types.Object):
     )
 
 
-def merge_objects(objects: typing.List[bpy.types.Object], object_name: str = None):
+def merge_objects(objects: typing.List[bpy.types.Object], object_name: str = None, generate_merged_objects_info = False):
 
 
     incompatible_objects = set(objects) - set(get_joinable_objects(objects))
@@ -314,30 +322,17 @@ def merge_objects(objects: typing.List[bpy.types.Object], object_name: str = Non
         raise ValueError(f"Specified objects cannot be merged: {[o.name_full for o in objects]}\nIncompatible: {[o.name_full for o in incompatible_objects]}")
 
 
-    if DO_GENERATE_MERGED_OBJECTS_INFO:
+    if generate_merged_objects_info:
         current_merge_objects_info = {}
 
         for object in objects:
             current_merge_objects_info[get_object_info_key(object)] = get_object_info(object)
 
 
-    metaball_family = f"__metaball_family_{uuid.uuid1().hex}"
-
-    with bpy_context.Focus_Objects(objects):
-
-        bpy.ops.object.make_local(type='ALL')
-
-        for object_type, objects_of_type in utils.list_by_key(objects, lambda x: x.type).items():
-            if object_type == 'META':
-                for index, metaball in enumerate(objects_of_type):
-                    metaball.name = f"{metaball_family}_{index}"
-            else:
-                make_object_data_unique(objects)
-
-        objects = convert_to_mesh(objects)
+    objects = convert_to_mesh(objects)
 
 
-    if DO_GENERATE_MERGED_OBJECTS_INFO:
+    if generate_merged_objects_info:
         for object in objects:
             vertex_group = object.vertex_groups.new(name=get_object_info_key(object))
             vertex_group.add(range(len(object.data.vertices)), 1, 'REPLACE')
@@ -355,7 +350,7 @@ def merge_objects(objects: typing.List[bpy.types.Object], object_name: str = Non
         merged_object.name = object_name
 
 
-    if DO_GENERATE_MERGED_OBJECTS_INFO:
+    if generate_merged_objects_info:
         bc_merged_objects_info = merged_object.get(K_MERGED_OBJECTS_INFO)
         if bc_merged_objects_info is None:
             bc_merged_objects_info = merged_object[K_MERGED_OBJECTS_INFO] = {}
@@ -849,6 +844,19 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
     unify_color_attributes_format(objects_with_materials)
 
 
+    def get_active_render_uv_layer(object: bpy.types.Object):
+
+        if not object.data:
+            return
+
+        if not hasattr(object.data, 'uv_layers'):
+            return
+
+        for layer in object.data.uv_layers:
+            if layer.active_render:
+                return layer
+
+
     depsgraph = bpy.context.evaluated_depsgraph_get()
 
     for object in objects_with_materials:
@@ -877,12 +885,12 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
                 groups = get_groups()
 
 
-            if hasattr(object.data, 'uv_layers') and object.data.uv_layers:
+            if get_active_render_uv_layer(object):
 
                 # Joining objects deletes UV map #64245
                 # https://projects.blender.org/blender/blender/issues/64245
 
-                render_uv_layer = next(layer.name for layer in object.data.uv_layers if layer.active_render)
+                render_uv_layer = get_active_render_uv_layer(object).name
 
                 for node in reversed(tree.surface_input.descendants):
                     if node.be('ShaderNodeTexImage') and not node.inputs['Vector'].connections:
@@ -960,8 +968,8 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
 
                 elif node.be('ShaderNodeUVMap'):
 
-                    if object.data and hasattr(object.data, 'uv_layers') and object.data.uv_layers.active:
-                        node.uv_map = object.data.uv_layers.active.name
+                    if get_active_render_uv_layer(object):
+                        node.uv_map = get_active_render_uv_layer(object).name
                     elif object.type == 'MESH':
                         warn(f"A mesh does not have any uv layers the output of the UV socket is (0, 0, 0): {object.data.name_full}")
                         replacement_node = tree.new('ShaderNodeCombineXYZ')
@@ -973,8 +981,8 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
 
                 elif node.be('ShaderNodeNormalMap') and node.space == 'TANGENT':
 
-                    if object.data and hasattr(object.data, 'uv_layers') and object.data.uv_layers.active:
-                        node.uv_map = object.data.uv_layers.active.name
+                    if get_active_render_uv_layer(object):
+                        node.uv_map = get_active_render_uv_layer(object).name
                     elif object.type == 'MESH':
                         # TODO: undefined behavior
                         warn(f"A mesh does not have any uv layers for tangent space: {object.data.name_full}")
@@ -1005,9 +1013,9 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
 
                         elif output.identifier == 'UV':
 
-                            if object.data and hasattr(object.data, 'uv_layers') and object.data.uv_layers.active:
+                            if get_active_render_uv_layer(object):
                                 replacement_node = tree.new('ShaderNodeUVMap')
-                                replacement_node.uv_map = object.data.uv_layers.active.name
+                                replacement_node.uv_map = get_active_render_uv_layer(object).name
                             elif object.type == 'MESH':
                                 warn(f"A mesh does not have any uv layers the output of the UV socket is (0, 0, 0): {object.data.name_full}")
                                 replacement_node = tree.new('ShaderNodeCombineXYZ')
@@ -1248,7 +1256,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
         return merged_object
 
 
-def get_texture_resolution(object: bpy.types.Object, uv_layer_name: str, materials: typing.Optional[typing.List[bpy.types.Material]] = None, px_per_meter = 1024, min_res = 64, max_res = 4096):
+def get_texture_resolution(object: bpy.types.Object, *, uv_layer_name: str, materials: typing.Optional[typing.List[bpy.types.Material]] = None, px_per_meter = 1024, min_res = 64, max_res = 4096):
     """ Get a texture resolution needed to achieve the given textel density. """
 
     import bmesh
@@ -1323,3 +1331,430 @@ def get_texture_resolution(object: bpy.types.Object, uv_layer_name: str, materia
     object.data.uv_layers.active = init_active
 
     return res[1]
+
+
+def get_visible_objects():
+    return [object for object in get_view_layer_objects() if object.visible_get()]
+
+
+def split_objects_into_pre_merged_objects(objects: typing.List[bpy.types.Object], do_cleanup = True, force_rename = False):
+    """ Split objects into separate objects using information generated by `merge_objects`. """
+    print("split_objects_into_pre_merged_objects...")
+
+    new_objects: typing.List[bpy.types.Object] = []
+
+
+    # separate objects
+    for object in objects:
+
+        merged_objects_info = object.get(K_MERGED_OBJECTS_INFO)
+        if not merged_objects_info:
+            continue
+
+        with bpy_context.Focus_Objects(object, 'EDIT'):
+
+            bpy.ops.mesh.reveal()
+
+            for object_id, info in merged_objects_info.items():
+
+                object.vertex_groups.active_index = object.vertex_groups[object_id].index
+
+                bpy.ops.mesh.select_all(action='DESELECT')
+                bpy.ops.object.vertex_group_select()
+                bpy.ops.mesh.separate(type='SELECTED')
+
+            new_objects.extend(bpy.context.selected_objects)
+            new_objects.remove(object)
+
+
+        bpy.data.objects.remove(object)
+
+
+
+    def get_vertex_group(object: bpy.types.Object, vertex_group_names):
+
+        for vertex in object.data.vertices:
+            for group_element in vertex.groups:
+
+                if group_element.weight != 1:
+                    continue
+
+                vertex_group_name = object.vertex_groups[group_element.group].name
+
+                if vertex_group_name in vertex_group_names:
+                    return vertex_group_name
+
+        raise Exception(f"Geometry group not found for object: {object.name_full}")
+
+
+    # move pivots
+    for object in new_objects:
+
+        merged_objects_info = object.get(K_MERGED_OBJECTS_INFO)
+        if not merged_objects_info:
+            continue
+
+        if not object.data.vertices:
+            continue
+
+        vertex_group_name = get_vertex_group(object, set(merged_objects_info))
+        object_info = merged_objects_info[vertex_group_name]
+
+        if force_rename:
+            other_object_with_the_same_name = bpy.data.objects.get(object_info['name'])
+            if other_object_with_the_same_name:
+                other_object_with_the_same_name.name = other_object_with_the_same_name.name + '1'
+
+            object.name = object_info['name']
+
+        for key, value in object_info['custom_properties'].items():
+            object[key] = value
+
+        with bpy_context.Focus_Objects(object):
+            bpy.context.scene.cursor.location = object_info['location']
+            bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+
+
+    # clean up
+    if do_cleanup:
+        for object in new_objects:
+
+            merged_objects_info = object.get(K_MERGED_OBJECTS_INFO)
+            if not merged_objects_info:
+                continue
+
+            for object_id, info in merged_objects_info.items():
+                object.vertex_groups.remove(object.vertex_groups[object_id])
+
+            del object[K_MERGED_OBJECTS_INFO]
+
+
+    return new_objects
+
+
+
+def get_object_group_by_parent(objects: typing.List[bpy.types.Object]):
+    """ Assuming there is no cyclic dependency in object parenting. The algorithm is not efficient. """
+
+    user_map = bpy.data.user_map(subset=objects, key_types={'OBJECT'}, value_types={'OBJECT'})
+
+    sub_groups = []
+
+    for key, items in user_map.items():
+
+        for sub_group in sub_groups:
+            if key in sub_group or any(item in sub_group for item in items):
+                sub_group.add(key)
+                sub_group.update(items)
+                break
+        else:
+            sub_groups.append(set([key, *items]))
+
+    group_by_parent = {}
+
+    for group in sub_groups:
+        for object in group:
+            if object.parent is None:
+                group_by_parent[object] = group
+                break
+
+    return group_by_parent
+
+
+def get_aabb(objects: typing.List[bpy.types.Object]):
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+
+    vertices = []
+    for object in objects:
+        evaluated_object = object.evaluated_get(depsgraph)
+        bound_box = evaluated_object.bound_box
+        matrix_world = evaluated_object.matrix_world
+        vertices.extend([matrix_world @ mathutils.Vector(v) for v in bound_box])
+
+    xs = []
+    ys = []
+    zs = []
+    for v in vertices:
+        xs.append(v[0])
+        ys.append(v[1])
+        zs.append(v[2])
+
+    max_x = max(xs)
+    min_x = min(xs)
+
+    max_y = max(ys)
+    min_y = min(ys)
+
+    max_z = max(zs)
+    min_z = min(zs)
+
+    x = abs(max_x - min_x)
+    y = abs(max_y - min_y)
+    z = abs(max_z - min_z)
+
+    loc_x = (max_x + min_x)/2
+    loc_y = (max_y + min_y)/2
+    loc_z = (max_z + min_z)/2
+
+    return mathutils.Vector((x, y, z)), mathutils.Vector((loc_x, loc_y, loc_z))
+
+
+K_EXPLODED_BAKE_ORIGINAL_LOCATION = 'bc_exploded_bake_original_location'
+
+
+def space_out_objects(objects: typing.List[bpy.types.Object]):
+
+    group_offset = 0
+
+    for parent, group in get_object_group_by_parent(objects).items():
+
+        dimensions, center = get_aabb(group)
+
+        offset = parent.location - center
+
+        new_location = mathutils.Vector((0, 0, 0)) + offset
+        new_location.x = group_offset
+
+        parent[K_EXPLODED_BAKE_ORIGINAL_LOCATION] = parent.location
+
+        parent.location = new_location
+
+        group_offset += max(4, dimensions[0] * dimensions[0])
+
+
+def revert_space_out_objects(objects: typing.List[bpy.types.Object]):
+
+    for object in objects:
+        location = object.get(K_EXPLODED_BAKE_ORIGINAL_LOCATION)
+        if location is not None:  # only top parent objects in groups have this property
+            object.location = location
+
+
+def deep_copy_objects(objects: typing.List[bpy.types.Object]):
+
+    with bpy_context.Focus_Objects(objects), bpy_context.State() as state:
+
+        for attr in dir(bpy.context.preferences.edit):
+            if attr.startswith('use_duplicate_'):
+                state.set(bpy.context.preferences.edit, attr, True)
+
+        bpy.ops.object.duplicate()
+
+        return bpy.context.selected_objects
+
+
+def move_objects_to_new_collection(objects: typing.List[bpy.types.Object], collection_name: str):
+
+    baked_copy_collection = bpy.data.collections.new(collection_name)
+    bpy.context.scene.collection.children.link(baked_copy_collection)
+
+    for layer_collection in bpy.context.view_layer.layer_collection.children:
+        if layer_collection.collection == baked_copy_collection:
+            break
+
+    for object in objects:
+
+        for collection in object.users_collection:
+            collection.objects.unlink(object)
+
+        baked_copy_collection.objects.link(object)
+
+    return layer_collection
+
+
+def copy_and_bake_materials(objects: typing.List[bpy.types.Object], merge_bake_settings: tool_settings.Bake_Materials, additional_bake_settings: typing.Optional[dict] = None):
+
+    if not get_meshable_objects(objects):
+        raise Exception(f"No valid objects provided, object types must be MESH or convertible to MESH: {[o.name_full for o in objects]}")
+
+
+    objects = get_meshable_objects(objects)
+
+
+    with bpy_context.Global_Bake_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
+
+        # this can help to reduce `Dependency cycle detected` spam in rigs
+        for o in bpy.data.objects:
+            if o.type == 'ARMATURE':
+                bpy_state_0.set(o.pose, 'ik_solver', 'LEGACY')
+
+
+        convert_materials_to_principled(objects, remove_unused=False)
+
+        set_out_of_range_material_indexes_to_zero(objects)
+
+        alpha_material_key, opaque_material_key = split_into_alpha_and_non_alpha_groups(objects)
+
+
+        ## unwrap uvs
+        settings = tool_settings.UVs(resolution = 1024 if merge_bake_settings.resolution == 0 else merge_bake_settings.resolution, do_unwrap=False, average_uv_scale=False)
+        settings._set_suggested_padding()
+        settings.uv_layer_name = merge_bake_settings.uv_layer_reuse
+
+        # TODO: check results for non mesh objects, they supposed to have valid auto-generated UVs, like curves do
+        objects_to_unwrap = get_unique_mesh_objects([object for object in objects if hasattr(object.data, 'uv_layers') and not merge_bake_settings.uv_layer_reuse in object.data.uv_layers])
+
+        with bpy_context.State() as state, bpy_context.Bpy_State() as bpy_state:
+
+            for object in objects_to_unwrap:
+                if object.animation_data:
+                    for driver in object.animation_data.drivers:
+                        state.set(driver, 'mute', True)
+
+            for object in objects_to_unwrap:
+                for modifier in object.modifiers:
+                    bpy_state.set(modifier, 'show_viewport', False)
+
+            bpy_uv.ensure_uv_layer(objects_to_unwrap, settings.uv_layer_name)
+
+            for object in objects_to_unwrap:
+                bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
+                # object.data.uv_layers.active = object.data.uv_layers[settings.uv_layer_name]
+
+            unwrap_ministry_of_flat_with_fallback(objects_to_unwrap, settings)
+
+            bpy_uv.scale_uv_to_world_per_uv_layout(objects_to_unwrap)
+
+
+        ## copy identifiers
+        K_OBJECT_COPY_ID = '__bc_temp_object_copy_id'
+
+        for object in objects:
+            object[K_OBJECT_COPY_ID] = uuid.uuid1().hex
+
+
+        ## merge objects
+        bpy.context.view_layer.update()
+
+        objects_copy = deep_copy_objects(objects)
+
+        make_material_independent_from_object(objects_copy)
+
+        convert_to_mesh(objects_copy)
+
+        if merge_bake_settings.space_out:
+            space_out_objects(objects_copy)
+
+        merged_object = merge_objects(objects_copy, generate_merged_objects_info = True)
+
+
+        ## pack uvs
+        merged_uvs_settings = settings._get_copy()
+        merged_uvs_settings.uv_layer_name = merge_bake_settings.uv_layer_bake
+        bpy_uv.ensure_uv_layer([merged_object], merged_uvs_settings.uv_layer_name, do_init = True)
+
+
+        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
+
+            bpy_state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[merge_bake_settings.uv_layer_bake])
+
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.uv.reveal()
+            bpy.ops.uv.select_all(action='SELECT')
+
+            bpy.ops.uv.average_islands_scale()
+
+        for material_key in (alpha_material_key, opaque_material_key):
+            merged_uvs_settings.material_key = material_key
+            merged_uvs_settings.average_uv_scale = False
+            merged_uvs_settings.uvp_rescale = True
+            bpy_uv.unwrap_and_pack([merged_object], merged_uvs_settings)
+
+
+        bpy_uv.ensure_pixel_per_island([merged_object], settings)
+
+
+        ## bake materials
+        bake_settings = tool_settings.Bake(image_dir = merge_bake_settings.image_dir, make_materials_single_user=False)
+
+        if additional_bake_settings:
+            for key, value in additional_bake_settings.items():
+                setattr(bake_settings, key, value)
+
+        bake_settings.uv_layer_name = merge_bake_settings.uv_layer_bake
+
+        has_alpha_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))
+
+        for material_key in (opaque_material_key, alpha_material_key):
+
+            material_group = [m for m in bpy.data.materials if m.get(material_key)]
+            if not material_group:
+                continue
+
+            bake_types = [[tool_settings_bake.AO_Diffuse(faster=merge_bake_settings.faster_ao_bake, environment_has_alpha = has_alpha_materials), tool_settings_bake.Roughness(use_denoise=merge_bake_settings.denoise_all), tool_settings_bake.Metallic(use_denoise=merge_bake_settings.denoise_all)]]
+
+            if any(material[Material_Bake_Type.HAS_EMISSION] for material in material_group):
+                bake_types.append(tool_settings_bake.Emission(use_denoise=merge_bake_settings.denoise_all))
+
+            if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
+                # TODO: denoising the normals destroys details
+                bake_types.append(tool_settings_bake.Normal(uv_layer=bake_settings.uv_layer_name))
+
+            if material_key == alpha_material_key:
+                bake_types.append([tool_settings_bake.Base_Color(use_denoise=merge_bake_settings.denoise_all), tool_settings_bake.Alpha(use_denoise=merge_bake_settings.denoise_all)])
+            else:
+                bake_types.append(tool_settings_bake.Base_Color(use_denoise=merge_bake_settings.denoise_all))
+
+            bake_settings.material_key = material_key
+            bake_settings.bake_types = bake_types
+
+            if merge_bake_settings.resolution == 0:
+                bake_settings.resolution = get_texture_resolution(
+                    merged_object,
+                    uv_layer_name = merge_bake_settings.uv_layer_bake,
+                    materials = material_group,
+                    px_per_meter = merge_bake_settings.texel_density,
+                    min_res = merge_bake_settings.min_resolution,
+                    max_res = merge_bake_settings.max_resolution,
+                    )
+            else:
+                bake_settings.resolution = merge_bake_settings.resolution
+
+
+            bpy_bake.bake([merged_object], bake_settings)
+
+
+        ## split baked copy
+        splitted_objects = split_objects_into_pre_merged_objects([merged_object])
+
+        if merge_bake_settings.space_out:
+            revert_space_out_objects(splitted_objects)
+
+        map_copy_id_to_copy = {object[K_OBJECT_COPY_ID]: object for object in splitted_objects}
+        map_original_to_copy = {object: map_copy_id_to_copy[object[K_OBJECT_COPY_ID]] for object in objects}
+
+
+        ## transfer packed uvs
+        print('transferring the baked data to originals...')
+
+        for orig, copy in map_original_to_copy.items():
+
+            modifier = orig.modifiers.new('__bc_temp_copy_uvs', type='DATA_TRANSFER')
+            modifier.object = copy
+            modifier.use_loop_data = True
+            modifier.data_types_loops = {'UV'}
+            modifier.loop_mapping = 'TOPOLOGY'
+            modifier.layers_uv_select_src = merge_bake_settings.uv_layer_bake
+            modifier.poly_mapping = 'TOPOLOGY'
+
+
+        ## copy materials
+        for orig, copy in map_original_to_copy.items():
+            bpy_context.call_with_object_override(copy, [orig, copy], bpy.ops.object.material_slot_copy)
+
+        merge_material_slots_with_the_same_materials(objects)
+        merge_material_slots_with_the_same_materials(splitted_objects)
+
+
+        move_objects_to_new_collection(splitted_objects, '__baked_copy__').exclude = True
+
+
+        ## delete temp objects
+        temp_collection = bpy.data.collections.get('__texture_coordinate__')
+        if temp_collection:
+            bpy.data.batch_remove(set(temp_collection.objects))
+            bpy.data.collections.remove(temp_collection)
+
+
+        return merged_object
