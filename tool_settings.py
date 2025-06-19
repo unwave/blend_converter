@@ -1703,6 +1703,15 @@ class Bake_Materials(Settings):
     #### Default: `False`
     """
 
+    exclude_topology_modifiers: bool = True
+    """
+    The UV data is transferred with the data transfer modifier.
+
+    If `False` the topology changing modifiers will be applied on the bake copy and the transfer modifier will be left on the original model.
+
+    #### Default: `True`
+    """
+
 
 @dataclasses.dataclass
 class Future_Bake_Materials(Settings):

@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
     from . import tool_settings
 
 
-VERTEX_CHANGING_MODIFIER_TYPES = {
+TOPOLOGY_CHANGING_MODIFIER_TYPES = {
     'ARRAY',
     'BEVEL',
     'BOOLEAN',
@@ -59,7 +59,7 @@ def call_with_override(override: typing.Dict[str, typing.Any], func: typing.Call
         result =  func(override, *args, **kwargs)
 
     if 'CANCELLED' in result:
-        raise Exception(f"CANCELLED:\noverride: {override}\nfunc: {repr(func)}\nargs: {args}\nkwargs: {kwargs}")
+        raise Exception("\n".join(['CANCELLED:', f"func: {repr(func)}", f"args: {args}", f"kwargs: {kwargs}", f"override: {override}"]))
 
     return result
 

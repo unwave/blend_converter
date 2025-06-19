@@ -1563,13 +1563,12 @@ def move_objects_to_new_collection(objects: typing.List[bpy.types.Object], colle
     return layer_collection
 
 
-def copy_and_bake_materials(objects: typing.List[bpy.types.Object], merge_bake_settings: tool_settings.Bake_Materials, additional_bake_settings: typing.Optional[dict] = None):
-
-    if not get_meshable_objects(objects):
-        raise Exception(f"No valid objects provided, object types must be MESH or convertible to MESH: {[o.name_full for o in objects]}")
+def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake_Materials, additional_bake_settings: typing.Optional[dict] = None):
 
 
-    objects = get_meshable_objects(objects)
+    incompatible_objects = set(objects) - set(get_meshable_objects(objects))
+    if incompatible_objects:
+        raise ValueError(f"Specified objects cannot be baked, type must be MESH or convertible to MESH: {[o.name_full for o in objects]}\nIncompatible: {[o.name_full for o in incompatible_objects]}")
 
 
     with bpy_context.Global_Bake_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
@@ -1588,12 +1587,12 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], merge_bake_s
 
 
         ## unwrap uvs
-        settings = tool_settings.UVs(resolution = 1024 if merge_bake_settings.resolution == 0 else merge_bake_settings.resolution, do_unwrap=False, average_uv_scale=False)
-        settings._set_suggested_padding()
-        settings.uv_layer_name = merge_bake_settings.uv_layer_reuse
+        uvs_unwrap_settings = tool_settings.UVs(resolution = 1024 if settings.resolution == 0 else settings.resolution, do_unwrap=False, average_uv_scale=False)
+        uvs_unwrap_settings._set_suggested_padding()
+        uvs_unwrap_settings.uv_layer_name = settings.uv_layer_reuse
 
         # TODO: check results for non mesh objects, they supposed to have valid auto-generated UVs, like curves do
-        objects_to_unwrap = get_unique_mesh_objects([object for object in objects if hasattr(object.data, 'uv_layers') and not merge_bake_settings.uv_layer_reuse in object.data.uv_layers])
+        objects_to_unwrap = get_unique_mesh_objects([object for object in objects if hasattr(object.data, 'uv_layers') and not settings.uv_layer_reuse in object.data.uv_layers])
 
         with bpy_context.State() as state, bpy_context.Bpy_State() as bpy_state:
 
@@ -1606,13 +1605,13 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], merge_bake_s
                 for modifier in object.modifiers:
                     bpy_state.set(modifier, 'show_viewport', False)
 
-            bpy_uv.ensure_uv_layer(objects_to_unwrap, settings.uv_layer_name)
+            bpy_uv.ensure_uv_layer(objects_to_unwrap, uvs_unwrap_settings.uv_layer_name)
 
             for object in objects_to_unwrap:
-                bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
+                bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[uvs_unwrap_settings.uv_layer_name])
                 # object.data.uv_layers.active = object.data.uv_layers[settings.uv_layer_name]
 
-            unwrap_ministry_of_flat_with_fallback(objects_to_unwrap, settings)
+            unwrap_ministry_of_flat_with_fallback(objects_to_unwrap, uvs_unwrap_settings)
 
             bpy_uv.scale_uv_to_world_per_uv_layout(objects_to_unwrap)
 
@@ -1631,23 +1630,35 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], merge_bake_s
 
         make_material_independent_from_object(objects_copy)
 
+        if settings.exclude_topology_modifiers:
+            for object in objects_copy:
+                for modifier in object.modifiers:
+
+                    if is_smooth_modifier(modifier):
+                        continue
+
+                    if modifier.type not in bpy_context.TOPOLOGY_CHANGING_MODIFIER_TYPES:
+                        continue
+
+                    modifier.show_viewport = False
+
         convert_to_mesh(objects_copy)
 
-        if merge_bake_settings.space_out:
+        if settings.space_out:
             space_out_objects(objects_copy)
 
         merged_object = merge_objects(objects_copy, generate_merged_objects_info = True)
 
 
         ## pack uvs
-        merged_uvs_settings = settings._get_copy()
-        merged_uvs_settings.uv_layer_name = merge_bake_settings.uv_layer_bake
+        merged_uvs_settings = uvs_unwrap_settings._get_copy()
+        merged_uvs_settings.uv_layer_name = settings.uv_layer_bake
         bpy_uv.ensure_uv_layer([merged_object], merged_uvs_settings.uv_layer_name, do_init = True)
 
 
         with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
 
-            bpy_state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[merge_bake_settings.uv_layer_bake])
+            bpy_state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[settings.uv_layer_bake])
 
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.uv.reveal()
@@ -1662,17 +1673,17 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], merge_bake_s
             bpy_uv.unwrap_and_pack([merged_object], merged_uvs_settings)
 
 
-        bpy_uv.ensure_pixel_per_island([merged_object], settings)
+        bpy_uv.ensure_pixel_per_island([merged_object], uvs_unwrap_settings)
 
 
         ## bake materials
-        bake_settings = tool_settings.Bake(image_dir = merge_bake_settings.image_dir, make_materials_single_user=False)
+        bake_settings = tool_settings.Bake(image_dir = settings.image_dir, make_materials_single_user=False)
 
         if additional_bake_settings:
             for key, value in additional_bake_settings.items():
                 setattr(bake_settings, key, value)
 
-        bake_settings.uv_layer_name = merge_bake_settings.uv_layer_bake
+        bake_settings.uv_layer_name = settings.uv_layer_bake
 
         has_alpha_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))
 
@@ -1682,61 +1693,96 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], merge_bake_s
             if not material_group:
                 continue
 
-            bake_types = [[tool_settings_bake.AO_Diffuse(faster=merge_bake_settings.faster_ao_bake, environment_has_alpha = has_alpha_materials), tool_settings_bake.Roughness(use_denoise=merge_bake_settings.denoise_all), tool_settings_bake.Metallic(use_denoise=merge_bake_settings.denoise_all)]]
+            bake_types = [[tool_settings_bake.AO_Diffuse(faster=settings.faster_ao_bake, environment_has_alpha = has_alpha_materials), tool_settings_bake.Roughness(use_denoise=settings.denoise_all), tool_settings_bake.Metallic(use_denoise=settings.denoise_all)]]
 
             if any(material[Material_Bake_Type.HAS_EMISSION] for material in material_group):
-                bake_types.append(tool_settings_bake.Emission(use_denoise=merge_bake_settings.denoise_all))
+                bake_types.append(tool_settings_bake.Emission(use_denoise=settings.denoise_all))
 
             if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
                 # TODO: denoising the normals destroys details
                 bake_types.append(tool_settings_bake.Normal(uv_layer=bake_settings.uv_layer_name))
 
             if material_key == alpha_material_key:
-                bake_types.append([tool_settings_bake.Base_Color(use_denoise=merge_bake_settings.denoise_all), tool_settings_bake.Alpha(use_denoise=merge_bake_settings.denoise_all)])
+                bake_types.append([tool_settings_bake.Base_Color(use_denoise=settings.denoise_all), tool_settings_bake.Alpha(use_denoise=settings.denoise_all)])
             else:
-                bake_types.append(tool_settings_bake.Base_Color(use_denoise=merge_bake_settings.denoise_all))
+                bake_types.append(tool_settings_bake.Base_Color(use_denoise=settings.denoise_all))
 
             bake_settings.material_key = material_key
             bake_settings.bake_types = bake_types
 
-            if merge_bake_settings.resolution == 0:
+            if settings.resolution == 0:
                 bake_settings.resolution = get_texture_resolution(
                     merged_object,
-                    uv_layer_name = merge_bake_settings.uv_layer_bake,
+                    uv_layer_name = settings.uv_layer_bake,
                     materials = material_group,
-                    px_per_meter = merge_bake_settings.texel_density,
-                    min_res = merge_bake_settings.min_resolution,
-                    max_res = merge_bake_settings.max_resolution,
+                    px_per_meter = settings.texel_density,
+                    min_res = settings.min_resolution,
+                    max_res = settings.max_resolution,
                     )
             else:
-                bake_settings.resolution = merge_bake_settings.resolution
+                bake_settings.resolution = settings.resolution
 
 
             bpy_bake.bake([merged_object], bake_settings)
 
 
         ## split baked copy
-        splitted_objects = split_objects_into_pre_merged_objects([merged_object])
+        splitted_objects_copy = split_objects_into_pre_merged_objects([merged_object])
 
-        if merge_bake_settings.space_out:
-            revert_space_out_objects(splitted_objects)
+        if settings.space_out:
+            revert_space_out_objects(splitted_objects_copy)
 
-        map_copy_id_to_copy = {object[K_OBJECT_COPY_ID]: object for object in splitted_objects}
+        map_copy_id_to_copy = {object[K_OBJECT_COPY_ID]: object for object in splitted_objects_copy}
         map_original_to_copy = {object: map_copy_id_to_copy[object[K_OBJECT_COPY_ID]] for object in objects}
 
 
         ## transfer packed uvs
         print('transferring the baked data to originals...')
 
-        for orig, copy in map_original_to_copy.items():
+        def add_data_transfer_modifier():
 
-            modifier = orig.modifiers.new('__bc_temp_copy_uvs', type='DATA_TRANSFER')
+            modifier = orig.modifiers.new(f"__bc_temp_copy_uvs_{uuid.uuid1().hex}", type='DATA_TRANSFER')
+
             modifier.object = copy
             modifier.use_loop_data = True
             modifier.data_types_loops = {'UV'}
             modifier.loop_mapping = 'TOPOLOGY'
-            modifier.layers_uv_select_src = merge_bake_settings.uv_layer_bake
+            modifier.layers_uv_select_src = settings.uv_layer_bake
             modifier.poly_mapping = 'TOPOLOGY'
+            modifier.show_expanded = False
+
+            return modifier
+
+        for orig, copy in map_original_to_copy.items():
+
+            if settings.exclude_topology_modifiers:
+
+                with bpy_context.Bpy_State() as bpy_state:
+
+                    for modifier in orig.modifiers:
+                        bpy_state.set(modifier, 'show_viewport', False)
+
+                    data_transfer_modifier = add_data_transfer_modifier()
+
+                    # TODO: this is for testing, it is not necessary
+                    try:
+                        with utils.Capture_Stdout() as capture:
+                            move_modifier_to_first(orig, data_transfer_modifier)
+                    except Exception as e:
+                        error = 'Cannot move above a modifier requiring original data'
+                        if any(error in line for line in capture.lines.queue):
+                            utils.print_in_color(utils.get_color_code(240,0,0, 0,0,0), f"Fail to move modifier '{modifier.name}' for object '{object.name_full}': {error}\n")
+                        else:
+                            raise e
+
+                    # Info: Applied modifier was not first, result may not be as expected
+                    # Error: Source and destination meshes do not have the same number of face corners, 'Topology' mapping cannot be used in this case
+
+                    bpy_context.call_with_object_override(orig, [orig], bpy.ops.object.modifier_apply, modifier = data_transfer_modifier.name)
+
+            else:
+                add_data_transfer_modifier()
+
 
 
         ## copy materials
@@ -1744,10 +1790,12 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], merge_bake_s
             bpy_context.call_with_object_override(copy, [orig, copy], bpy.ops.object.material_slot_copy)
 
         merge_material_slots_with_the_same_materials(objects)
-        merge_material_slots_with_the_same_materials(splitted_objects)
+        merge_material_slots_with_the_same_materials(splitted_objects_copy)
 
-
-        move_objects_to_new_collection(splitted_objects, '__baked_copy__').exclude = True
+        if settings.exclude_topology_modifiers:
+            bpy.data.batch_remove(splitted_objects_copy)
+        else:
+            move_objects_to_new_collection(splitted_objects_copy, '__baked_copy__').exclude = True
 
 
         ## delete temp objects
@@ -1758,3 +1806,28 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], merge_bake_s
 
 
         return merged_object
+
+
+
+def move_modifier_to_first(object: bpy.types.Object, modifier: bpy.types.Modifier):
+
+    index = list(object.modifiers).index(modifier)
+    if index == 0:
+        return
+
+    if bpy.app.version < (2,90,0):
+        for _ in range(index):
+            bpy_context.call_with_object_override(object, [object], bpy.ops.object.modifier_move_up, modifier = modifier.name)
+    else:
+        bpy_context.call_with_object_override(object, [object], bpy.ops.object.modifier_move_to_index, modifier = modifier.name, index=0)
+
+
+def is_smooth_modifier(modifier: bpy.types.Modifier):
+
+    if modifier.type != 'NODES':
+        return False
+
+    if not modifier.node_group:
+        return False
+
+    return 'Smooth by Angle' in modifier.node_group.name

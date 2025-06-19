@@ -1036,7 +1036,7 @@ def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings
             # disable geometry order changing modifiers
             if settings.turn_off_vertex_changing_modifiers:
                 for modifier in object.modifiers:
-                    if modifier.show_render and modifier.type in bpy_context.VERTEX_CHANGING_MODIFIER_TYPES:
+                    if modifier.show_render and modifier.type in bpy_context.TOPOLOGY_CHANGING_MODIFIER_TYPES:
                         state.set(modifier, 'show_render', False)
 
             # disable armature
