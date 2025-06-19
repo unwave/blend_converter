@@ -1387,7 +1387,7 @@ def split_objects_into_pre_merged_objects(objects: typing.List[bpy.types.Object]
         raise Exception(f"Geometry group not found for object: {object.name_full}")
 
 
-    # move pivots
+    # move pivots, restore properties
     for object in new_objects:
 
         merged_objects_info = object.get(K_MERGED_OBJECTS_INFO)
@@ -1408,7 +1408,10 @@ def split_objects_into_pre_merged_objects(objects: typing.List[bpy.types.Object]
             object.name = object_info['name']
 
         for key, value in object_info['custom_properties'].items():
-            object[key] = value
+            try:
+                object[key] = value
+            except TypeError:
+                traceback.print_exc(file=sys.stderr)
 
         with bpy_context.Focus_Objects(object):
             bpy.context.scene.cursor.location = object_info['location']
@@ -1587,7 +1590,8 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         ## unwrap uvs
-        uvs_unwrap_settings = tool_settings.UVs(resolution = 1024 if settings.resolution == 0 else settings.resolution, do_unwrap=False, average_uv_scale=False)
+        unwrap_resolution = 1024 if settings.resolution == 0 else settings.resolution
+        uvs_unwrap_settings = tool_settings.UVs(resolution = unwrap_resolution, do_unwrap=False, average_uv_scale=False)
         uvs_unwrap_settings._set_suggested_padding()
         uvs_unwrap_settings.uv_layer_name = settings.uv_layer_reuse
 
@@ -1805,7 +1809,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
             bpy.data.collections.remove(temp_collection)
 
 
-        return merged_object
+        return objects
 
 
 
