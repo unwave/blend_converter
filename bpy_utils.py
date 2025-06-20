@@ -282,7 +282,8 @@ K_MERGED_OBJECTS_INFO = 'bc_merged_objects_info'
 
 
 def get_object_info_key(object: bpy.types.Object):
-    return hashlib.sha256(object.name_full.encode()).hexdigest()[:63]
+    name = object.name[:62-16]
+    return name + '@' + hashlib.sha256(object.name_full.encode()).hexdigest()[:62-len(name)]
 
 
 def copy_custom_properties(object: bpy.types.Object):
@@ -331,6 +332,7 @@ def merge_objects(objects: typing.List[bpy.types.Object], object_name: str = Non
 
     objects = convert_to_mesh(objects)
 
+    make_object_data_unique(objects)
 
     if generate_merged_objects_info:
         for object in objects:
@@ -1652,6 +1654,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
             space_out_objects(objects_copy)
 
         merged_object = merge_objects(objects_copy, generate_merged_objects_info = True)
+        merged_object.name = '__bake_copy__'
 
 
         ## pack uvs
@@ -1781,6 +1784,8 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
                     # Info: Applied modifier was not first, result may not be as expected
                     # Error: Source and destination meshes do not have the same number of face corners, 'Topology' mapping cannot be used in this case
+
+                    make_object_data_unique([orig])
 
                     bpy_context.call_with_object_override(orig, [orig], bpy.ops.object.modifier_apply, modifier = data_transfer_modifier.name)
 

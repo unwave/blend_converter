@@ -593,12 +593,12 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     @classmethod
-    def start(cls, files, columns = None):
+    def get_app(cls, files, columns = None):
         app = wxp_utils.App()
         frame = cls(files=files, columns = columns)
         frame.Show()
-        app.MainLoop()
-        exit()
+        frame.show_console(False)
+        return app
 
 
     def init_ui(self):
