@@ -751,24 +751,17 @@ class Output_Socket_World_Space_To_Tangent_Space:
 
     def __enter__(self):
 
-        first_node = self.tree.new('ShaderNodeVectorMath')
-        first_node.operation = 'ADD'
+        first_node = self.tree.new('ShaderNodeVectorMath', operation = 'ADD')
         first_node[1] = (0.5, 0.5, 0.5)
 
-        node = first_node.inputs[0].new('ShaderNodeVectorMath')
-        node.operation = 'MULTIPLY'
+        node = first_node.inputs[0].new('ShaderNodeVectorMath', operation = 'MULTIPLY')
         node[1] = (0.5, 0.5, 0.5)
 
         combine_xyz = node.inputs[0].new('ShaderNodeCombineXYZ')
 
-        dot_product_1 = combine_xyz.inputs[0].new('ShaderNodeVectorMath', 'Value')
-        dot_product_1.operation = 'DOT_PRODUCT'
-
-        dot_product_2 = combine_xyz.inputs[1].new('ShaderNodeVectorMath', 'Value')
-        dot_product_2.operation = 'DOT_PRODUCT'
-
-        dot_product_3 = combine_xyz.inputs[2].new('ShaderNodeVectorMath', 'Value')
-        dot_product_3.operation = 'DOT_PRODUCT'
+        dot_product_1 = combine_xyz.inputs[0].new('ShaderNodeVectorMath', 'Value', operation = 'DOT_PRODUCT')
+        dot_product_2 = combine_xyz.inputs[1].new('ShaderNodeVectorMath', 'Value', operation = 'DOT_PRODUCT')
+        dot_product_3 = combine_xyz.inputs[2].new('ShaderNodeVectorMath', 'Value', operation = 'DOT_PRODUCT')
 
         dot_product_1.inputs[0].join(self.target_socket_output, move=False)
         dot_product_2.inputs[0].join(self.target_socket_output, move=False)
@@ -778,15 +771,13 @@ class Output_Socket_World_Space_To_Tangent_Space:
         tangent.direction_type = 'UV_MAP'
         tangent.uv_map = self.uv_layer_name
 
-        node = dot_product_2.inputs[1].new('ShaderNodeVectorMath')
-        node.operation = 'MULTIPLY'
+        node = dot_product_2.inputs[1].new('ShaderNodeVectorMath', operation = 'MULTIPLY')
 
         attr_node = node.inputs[1].new('ShaderNodeAttribute')
         attr_node.attribute_type = 'GEOMETRY'
         attr_node.attribute_name = self.uv_layer_name + '.tangent_sign'
 
-        node = node.inputs[0].new('ShaderNodeVectorMath')
-        node.operation = 'CROSS_PRODUCT'
+        node = node.inputs[0].new('ShaderNodeVectorMath', operation = 'CROSS_PRODUCT')
 
         node.inputs[1].join(tangent.outputs[0], move=False)
 

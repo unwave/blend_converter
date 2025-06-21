@@ -14,6 +14,10 @@ from . import bpy_context
 from . import bpy_utils
 
 
+VALIDATE_NEW_LINKS = True
+""" Validate newly crated links. If `True` and a link is invalid — an exception is raised. """
+
+
 DEFAULT_ATTRS = {
     '__doc__',
     '__module__',
@@ -268,8 +272,8 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
         self.connections.clear()
 
         tree = self.node.tree
-        bl_link = tree.input_socket_to_link_map[self.bl_socket]
-        del tree.input_socket_to_link_map[self.bl_socket]
+        bl_link = tree.input_bl_socket_to_link_map[self.bl_socket]
+        del tree.input_bl_socket_to_link_map[self.bl_socket]
         tree.bl_tree.links.remove(bl_link)
 
 
@@ -277,6 +281,9 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
 
         if socket.is_output:
             bl_link = self.bl_socket.id_data.links.new(self.bl_socket, socket.bl_socket)
+
+            if VALIDATE_NEW_LINKS and not bl_link.is_valid:
+                raise RuntimeError(f"Invalid link created: from node: '{socket.node.name}' [{socket.node.bl_idname}] and socket: '{socket.identifier}' to node: '{self.node.name}' [{self.node.bl_idname}] and socket: '{self.identifier}'")
 
             # only one input is allowed
             for _socket in self.connections:
@@ -287,7 +294,7 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
 
             socket.connections.append(self)
 
-            self.node.tree.input_socket_to_link_map[self] = bl_link
+            self.node.tree.input_bl_socket_to_link_map[self.bl_socket] = bl_link
 
             if ALLOW_NODE_MOVE and move:
                 x, y = self.get_location()
@@ -299,6 +306,9 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
         else:
             bl_link = self.bl_socket.id_data.links.new(socket.bl_socket, self.bl_socket)
 
+            if VALIDATE_NEW_LINKS and not bl_link.is_valid:
+                raise RuntimeError(f"Invalid link created: from node: '{self.node.name}' [{self.node.bl_idname}] and socket: '{self.identifier}' to node: '{socket.node.name}' [{socket.node.bl_idname}] and socket: '{socket.identifier}'")
+
             # only one input is allowed
             for _socket in socket.connections:
                 _socket.connections.remove(socket)
@@ -308,7 +318,7 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
 
             socket.connections.append(self)
 
-            self.node.tree.input_socket_to_link_map[socket] = bl_link
+            self.node.tree.input_bl_socket_to_link_map[socket.bl_socket] = bl_link
 
             if ALLOW_NODE_MOVE and move:
                 x, y = socket.get_location()
@@ -737,7 +747,7 @@ class _Tree_Wrapper(bpy.types.NodeTree if typing.TYPE_CHECKING else _No_Type, ty
         self.clear()
 
         self.bl_tree = bl_tree
-        self.input_socket_to_link_map: typing.Dict[_T_SOCKET, bpy.types.NodeLink] = {}
+        self.input_bl_socket_to_link_map: typing.Dict[bpy.types.NodeSocketStandard, bpy.types.NodeLink] = {}
 
         self._new_nodes: typing.List[_T_NODE] = []
         """ The nodes created via the wrapper. """
@@ -764,7 +774,7 @@ class _Tree_Wrapper(bpy.types.NodeTree if typing.TYPE_CHECKING else _No_Type, ty
             to_node.inputs[to_socket.identifier].connections.append(from_node.outputs[from_socket.identifier])
             from_node.outputs[from_socket.identifier].connections.append(to_node.inputs[to_socket.identifier])
 
-            self.input_socket_to_link_map[to_socket] = link
+            self.input_bl_socket_to_link_map[to_socket] = link
 
 
     if typing.TYPE_CHECKING:
@@ -1089,8 +1099,7 @@ class _Shader_Node_Wrapper(_Node_Wrapper['Shader_Tree_Wrapper', _Shader_Socket_W
             radius = self.get_input('Radius') # Subsurface Radius
 
             if isinstance(scale, _Shader_Socket_Wrapper) or isinstance(radius, _Shader_Socket_Wrapper):
-                vector_math = radius.insert_new('ShaderNodeVectorMath')
-                vector_math.operation = 'MULTIPLY'
+                vector_math = radius.insert_new('ShaderNodeVectorMath', operation = 'MULTIPLY')
 
                 vector_math[0] = radius
                 vector_math[1] = scale
@@ -1394,6 +1403,30 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
 
             for socket in node.outputs[0].connections[1:]:
                 node.copy().outputs[0].join(socket)
+
+
+        # pre-multiply emissions
+        for node in surface_input.descendants:
+
+            if not node.be('ShaderNodeBsdfPrincipled'):
+                continue
+
+            if not 'Emission Strength' in node.inputs.identifiers:
+                continue
+
+            if (not node.inputs['Emission Strength'].connections and node.inputs['Emission Strength'].is_close(0)) or (not node.inputs[Socket_Identifier.EMISSION].connections and node.inputs[Socket_Identifier.EMISSION].is_close((0, 0, 0))):
+                node.inputs[Socket_Identifier.EMISSION].disconnect()
+                node.inputs[Socket_Identifier.EMISSION].set_default_value((1, 1, 1, 1))
+                node.inputs['Emission Strength'].disconnect()
+                node.inputs['Emission Strength'].set_default_value(0)
+            else:
+                emission_socket = node.inputs[Socket_Identifier.EMISSION]
+
+                mix_node = emission_socket.new('ShaderNodeVectorMath', operation = 'MULTIPLY')
+                mix_node[1] = node.inputs['Emission Strength'].as_output()
+
+                node.inputs['Emission Strength'].disconnect()
+                node.inputs['Emission Strength'].set_default_value(1)
 
 
         # merge descendants of ShaderNodeMixShader and ShaderNodeAddShader nodes

@@ -900,7 +900,7 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
 
 
             for node in reversed(tree.surface_input.descendants):
-                if node.be(GENERATED_COORDINATES_TEXTURE_NODE) and not node.inputs['Vector'].connections:
+                if node.be(GENERATED_COORDINATES_TEXTURE_NODE) and not node.inputs['Vector'].connections and node.inputs['Vector'].enabled:
                     node.inputs['Vector'].new('ShaderNodeTexCoord', 'Generated')
 
 
