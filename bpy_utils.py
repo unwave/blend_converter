@@ -1167,7 +1167,6 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
 
             for object in objects_to_unwrap:
                 bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
-                # object.data.uv_layers.active = object.data.uv_layers[settings.uv_layer_name]
 
             unwrap_ministry_of_flat_with_fallback(objects_to_unwrap, settings)
 
@@ -1182,7 +1181,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
         ## pack
         merged_uvs_settings = settings._get_copy()
         merged_uvs_settings.uv_layer_name = uv_layer_bake
-        bpy_uv.ensure_uv_layer([merged_object], merged_uvs_settings.uv_layer_name, do_init = True)
+        bpy_uv.ensure_uv_layer([merged_object], merged_uvs_settings.uv_layer_name, init_from=settings.uv_layer_name)
 
 
         with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
@@ -1410,6 +1409,11 @@ def split_objects_into_pre_merged_objects(objects: typing.List[bpy.types.Object]
             object.name = object_info['name']
 
         for key, value in object_info['custom_properties'].items():
+
+            if key == 'cycles':
+                # Cannot assign a 'IDPropertyGroup' value to the existing 'cycles' Group IDProperty
+                continue
+
             try:
                 object[key] = value
             except TypeError:
@@ -1568,6 +1572,24 @@ def move_objects_to_new_collection(objects: typing.List[bpy.types.Object], colle
     return layer_collection
 
 
+def unwrap_unique_meshes(objects: typing.List[bpy.types.Object], settings: tool_settings.UVs):
+
+    objects = get_unique_mesh_objects(objects)
+
+    with bpy_context.Bpy_State() as bpy_state:
+
+        for object in objects:
+            for modifier in object.modifiers:
+                bpy_state.set(modifier, 'show_viewport', False)
+
+        for object in objects:
+            bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
+
+        unwrap_ministry_of_flat_with_fallback(objects, settings)
+
+        bpy_uv.scale_uv_to_world_per_uv_layout(objects)
+
+
 def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake_Materials, additional_bake_settings: typing.Optional[dict] = None):
 
 
@@ -1606,31 +1628,18 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         unwrap_resolution = 1024 if settings.resolution == 0 else settings.resolution
         uvs_unwrap_settings = tool_settings.UVs(resolution = unwrap_resolution, do_unwrap=False, average_uv_scale=False)
         uvs_unwrap_settings._set_suggested_padding()
-        uvs_unwrap_settings.uv_layer_name = settings.uv_layer_reuse
+        uvs_unwrap_settings.uv_layer_name = settings.uv_layer_bake
 
-        # TODO: check results for non mesh objects, they supposed to have valid auto-generated UVs, like curves do
-        objects_to_unwrap = get_unique_mesh_objects([object for object in objects if hasattr(object.data, 'uv_layers') and not settings.uv_layer_reuse in object.data.uv_layers])
+        bpy_uv.ensure_uv_layer(objects, settings.uv_layer_bake, init_from = settings.uv_layer_reuse)
 
-        with bpy_context.State() as state, bpy_context.Bpy_State() as bpy_state:
 
-            for object in objects_to_unwrap:
-                if object.animation_data:
-                    for driver in object.animation_data.drivers:
-                        state.set(driver, 'mute', True)
+        def filter_objects_to_unwrap(objects: typing.List[bpy.types.Object]):
+            # TODO: check results for non mesh objects, they supposed to have valid auto-generated UVs, like curves do
+            return [object for object in objects if hasattr(object.data, 'uv_layers') and not settings.uv_layer_reuse in object.data.uv_layers]
 
-            for object in objects_to_unwrap:
-                for modifier in object.modifiers:
-                    bpy_state.set(modifier, 'show_viewport', False)
 
-            bpy_uv.ensure_uv_layer(objects_to_unwrap, uvs_unwrap_settings.uv_layer_name)
-
-            for object in objects_to_unwrap:
-                bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[uvs_unwrap_settings.uv_layer_name])
-                # object.data.uv_layers.active = object.data.uv_layers[settings.uv_layer_name]
-
-            unwrap_ministry_of_flat_with_fallback(objects_to_unwrap, uvs_unwrap_settings)
-
-            bpy_uv.scale_uv_to_world_per_uv_layout(objects_to_unwrap)
+        if settings.unwrap_original_topology:
+            unwrap_unique_meshes(filter_objects_to_unwrap(objects), uvs_unwrap_settings)
 
 
         ## copy identifiers
@@ -1647,7 +1656,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
         make_material_independent_from_object(objects_copy)
 
-        if settings.exclude_topology_modifiers:
+        if settings.bake_original_topology:
             for object in objects_copy:
                 for modifier in object.modifiers:
 
@@ -1661,7 +1670,12 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
         convert_to_mesh(objects_copy)
 
-        if settings.space_out:
+
+        if not settings.unwrap_original_topology:
+            unwrap_unique_meshes(filter_objects_to_unwrap(objects_copy), uvs_unwrap_settings)
+
+
+        if settings.isolate_object_hierarchies:
             space_out_objects(objects_copy)
 
         merged_object = merge_objects(objects_copy, generate_merged_objects_info = True)
@@ -1669,11 +1683,6 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         ## pack uvs
-        merged_uvs_settings = uvs_unwrap_settings._get_copy()
-        merged_uvs_settings.uv_layer_name = settings.uv_layer_bake
-        bpy_uv.ensure_uv_layer([merged_object], merged_uvs_settings.uv_layer_name, do_init = True)
-
-
         with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
 
             bpy_state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[settings.uv_layer_bake])
@@ -1685,6 +1694,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
             bpy.ops.uv.average_islands_scale()
 
         for material_key in (alpha_material_key, opaque_material_key):
+            merged_uvs_settings = uvs_unwrap_settings._get_copy()
             merged_uvs_settings.material_key = material_key
             merged_uvs_settings.average_uv_scale = False
             merged_uvs_settings.uvp_rescale = True
@@ -1747,7 +1757,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         ## split baked copy
         splitted_objects_copy = split_objects_into_pre_merged_objects([merged_object])
 
-        if settings.space_out:
+        if settings.isolate_object_hierarchies:
             revert_space_out_objects(splitted_objects_copy)
 
         map_copy_id_to_copy = {object[K_OBJECT_COPY_ID]: object for object in splitted_objects_copy}
@@ -1773,7 +1783,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
         for orig, copy in map_original_to_copy.items():
 
-            if settings.exclude_topology_modifiers:
+            if settings.bake_original_topology:
 
                 with bpy_context.Bpy_State() as bpy_state:
 
@@ -1812,7 +1822,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         merge_material_slots_with_the_same_materials(objects)
         merge_material_slots_with_the_same_materials(splitted_objects_copy)
 
-        if settings.exclude_topology_modifiers:
+        if settings.bake_original_topology:
             bpy.data.batch_remove(splitted_objects_copy)
         else:
             move_objects_to_new_collection(splitted_objects_copy, '__baked_copy__').exclude = True

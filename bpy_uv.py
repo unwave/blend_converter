@@ -22,7 +22,7 @@ from . import bpy_utils
 from . import tool_settings
 
 
-def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, do_init = False):
+def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, *, init_from: str = ''):
 
     # TODO: need to ensure the name is unique
     added_uvs_names = set()
@@ -38,7 +38,12 @@ def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, do_init =
         if len(mesh.uv_layers) >= 8:
             raise Exception(f"Fail to create uv layer: '{name}'. Only 8 UV maps maximum per mesh is allowed. The mesh already has the maximum: {mesh.name_full}")
 
-        uvs = mesh.uv_layers.new(name = name, do_init = do_init)
+        if init_from:
+            with bpy_context.Bpy_State() as bpy_state:
+                bpy_state.set(mesh.uv_layers, 'active', mesh.uv_layers[init_from])
+                uvs = mesh.uv_layers.new(name = name, do_init = True)
+        else:
+            uvs = mesh.uv_layers.new(name = name, do_init = False)
 
         added_uvs_names.add(uvs.name)
 

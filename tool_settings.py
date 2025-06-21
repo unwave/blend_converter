@@ -1038,8 +1038,12 @@ class UVs(Settings):
 
     uv_packer_addon_pin_any_uv_vertex: bool = False
     """
-    Allows for a better UV coverage for a stretch geometry.
+    A hack to trigger a packing to others algorithm.
+
+    Allows for a better UV coverage in presence of stretched and long uv islands.
     https://blenderartists.org/t/uv-packer-for-blender-free-windows-macos/1287541/71
+
+    Increases the packing time. Can still produce a suboptimal pack.
 
     #### Default: `False`
     """
@@ -1673,11 +1677,11 @@ class Bake_Materials(Settings):
     #### Default: `'_bc_bake'`
     """
 
-    uv_layer_reuse: str = '_bc_bake'
+    uv_layer_reuse: str = ''
     """
     The name of a uv layer that will not be re-unwrapped, only packed.
 
-    #### Default: `'_bc_bake'`
+    #### Default: `''`
     """
 
     faster_ao_bake: bool = False
@@ -1696,20 +1700,29 @@ class Bake_Materials(Settings):
     #### Default: `False`
     """
 
-    space_out: bool = False
+    isolate_object_hierarchies: bool = False
     """
-    Space out objects, aka exploded bake.
+    Space out object hierarchies, grouped by a top common parent, before baking to prevent them affecting each other, aka exploded bake.
 
     #### Default: `False`
     """
 
-    exclude_topology_modifiers: bool = True
+    bake_original_topology: bool = True
     """
-    The UV data is transferred with the data transfer modifier.
+    The UV data is transferred using the data transfer modifier.
 
-    If `False` the topology changing modifiers will be applied on the bake copy and the transfer modifier will be left on the original model.
+    If `True` the topology changing modifiers will be excluded and the uvs transferred to the model.
+
+    If `False` the topology changing modifiers will be applied and the transfer modifier will be left on the original model as a top most modifier.
 
     #### Default: `True`
+    """
+
+    unwrap_original_topology: bool = False
+    """
+    If `True` then pre-converter meshes will be UV unwrapped.
+
+    #### Default: `False`
     """
 
 
