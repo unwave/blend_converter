@@ -249,8 +249,13 @@ if __name__ == '__main__':
     warnings.simplefilter('error')
 
 
+    from blend_converter import bpy_utils
+
+    setattr(builtins, 'binspect', bpy_utils.inspect_blend)
+
+
     if ARGS['ignore_inspect']:
-        from blend_converter import bpy_utils
+
 
         def dummy_inspect(*args, **kwargs):
             pass
@@ -271,5 +276,4 @@ if __name__ == '__main__':
     utils.print_in_color(utils.get_color_code(256,256,256, 34, 139, 34), f"CONVERTED IN {round(time.perf_counter() - start_time, 2)} SECONDS.", flush=True)
 
     if ARGS['inspect']:
-        from blend_converter import bpy_utils
         bpy_utils.inspect_blend()

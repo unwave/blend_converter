@@ -10,6 +10,7 @@ import re
 import math
 
 import bpy
+from bpy import utils as b_utils
 import mathutils
 
 from . import bpy_node
@@ -155,6 +156,55 @@ def del_scene_prop(key: str):
 
 
 
+def get_embedded_id_data_and_path(object: bpy.types.bpy_struct):
+    """
+    #129393 - Python API: Can not assign bpy.types.Collection as PointerProperty - blender - Blender Projects
+    https://projects.blender.org/blender/blender/issues/129393
+
+    PointerProperty for NodeTree broke - Coding / Python Support - Blender Artists Community
+    https://blenderartists.org/t/pointerproperty-for-nodetree-broke/1549830
+    """
+
+    id_data = object.id_data
+
+    if isinstance(id_data, bpy.types.ShaderNodeTree):
+
+        name = re.match(r"bpy\.data\.materials\['(.+?)'\]\.node_tree", repr(object)).group(1)
+        material = bpy.data.materials[name]
+
+        if object is id_data:
+            return material, 'node_tree'
+        else:
+            return material, f'node_tree.{object.path_from_id()}'
+
+    elif isinstance(id_data, bpy.types.CompositorNodeTree):
+
+        name = re.match(r"bpy\.data\.scenes\['(.+?)'\]\.node_tree", repr(object)).group(1)
+        scene = bpy.data.scenes[name]
+
+        if object is id_data:
+            return scene, 'node_tree'
+        else:
+            return scene, f'node_tree.{object.path_from_id()}'
+
+    else:
+        raise NotImplementedError(repr(object))
+
+
+def get_id_data_and_path(object: typing.Union[bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection]):
+
+    id_data: bpy.types.ID = object.id_data
+
+    if id_data.is_embedded_data:
+        return get_embedded_id_data_and_path(object)
+    else:
+        if object == id_data:
+            return id_data, ''
+        else:
+            if isinstance(object, bpy.types.NlaTrack):
+                return id_data, f'animation_data.nla_tracks["{b_utils.escape_identifier(object.name)}"]'
+            else:
+                return id_data, object.path_from_id()
 
 
 class Bpy_State_Item(bpy.types.PropertyGroup):
@@ -170,8 +220,6 @@ class Bpy_State_Item(bpy.types.PropertyGroup):
     # ⚓ T51096 path_from_id does not work on subproperties of a custom node
     # https://developer.blender.org/T51096
 
-    re_material_name = re.compile(r"bpy\.data\.materials\['(.+?)'\]\.node_tree")
-    re_scene_name = re.compile(r"bpy\.data\.scenes\['(.+?)'\]\.node_tree")
 
     @property
     def target(self):
@@ -189,16 +237,7 @@ class Bpy_State_Item(bpy.types.PropertyGroup):
     def target(self, object):
 
         if isinstance(object, (bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection)):
-
-            id_data: bpy.types.ID = object.id_data
-
-            if id_data.is_embedded_data:
-                self.object_id_data, self.object_path_from_id = self.get_embedded_data(object)
-            else:
-                self.object_id_data = id_data
-                if object != id_data:
-                    self.object_path_from_id = object.path_from_id()
-
+            self.object_id_data, self.object_path_from_id = get_id_data_and_path(object)
         else:
             self['_target'] = object
 
@@ -219,46 +258,9 @@ class Bpy_State_Item(bpy.types.PropertyGroup):
     def init_value(self, value):
 
         if isinstance(value, (bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection)):
-            self.init_value_id_data = value.id_data
-            if value != value.id_data:
-                self.init_value_path_from_id = value.path_from_id()
+            self.init_value_id_data, self.init_value_path_from_id = get_id_data_and_path(value)
         else:
             self['_init_value'] = value
-
-
-    def get_embedded_data(self, object: bpy.types.bpy_struct):
-        """
-        #129393 - Python API: Can not assign bpy.types.Collection as PointerProperty - blender - Blender Projects
-        https://projects.blender.org/blender/blender/issues/129393
-
-        PointerProperty for NodeTree broke - Coding / Python Support - Blender Artists Community
-        https://blenderartists.org/t/pointerproperty-for-nodetree-broke/1549830
-        """
-
-        id_data = object.id_data
-
-        if isinstance(id_data, bpy.types.ShaderNodeTree):
-
-            name = self.re_material_name.match(repr(object)).group(1)
-            material = bpy.data.materials[name]
-
-            if object is id_data:
-                return material, 'node_tree'
-            else:
-                return material, f'node_tree.{object.path_from_id()}'
-
-        elif isinstance(id_data, bpy.types.CompositorNodeTree):
-
-            name = self.re_scene_name.match(repr(object)).group(1)
-            scene = bpy.data.scenes[name]
-
-            if object is id_data:
-                return scene, 'node_tree'
-            else:
-                return scene, f'node_tree.{object.path_from_id()}'
-
-        else:
-            raise NotImplementedError(repr(object))
 
 
 

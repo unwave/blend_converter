@@ -10,8 +10,10 @@ import random
 import uuid
 import operator
 import hashlib
+import re
 
 import bpy
+from bpy import utils as b_utils
 import mathutils
 
 from . import bpy_bake
@@ -40,14 +42,12 @@ def get_view_layer_objects(view_layer: typing.Optional[bpy.types.ViewLayer] = No
 def iter_bone_names(action: bpy.types.Action):
     """ Iterate through bones names associated with the action. """
 
-    import re
-    from bpy.utils import unescape_identifier
     re_bone_animation = re.compile(r'pose.bones\["(.+)"\]')
 
     for fcurve in action.fcurves:
         match = re_bone_animation.match(fcurve.data_path)
         if match:
-            yield unescape_identifier(match.group(1))
+            yield b_utils.unescape_identifier(match.group(1))
 
 
 def duplicates_make_real():
@@ -1579,9 +1579,20 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
     with bpy_context.Global_Bake_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
-        for o in bpy.data.objects:
-            if o.type == 'ARMATURE':
-                bpy_state_0.set(o.pose, 'ik_solver', 'LEGACY')
+        for object in bpy.data.objects:
+            if object.type == 'ARMATURE':
+                bpy_state_0.set(object.pose, 'ik_solver', 'LEGACY')
+
+
+        for object in objects:
+
+            if object.animation_data:
+
+                for driver in object.animation_data.drivers:
+                    bpy_state_0.set(driver, 'mute', True)
+
+                for nla_track in object.animation_data.nla_tracks:
+                    bpy_state_0.set(nla_track, 'mute', True)
 
 
         convert_materials_to_principled(objects, remove_unused=False)

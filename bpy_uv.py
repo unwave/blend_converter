@@ -782,7 +782,6 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
 
         print('Packing UV islands...')
 
-        # bpy_utils.inspect_blend()
 
         if settings.use_uv_packer_addon and enable_uv_packer_addon():
 
