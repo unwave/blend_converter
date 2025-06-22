@@ -146,8 +146,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         elif mask == (False, True, False):
             if os.path.exists(entry.model.result_path):
                 self.on_show_result_in_explorer(entry)
-            else:
+            elif os.path.exists(entry.model.result_dir):
                 utils.os_open(entry.model.result_dir)
+            else:
+                wx.MessageBox(f"The result path does not exist yet:\n{entry.model.result_path}", 'File does not exist', style= wx.OK | wx.ICON_ERROR)
 
         elif mask == (True, True, True):
             self.on_compare_model(entry)

@@ -1036,14 +1036,14 @@ class UVs(Settings):
     #### Default: `True`
     """
 
-    uv_packer_addon_pin_any_uv_vertex: bool = False
+    uv_packer_addon_pin_largest_island: bool = False
     """
     A hack to trigger a packing to others algorithm.
 
     Allows for a better UV coverage in presence of stretched and long uv islands.
     https://blenderartists.org/t/uv-packer-for-blender-free-windows-macos/1287541/71
 
-    Increases the packing time. Can still produce a suboptimal pack.
+    Significantly increases the packing time. Can still produce a suboptimal pack.
 
     #### Default: `False`
     """
@@ -1065,6 +1065,13 @@ class UVs(Settings):
     uvp_rescale: bool = False
     """
     Rescale UVs before packing.
+
+    #### Default: `False`
+    """
+
+    uvp_prerotate: bool = False
+    """
+    Pre-rotate UVs before packing. This can make them be no longer axis aligned.
 
     #### Default: `False`
     """
@@ -1725,6 +1732,14 @@ class Bake_Materials(Settings):
     #### Default: `False`
     """
 
+    non_uniform_average_uv_scale: bool = False
+    """
+    Use non-uniform UVs rescale in `bpy.ops.uv.average_islands_scale`.
+
+    May fix stretched UVs issues or make it worse.
+
+    #### Default: `False`
+    """
 
 @dataclasses.dataclass
 class Future_Bake_Materials(Settings):

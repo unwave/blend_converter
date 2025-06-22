@@ -203,6 +203,10 @@ def get_id_data_and_path(object: typing.Union[bpy.types.bpy_struct, bpy.types.bp
         else:
             if isinstance(object, bpy.types.NlaTrack):
                 return id_data, f'animation_data.nla_tracks["{b_utils.escape_identifier(object.name)}"]'
+            elif isinstance(object, bpy.types.FCurve):
+                # TODO: this may not be adequate, try search by data_path
+                index = list(id_data.animation_data.drivers).index(object)
+                return id_data, f'animation_data.drivers[{index}]'
             else:
                 return id_data, object.path_from_id()
 
@@ -920,6 +924,8 @@ class Diffuse_AO_Bake_Settings(Bpy_State):
 
         self.set(render, 'engine', 'CYCLES')
 
+        self.set(scene, 'world', self.get_world())
+
         if faster:
 
             self.set(cycles, 'samples', int(math.sqrt(samples)))
@@ -959,8 +965,6 @@ class Diffuse_AO_Bake_Settings(Bpy_State):
             self.set(cycles, 'volume_bounces', 0)
             self.set(cycles, 'transparent_max_bounces', 8)
 
-
-        self.set(scene, 'world', self.get_world())
 
         try:
             self.set(render.bake, 'view_from', 'ABOVE_SURFACE')

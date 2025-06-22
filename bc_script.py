@@ -26,6 +26,7 @@ if 'bpy' in sys.modules:
 
     from blend_converter import bpy_context
     from blend_converter import bpy_utils
+    from blend_converter import tool_settings
 
 
 
@@ -356,3 +357,31 @@ def reset_ui_layout():
 
 def get_visible_objects():
     return bpy_utils.get_visible_objects()
+
+
+def get_meshable_objects(objects: Objects_Like):
+    return bpy_utils.get_meshable_objects(get_objects(objects))
+
+
+def copy_and_bake_materials(objects: Objects_Like, settings: 'tool_settings.Bake_Materials'):
+    bpy_utils.copy_and_bake_materials(get_objects(objects), tool_settings.Bake_Materials._from_dict(settings))
+
+
+def scene_clean_up():
+    """ Remove all objects and collection starting from `#` and purge unused. """
+
+    for object in list(bpy.data.objects):
+        if object.name.startswith('#'):
+            bpy.data.objects.remove(object)
+
+    for layer in list(bpy.context.view_layer.layer_collection.children):
+
+        if layer.collection.name.startswith('#'):
+
+            bpy.data.batch_remove(set(layer.collection.all_objects))
+            bpy.data.collections.remove(layer.collection)
+
+        elif layer.exclude:
+            layer.exclude = False
+
+    bpy.ops.outliner.orphans_purge()

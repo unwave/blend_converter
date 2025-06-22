@@ -69,6 +69,29 @@ def pin_any_vertex(mesh: bpy.types.Mesh):
             return
 
 
+def pin_largest_island(mesh: bpy.types.Mesh):
+
+    from mathutils.geometry import area_tri
+
+    b_mesh = bmesh.from_edit_mesh(mesh)
+    uv_layer = b_mesh.loops.layers.uv.verify()
+
+    linked_uv_islands = get_linked_uv_islands(b_mesh, uv_layer)
+
+    face_to_uv_triangles = get_uv_triangles(b_mesh, b_mesh.loops.layers.uv.verify())
+
+    def get_area(island):
+        return sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face])
+
+    largest_island = sorted(linked_uv_islands, key=get_area)[-1]
+
+    for face in largest_island:
+        for loop in face.loops:
+            loop[uv_layer].pin_uv = True
+
+    bmesh.update_edit_mesh(mesh, loop_triangles=False, destructive=False)
+
+
 def execute_uv_packer_addon(self: 'uv_packer.UVPackerPackButtonOperator', context: 'bpy.types.Context'):
     """ Make UV-Packer to execute non-modally. """
 
@@ -790,8 +813,8 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
 
         if settings.use_uv_packer_addon and enable_uv_packer_addon():
 
-            if settings.uv_packer_addon_pin_any_uv_vertex:
-                pin_any_vertex(bpy.context.object.data)
+            if settings.uv_packer_addon_pin_largest_island:
+                pin_largest_island(bpy.context.object.data)
 
             uv_packer_props: uv_packer.UVPackProperty = bpy.context.scene.UVPackerProps
 
@@ -807,7 +830,7 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
             uv_packer_props.uvp_selection_only = True
             uv_packer_props.uvp_combine = True
 
-            uv_packer_props.uvp_prerotate = True
+            uv_packer_props.uvp_prerotate = settings.uvp_prerotate
             uv_packer_props.uvp_rescale = settings.uvp_rescale
 
 
@@ -829,7 +852,7 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
             execute_uv_packer_addon(Dummy(), Dummy_Context())
 
 
-            if settings.uv_packer_addon_pin_any_uv_vertex:
+            if settings.uv_packer_addon_pin_largest_island:
                 bpy.ops.uv.pin(clear=True)
 
         else:

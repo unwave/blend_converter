@@ -370,9 +370,9 @@ class AO_Diffuse(_AO):
     #### Default: `False`
     """
 
-    environment_has_alpha: bool = False
+    environment_has_transparent_materials: bool = False
     """
-    Assume the environment has alpha materials.
+    Assume the environment has transparent materials.
 
     #### Default: `True`
     """
@@ -390,7 +390,7 @@ class AO_Diffuse(_AO):
 
 
     def _get_material_context(self, material: 'bpy.types.Material'):
-        return bpy_context.Output_Socket_Diffuse_AO(material, self.ignore_backface, self.faster, self.environment_has_alpha)
+        return bpy_context.Output_Socket_Diffuse_AO(material, self.ignore_backface, self.faster, self.environment_has_transparent_materials)
 
 
     def _get_composer_context(self, input_socket, images):

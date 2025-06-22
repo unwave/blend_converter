@@ -1221,7 +1221,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
             if not material_group:
                 continue
 
-            bake_types = [[tool_settings_bake.AO_Diffuse(faster=faster_ao_bake, environment_has_alpha = has_alpha_materials), tool_settings_bake.Roughness(use_denoise=denoise_all), tool_settings_bake.Metallic(use_denoise=denoise_all)]]
+            bake_types = [[tool_settings_bake.AO_Diffuse(faster=faster_ao_bake, environment_has_transparent_materials = has_alpha_materials), tool_settings_bake.Roughness(use_denoise=denoise_all), tool_settings_bake.Metallic(use_denoise=denoise_all)]]
 
             if any(material[Material_Bake_Type.HAS_EMISSION] for material in material_group):
                 bake_types.append(tool_settings_bake.Emission(use_denoise=denoise_all))
@@ -1257,8 +1257,24 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
         return merged_object
 
 
+def get_closest_power_of_two(resolution: float, min_res = 64, max_res = 4096) -> int:
+
+    variants = []
+
+    def get_power_of_2(n):
+        return round(math.log(n)/math.log(2))
+
+    for i in range(get_power_of_2(min_res), get_power_of_2(max_res) + 1):
+        n = pow(2, i)
+        variants.append((n - resolution, n))
+
+    closest_resolution = min(variants, key = lambda x: abs(x[0]))
+
+    return closest_resolution[1]
+
+
 def get_texture_resolution(object: bpy.types.Object, *, uv_layer_name: str, materials: typing.Optional[typing.List[bpy.types.Material]] = None, px_per_meter = 1024, min_res = 64, max_res = 4096):
-    """ Get a texture resolution needed to achieve the given textel density. """
+    """ Get a texture resolution needed to achieve the given texel density. """
 
     import bmesh
     from mathutils.geometry import area_tri
@@ -1277,13 +1293,16 @@ def get_texture_resolution(object: bpy.types.Object, *, uv_layer_name: str, mate
     face_areas = []
     face_uv_areas = []
 
-    if materials is not None:
+    if materials:
         material_indexes = set(index for index, material in enumerate(object.data.materials) if material in materials)
+    else:
+        material_indexes = None
 
     for face in bm.faces:
 
-        if materials is not None and face.material_index not in material_indexes:
-            continue
+        if material_indexes is not None:
+            if face.material_index not in material_indexes:
+                continue
 
         face_areas.append(face.calc_area())
         face_uv_areas.append(sum(area_tri(*loop) for loop in face_to_uv_triangles[face]))
@@ -1292,46 +1311,36 @@ def get_texture_resolution(object: bpy.types.Object, *, uv_layer_name: str, mate
     total_uv_area = sum(face_uv_areas)
     assert not math.isnan(total_uv_area)
 
-    texel_densities = []
+    # texel_densities = []
     texel_densities_to_find = []
     weights = []
 
-    current_texture_size = 1024
+    # current_texture_size = 1024
 
     for face_area, face_area_uv in zip(face_areas, face_uv_areas):
 
         try:
-            texel_density = math.sqrt(pow(current_texture_size, 2) / face_area * face_area_uv)
+            # texel_density = math.sqrt(pow(current_texture_size, 2) / face_area * face_area_uv)
             texel_density_to_find = math.sqrt(face_area / face_area_uv) * px_per_meter
             weight = face_area_uv / total_uv_area
         except ZeroDivisionError:
             continue
 
-        texel_densities.append(texel_density)
+        # texel_densities.append(texel_density)
         texel_densities_to_find.append(texel_density_to_find)
         weights.append(weight)
 
-
-    total_mesh_area = sum(face_areas)
-    current_from_weighted_mean = sum(map(operator.mul, texel_densities, weights))/sum(weights)
-    current_from_total = math.sqrt(total_mesh_area / total_uv_area) * current_texture_size
+    # total_mesh_area = sum(face_areas)
+    # current_from_weighted_mean = sum(map(operator.mul, texel_densities, weights))/sum(weights)
+    # current_from_total = math.sqrt(total_mesh_area / total_uv_area) * current_texture_size
 
     perfect_resolution = sum(map(operator.mul, texel_densities_to_find, weights))/sum(weights)
 
-    variants = []
-
-    def get_power_of_2(n):
-        return round(math.log(n)/math.log(2))
-
-    for i in range(get_power_of_2(min_res), get_power_of_2(max_res) + 1):
-        n = pow(2, i)
-        variants.append((n - perfect_resolution, n))
-
-    res = min(variants, key = lambda x: abs(x[0]))
+    final_resolution = get_closest_power_of_two(perfect_resolution, min_res, max_res)
 
     object.data.uv_layers.active = init_active
 
-    return res[1]
+    return final_resolution
 
 
 def get_visible_objects():
@@ -1598,7 +1607,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         raise ValueError(f"Specified objects cannot be baked, type must be MESH or convertible to MESH: {[o.name_full for o in objects]}\nIncompatible: {[o.name_full for o in incompatible_objects]}")
 
 
-    with bpy_context.Global_Bake_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
+    with bpy_context.Global_Bake_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.Bpy_State() as bpy_state_0:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
         for object in bpy.data.objects:
@@ -1625,12 +1634,12 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         ## unwrap uvs
-        unwrap_resolution = 1024 if settings.resolution == 0 else settings.resolution
-        uvs_unwrap_settings = tool_settings.UVs(resolution = unwrap_resolution, do_unwrap=False, average_uv_scale=False)
-        uvs_unwrap_settings._set_suggested_padding()
-        uvs_unwrap_settings.uv_layer_name = settings.uv_layer_bake
+        uvs_unwrap_settings = tool_settings.UVs(uv_layer_name = settings.uv_layer_bake)
 
         bpy_uv.ensure_uv_layer(objects, settings.uv_layer_bake, init_from = settings.uv_layer_reuse)
+
+        for object in objects:
+            object.data.uv_layers.active = object.data.uv_layers[settings.uv_layer_bake]
 
 
         def filter_objects_to_unwrap(objects: typing.List[bpy.types.Object]):
@@ -1682,7 +1691,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         merged_object.name = '__bake_copy__'
 
 
-        ## pack uvs
+        ## average uv islands scale
         with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
 
             bpy_state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[settings.uv_layer_bake])
@@ -1691,37 +1700,87 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
             bpy.ops.uv.reveal()
             bpy.ops.uv.select_all(action='SELECT')
 
-            bpy.ops.uv.average_islands_scale()
-
-        for material_key in (alpha_material_key, opaque_material_key):
-            merged_uvs_settings = uvs_unwrap_settings._get_copy()
-            merged_uvs_settings.material_key = material_key
-            merged_uvs_settings.average_uv_scale = False
-            merged_uvs_settings.uvp_rescale = True
-            bpy_uv.unwrap_and_pack([merged_object], merged_uvs_settings)
+            if settings.non_uniform_average_uv_scale and 'scale_uv' in repr(bpy.ops.uv.average_islands_scale):
+                bpy.ops.uv.average_islands_scale(scale_uv = True)
+            else:
+                bpy.ops.uv.average_islands_scale()
 
 
-        bpy_uv.ensure_pixel_per_island([merged_object], uvs_unwrap_settings)
+        ## uv pack
+
+        materials = list(group_objects_by_material([merged_object]))
+
+        def pack_uvs(resolution):
+            for material_key in (opaque_material_key, alpha_material_key):
+
+                if not any(m for m in materials if m.get(material_key)):
+                    continue
+
+                pack_uvs_settings = tool_settings.UVs(
+                    resolution = resolution,
+                    uv_layer_name = settings.uv_layer_bake,
+                    material_key = material_key,
+                    average_uv_scale = False,
+                    uvp_rescale = False,
+                    uvp_prerotate = False,
+                    do_unwrap = False,
+                    uv_packer_addon_pin_largest_island=True,
+                )
+                pack_uvs_settings._set_suggested_padding()
+                bpy_uv.unwrap_and_pack([merged_object], pack_uvs_settings)
+                bpy_uv.ensure_pixel_per_island([merged_object], pack_uvs_settings)
+
+
+        if settings.resolution:
+            pack_uvs(settings.resolution)
+        else:
+            # pre packing
+            # needed to calculate the texel density
+            # but to match the final resolution, we have to pack a second time
+            pack_uvs(get_closest_power_of_two((settings.min_resolution + settings.max_resolution)/2))
 
 
         ## bake materials
-        bake_settings = tool_settings.Bake(image_dir = settings.image_dir, make_materials_single_user=False)
+        bake_settings = tool_settings.Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir, make_materials_single_user=False)
 
         if additional_bake_settings:
             for key, value in additional_bake_settings.items():
                 setattr(bake_settings, key, value)
 
-        bake_settings.uv_layer_name = settings.uv_layer_bake
+        # TODO: this only works for the processed objects, not others in the scene
+        environment_has_transparent_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))
 
-        has_alpha_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))
 
         for material_key in (opaque_material_key, alpha_material_key):
 
-            material_group = [m for m in bpy.data.materials if m.get(material_key)]
+            material_group = [m for m in materials if m.get(material_key)]
             if not material_group:
                 continue
 
-            bake_types = [[tool_settings_bake.AO_Diffuse(faster=settings.faster_ao_bake, environment_has_alpha = has_alpha_materials), tool_settings_bake.Roughness(use_denoise=settings.denoise_all), tool_settings_bake.Metallic(use_denoise=settings.denoise_all)]]
+
+            if settings.resolution:
+                bake_settings.resolution = settings.resolution
+            else:
+                # calculate target resolution and repack
+                bake_settings.resolution = get_texture_resolution(
+                    merged_object,
+                    uv_layer_name = settings.uv_layer_bake,
+                    materials = material_group,
+                    px_per_meter = settings.texel_density,
+                    min_res = settings.min_resolution,
+                    max_res = settings.max_resolution,
+                    )
+                pack_uvs(bake_settings.resolution)
+
+
+            ## bake
+            bake_types = [
+                [
+                    tool_settings_bake.AO_Diffuse(faster=settings.faster_ao_bake, environment_has_transparent_materials = environment_has_transparent_materials),
+                    tool_settings_bake.Roughness(use_denoise=settings.denoise_all),
+                    tool_settings_bake.Metallic(use_denoise=settings.denoise_all)
+                ]
+            ]
 
             if any(material[Material_Bake_Type.HAS_EMISSION] for material in material_group):
                 bake_types.append(tool_settings_bake.Emission(use_denoise=settings.denoise_all))
@@ -1737,18 +1796,6 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
             bake_settings.material_key = material_key
             bake_settings.bake_types = bake_types
-
-            if settings.resolution == 0:
-                bake_settings.resolution = get_texture_resolution(
-                    merged_object,
-                    uv_layer_name = settings.uv_layer_bake,
-                    materials = material_group,
-                    px_per_meter = settings.texel_density,
-                    min_res = settings.min_resolution,
-                    max_res = settings.max_resolution,
-                    )
-            else:
-                bake_settings.resolution = settings.resolution
 
 
             bpy_bake.bake([merged_object], bake_settings)
