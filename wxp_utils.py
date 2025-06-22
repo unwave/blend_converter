@@ -1125,6 +1125,7 @@ def get_bitmap_from_clipboard() -> wx.Bitmap:
 
     return bitmap.GetBitmap() if success else None
 
+
 def get_clipboard_text() -> str:
     if not wx.TheClipboard.Open():
         return None
@@ -1135,13 +1136,28 @@ def get_clipboard_text() -> str:
 
     return text_data.GetText() if success else None
 
-def set_clipboard_text(text: str):
-    if not wx.TheClipboard.Open():
-        return None
 
-    wx.TheClipboard.SetData(wx.TextDataObject(text))
-    wx.TheClipboard.Flush()
-    wx.TheClipboard.Close()
+def set_clipboard_text(text: str):
+
+    try:
+        import pyperclip
+
+    except ImportError:
+
+        if wx.TheClipboard.IsOpened():
+            wx.TheClipboard.Close()
+
+        if wx.TheClipboard.Open():
+            wx.TheClipboard.SetData(wx.TextDataObject(text))
+            wx.TheClipboard.GetData(wx.TextDataObject())
+            wx.TheClipboard.Flush()
+            wx.TheClipboard.Close()
+        else:
+            wx.MessageBox('Unable to open the clipboard.', 'Error', style= wx.OK | wx.ICON_ERROR)
+
+    else:
+        pyperclip.copy(text)
+
 
 
 
