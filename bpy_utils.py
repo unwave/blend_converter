@@ -15,6 +15,7 @@ import re
 import bpy
 from bpy import utils as b_utils
 import mathutils
+import bmesh
 
 from . import bpy_bake
 from . import tool_settings
@@ -455,24 +456,83 @@ def get_compatible_armature_actions(objects: typing.List[bpy.types.Object]) -> t
     return actions
 
 
-def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object], settings: 'tool_settings.UVs'):
+def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object], settings: tool_settings.UVs):
 
-    ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(vertex_weld=False, rasterization_resolution=1, packing_iterations=1)
+    ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(
+        vertex_weld=False,
+        rasterization_resolution=1,
+        packing_iterations=1,
+    )
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        for object in objects:
+
+    def restore_sharp_edges(object: bpy.types.Object):
+
+        b_mesh = bmesh.from_edit_mesh(object.data)
+
+        for edge in b_mesh.edges:
+            if edge.index in sharp_edge_indexes:
+                edge.smooth = False
+
+        bmesh.update_edit_mesh(object.data)
+
+
+    for object in objects:
+
+        with bpy_context.Focus_Objects(object, mode='EDIT'):
+
+            sharp_edge_indexes = set()
+
+            # tag sharp edges
+            b_mesh = bmesh.from_edit_mesh(object.data)
+            b_mesh.edges.ensure_lookup_table()
+
+            sharp_edge_indexes.update(edge.index for edge in b_mesh.edges if not edge.smooth)
+
+            bmesh.update_edit_mesh(object.data)
+
+
+            # mark seams by materials
+            bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='EDGE')
+            bpy.ops.mesh.reveal()
+            bpy.ops.mesh.select_all(action='DESELECT')
+
+            for material_index in range(len(object.material_slots)):
+
+                object.active_material_index = material_index
+
+                bpy.ops.mesh.select_all(action='DESELECT')
+                bpy.ops.object.material_slot_select()
+                bpy.ops.mesh.region_to_loop()
+                bpy.ops.mesh.mark_seam(clear=False)
+
+
+            b_mesh = bmesh.from_edit_mesh(object.data)
+            b_mesh.edges.ensure_lookup_table()
+
+            for edge in b_mesh.edges:
+                edge.smooth = True
+                edge.select_set(edge.seam)
+
+            bmesh.update_edit_mesh(object.data)
+
+            bpy.ops.mesh.mark_sharp(use_verts=False)
+
+
+            # unwrapping
             try:
-                bpy_uv.unwrap_ministry_of_flat(object, temp_dir, settings = ministry_of_flat_settings, uv_layer_name = settings.uv_layer_name)
+                with tempfile.TemporaryDirectory() as temp_dir:
+
+                    bpy_uv.unwrap_ministry_of_flat(object, temp_dir, settings = ministry_of_flat_settings, uv_layer_name = settings.uv_layer_name)
             except utils.Fallback as e:
+
                 utils.print_in_color(utils.get_color_code(240,0,0, 0,0,0), f"Fallback to smart_project: {e}")
 
-                with bpy_context.Focus_Objects(object, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
+                with bpy_context.Bpy_State() as bpy_state:
 
                     bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
 
                     bpy.ops.mesh.reveal()
                     if not bpy.ops.uv.reveal.poll():
-                        import bmesh
                         if not bmesh.from_edit_mesh(object.data).faces:
                             continue
                     bpy.ops.uv.reveal()
@@ -480,6 +540,8 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
                     bpy.ops.uv.select_all(action='SELECT')
                     bpy.ops.uv.pin(clear=True)
                     bpy.ops.uv.smart_project(island_margin = settings._uv_island_margin_fraction / 0.8, angle_limit = math.radians(settings.smart_project_angle_limit))
+            finally:
+                restore_sharp_edges(object)
 
 
 def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material_keys: typing.Optional[typing.List[str]] = None):
@@ -1152,12 +1214,12 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
         # TODO: check results for non mesh objects, they supposed to have valid auto-generated UVs, like curves do
         objects_to_unwrap = get_unique_mesh_objects([object for object in objects if hasattr(object.data, 'uv_layers') and not uv_layer_reuse in object.data.uv_layers])
 
-        with bpy_context.State() as state, bpy_context.Bpy_State() as bpy_state:
+        with bpy_context.Bpy_State() as bpy_state:
 
             for object in objects_to_unwrap:
                 if object.animation_data:
                     for driver in object.animation_data.drivers:
-                        state.set(driver, 'mute', True)
+                        bpy_state.set(driver, 'mute', True)
 
             for object in objects_to_unwrap:
                 for modifier in object.modifiers:
@@ -1276,7 +1338,6 @@ def get_closest_power_of_two(resolution: float, min_res = 64, max_res = 4096) ->
 def get_texture_resolution(object: bpy.types.Object, *, uv_layer_name: str, materials: typing.Optional[typing.List[bpy.types.Material]] = None, px_per_meter = 1024, min_res = 64, max_res = 4096):
     """ Get a texture resolution needed to achieve the given texel density. """
 
-    import bmesh
     from mathutils.geometry import area_tri
 
     init_active = object.data.uv_layers.active
@@ -1629,6 +1690,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         convert_materials_to_principled(objects, remove_unused=False)
 
         set_out_of_range_material_indexes_to_zero(objects)
+        merge_material_slots_with_the_same_materials(objects)
 
         alpha_material_key, opaque_material_key = split_into_alpha_and_non_alpha_groups(objects)
 
@@ -1678,6 +1740,11 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
                     modifier.show_viewport = False
 
         convert_to_mesh(objects_copy)
+
+
+        # for object in objects_copy:
+        #     edge_split_modifier: bpy.types.EdgeSplitModifier = object.modifiers.new(name='__bc_bake_edge_split', type='EDGE_SPLIT')
+        #     edge_split_modifier.use_edge_angle = False
 
 
         if not settings.unwrap_original_topology:

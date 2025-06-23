@@ -267,6 +267,10 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
     print('ministry_of_flat:', object.name_full)
 
 
+    if object.type != 'MESH':
+        raise Exception(f"Object is not of MESH type: {object.name_full}")
+
+
     def move_modifier_to_first(object, modifier):
         if bpy.app.version < (2,90,0):
             for _ in range(len(object.modifiers)):
@@ -305,35 +309,68 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
     with bpy_context.Focus_Objects(object), bpy_context.Bpy_State() as bpy_state:
 
 
-        if object.type != 'MESH':
-            raise Exception(f"Object is not of mesh type: {object.name_full}")
-
         if not object.data.polygons:
             raise utils.Fallback(f"Object has no faces: {object.name_full}")
 
 
-        bpy_state.set(object, 'rotation_mode', 'XYZ')
-        bpy_state.set(object, 'location', (0,0,0))
-        bpy_state.set(object, 'scale', (1,1,1))
-        bpy_state.set(object, 'rotation_euler', (0,0,0))
-        bpy_state.set(object, 'delta_location', (0,0,0))
-        bpy_state.set(object, 'delta_scale', (1,1,1))
-        bpy_state.set(object, 'delta_rotation_euler', (0,0,0))
+        object_copy = object.copy()
+        object_copy.data = object.data.copy()
+
+        object_copy.rotation_mode = 'XYZ'
+        object_copy.location = (0,0,0)
+
+        object_copy.scale = (1,1,1)
+        object_copy.rotation_euler = (0,0,0)
+        object_copy.delta_location = (0,0,0)
+        object_copy.delta_scale = (1,1,1)
+        object_copy.delta_rotation_euler = (0,0,0)
+
+        object_copy.modifiers.clear()
 
 
-        filepath_input = utils.ensure_unique_path(os.path.join(temp_dir, utils.ensure_valid_basename(object.name_full + '.obj')))
-        filepath_output = utils.ensure_unique_path(os.path.join(temp_dir, utils.ensure_valid_basename(object.name_full + '_unwrapped.obj')))
+        # Error: Modifier cannot be applied to a mesh with shape keys
+        if object_copy.data.shape_keys:
+            for key_block in reversed(object_copy.data.shape_keys.key_blocks):
+                object_copy.shape_key_remove(key_block)
 
-        print('\tobj_export ', end='')
-        with utils.Capture_Stdout() as capture_stdout, utils.Capture_Stderr() as capture_stderr:
-            try:
+
+        with bpy_context.Focus_Objects(object_copy):
+
+            edge_split_modifier: bpy.types.EdgeSplitModifier = object_copy.modifiers.new(name='__edge_split__', type='EDGE_SPLIT')
+            edge_split_modifier.use_edge_angle = False
+
+            bpy.ops.object.modifier_apply(modifier=edge_split_modifier.name)
+
+
+            with bpy_context.Focus_Objects(object_copy, 'EDIT'):
+
+
+                bpy.ops.mesh.reveal()
+                bpy.ops.mesh.select_all(action='SELECT')
+
+                bpy_state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'BOUNDING_BOX_CENTER')
+                bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(1/0.1, 1/0.1, 1/0.1), mirror=False, use_proportional_edit=False, snap=False)
+
+                bpy_state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'INDIVIDUAL_ORIGINS')
+                bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(0.1, 0.1, 0.1), mirror=False, use_proportional_edit=False, snap=False)
+
+
+
+            filepath_input = utils.ensure_unique_path(os.path.join(temp_dir, utils.ensure_valid_basename(object.name_full + '.obj')))
+            filepath_output = utils.ensure_unique_path(os.path.join(temp_dir, utils.ensure_valid_basename(object.name_full + '_unwrapped.obj')))
+
+            print('\tobj_export ', end='')
+            with utils.Capture_Stdout() as capture_stdout, utils.Capture_Stderr() as capture_stderr:
                 try:
-                    bpy.ops.wm.obj_export(filepath=filepath_input, export_selected_objects=True, export_materials=False, export_uv=False, apply_modifiers=False)
-                except AttributeError:
-                    bpy.ops.export_scene.obj(filepath=filepath_input, use_selection=True, use_materials=False, use_uvs=False, use_mesh_modifiers=False)
-            except Exception as e:
-                print_output(capture_stdout, capture_stderr)
-                raise utils.Fallback('Fail to export obj.') from e
+                    try:
+                        bpy.ops.wm.obj_export(filepath=filepath_input, export_selected_objects=True, export_materials=False, export_uv=False, apply_modifiers=False)
+                    except AttributeError:
+                        bpy.ops.export_scene.obj(filepath=filepath_input, use_selection=True, use_materials=False, use_uvs=False, use_mesh_modifiers=False)
+                except Exception as e:
+                    print_output(capture_stdout, capture_stderr)
+                    raise utils.Fallback('Fail to export obj.') from e
+
+        bpy.data.objects.remove(object_copy)
 
 
         cmd = settings._get_cmd(filepath_input, filepath_output)
@@ -346,19 +383,6 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
         returncode = process.returncode
 
-        # if returncode == 1:
-        #     pass
-        # elif returncode == 3221225477:
-        #     utils.print_in_color(utils.get_color_code(255,255,255, 255//2,0,0), "0xc0000005 Access Violation Error")
-        #     _settings = settings._get_copy()
-        #     _settings.grids = False
-        #     _cmd = _settings._get_cmd(filepath_input, filepath_output)
-        #     try:
-        #         process = subprocess.run(_cmd, timeout=10, text = True, capture_output=True, encoding='utf-8')
-        #     except subprocess.TimeoutExpired as e:
-        #         raise utils.Fallback(f"Timeout: {object.name_full}") from e
-        #     returncode = process.returncode
-
         if returncode == 1:
             pass
         elif returncode == 3221225786:
@@ -370,7 +394,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
             utils.print_in_color(utils.get_color_code(0,0,0, 256,256,256), 'CMD:', utils.get_command_from_list(cmd))
             utils.print_in_color(yellow_color, process.stdout)
             utils.print_in_color(magenta_color, process.stderr)
-            raise utils.Fallback(f"Bad return code {process.returncode}: {object.name_full}")
+            raise utils.Fallback(f"Bad return code {returncode}: {object.name_full}")
 
         if not os.path.exists(filepath_output):
             raise utils.Fallback(f"Output .obj file does not exist: {filepath_output}")

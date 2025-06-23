@@ -30,6 +30,8 @@ def test_merge_and_bake_gltf(blend_dir, blender_executable):
 
     model.blender_executable = blender_executable
 
+    model.run(bc_script.reset_ui_layout)
+
     model.run(bc_script.merge_objects_and_bake_materials, model.run(bc_script.get_view_layer_objects), image_dir=os.path.join(model.result_dir, 'textures'), resolution=128)
 
     model.run(bc_script.save_blend_as_copy, os.path.join(model.result_dir, '_debug.blend'))
@@ -55,6 +57,9 @@ def test_copy_and_bake_gltf(blend_dir, blender_executable):
     model.settings.export_apply = True
 
     model.blender_executable = blender_executable
+
+    # TODO: getting a crash on `bpy_context.call_in_view3d(bpy.ops.transform.resize...` for an BLENDER_v249 file
+    model.run(bc_script.reset_ui_layout)
 
     objects = model.run(bc_script.get_meshable_objects, model.run(bc_script.get_view_layer_objects))
 
