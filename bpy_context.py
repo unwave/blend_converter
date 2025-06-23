@@ -229,7 +229,10 @@ class Bpy_State_Item(bpy.types.PropertyGroup):
     def target(self):
 
         if self.object_id_data is None:
-            return self['_target']
+            if '_target_repr' in self.keys():
+                raise Exception(f"The underling id data has been removed: {self['_target_repr']}")
+            else:
+                return self['_target']
         else:
             if self.object_path_from_id:
                 return self.object_id_data.path_resolve(self.object_path_from_id)
@@ -242,6 +245,7 @@ class Bpy_State_Item(bpy.types.PropertyGroup):
 
         if isinstance(object, (bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection)):
             self.object_id_data, self.object_path_from_id = get_id_data_and_path(object)
+            self['_target_repr'] = repr(self.object_id_data)
         else:
             self['_target'] = object
 
@@ -250,7 +254,10 @@ class Bpy_State_Item(bpy.types.PropertyGroup):
     def init_value(self):
 
         if self.init_value_id_data is None:
-            return self.get('_init_value')
+            if '_value_repr' in self.keys():
+                raise Exception(f"The underling value id data has been removed: {self['_value_repr']}")
+            else:
+                return self.get('_init_value')
         else:
             if self.init_value_path_from_id:
                 return self.init_value_id_data.path_resolve(self.init_value_path_from_id)
@@ -263,6 +270,7 @@ class Bpy_State_Item(bpy.types.PropertyGroup):
 
         if isinstance(value, (bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection)):
             self.init_value_id_data, self.init_value_path_from_id = get_id_data_and_path(value)
+            self['_value_repr'] = repr(self.init_value_id_data)
         else:
             self['_init_value'] = value
 

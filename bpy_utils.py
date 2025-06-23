@@ -810,15 +810,8 @@ def find_attribute_rgba(object: bpy.types.Object, name: str):
 
 def get_empty():
 
-    empty = bpy.data.objects.new(name='__texture_coordinate__', object_data=None)
+    empty = bpy.data.objects.new(name='__bc_temp_texture_coordinate', object_data=None)
     empty.empty_display_type = 'ARROWS'
-
-    collection = bpy.data.collections.get('__texture_coordinate__')
-    if collection is None:
-        collection = bpy.data.collections.new('__texture_coordinate__')
-        bpy.context.view_layer.layer_collection.collection.children.link(collection)
-
-    collection.objects.link(empty)
 
     return empty
 
@@ -900,6 +893,9 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
 
     The main use case is speedup texture baking.
     """
+
+    texture_coordinates_collection = bpy.data.collections.new(f'__bc_temp_texture_coordinates_{uuid.uuid1().hex}')
+    bpy.context.view_layer.layer_collection.collection.children.link(texture_coordinates_collection)
 
     objects = get_meshable_objects(objects)
 
@@ -1074,6 +1070,7 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
                         if output.identifier == 'Generated':
                             replacement_node = tree.new('ShaderNodeTexCoord')
                             replacement_node.object = get_texture_coordinates_generated_empty(evaluated_object)
+                            texture_coordinates_collection.objects.link(replacement_node.object)
 
                             if object.data and hasattr(object.data, 'texture_mesh') and object.data.texture_mesh:
                                 warn("texture_mesh is not handled.")
@@ -1081,6 +1078,7 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
                         elif output.identifier == 'Object':
                             replacement_node = tree.new('ShaderNodeTexCoord')
                             replacement_node.object = get_texture_coordinates_object_empty(evaluated_object)
+                            texture_coordinates_collection.objects.link(replacement_node.object)
 
                         elif output.identifier == 'UV':
 
@@ -1123,6 +1121,8 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
                     # https://github.com/blender/blender/blob/af4974dfaa165ff1be0819c52afc99217d3627ba/source/blender/gpu/shaders/material/gpu_shader_material_tex_image.glsl#L77
                     mapping = node.inputs['Vector'].insert_new('ShaderNodeMapping')
                     mapping.inputs['Rotation'].set_default_value(evaluated_object.matrix_world.to_euler())
+
+    return texture_coordinates_collection
 
 
 def merge_material_slots_with_the_same_materials(objects: typing.List[bpy.types.Object]):
@@ -1243,7 +1243,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
 
         ## merge
         bpy.context.view_layer.update()
-        make_material_independent_from_object(objects)
+        texture_coordinates_collection = make_material_independent_from_object(objects)
         merged_object = merge_objects(objects)
 
 
@@ -1315,10 +1315,8 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
             bpy_bake.bake([merged_object], bake_settings)
 
         ## delete temp objects
-        temp_collection = bpy.data.collections.get('__texture_coordinate__')
-        if temp_collection:
-            bpy.data.batch_remove(set(temp_collection.objects))
-            bpy.data.collections.remove(temp_collection)
+        bpy.data.batch_remove(set(texture_coordinates_collection.objects))
+        bpy.data.collections.remove(texture_coordinates_collection)
 
         merge_material_slots_with_the_same_materials([merged_object])
 
@@ -1732,7 +1730,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
         objects_copy = deep_copy_objects(objects)
 
-        make_material_independent_from_object(objects_copy)
+        texture_coordinates_collection = make_material_independent_from_object(objects_copy)
 
         if settings.bake_original_topology:
             for object in objects_copy:
@@ -1762,7 +1760,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
             space_out_objects(objects_copy)
 
         merged_object = merge_objects(objects_copy, generate_merged_objects_info = True)
-        merged_object.name = '__bake_copy__'
+        merged_object.name = '__bc_bake'
 
 
         ## average uv islands scale
@@ -1946,14 +1944,12 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         if settings.bake_original_topology:
             bpy.data.batch_remove(splitted_objects_copy)
         else:
-            move_objects_to_new_collection(splitted_objects_copy, '__baked_copy__').exclude = True
+            move_objects_to_new_collection(splitted_objects_copy, '__bc_baked_copy').exclude = True
 
 
         ## delete temp objects
-        temp_collection = bpy.data.collections.get('__texture_coordinate__')
-        if temp_collection:
-            bpy.data.batch_remove(set(temp_collection.objects))
-            bpy.data.collections.remove(temp_collection)
+        bpy.data.batch_remove(set(texture_coordinates_collection.objects))
+        bpy.data.collections.remove(texture_coordinates_collection)
 
 
         return objects

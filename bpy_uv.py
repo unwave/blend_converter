@@ -281,7 +281,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
     def create_uv_transfer_modifier(object: bpy.types.Object, target_object: bpy.types.Object):
 
-        modifier: bpy.types.DataTransferModifier = object.modifiers.new(name='__uv_transfer__', type='DATA_TRANSFER')
+        modifier: bpy.types.DataTransferModifier = object.modifiers.new(name='__bc_uv_transfer', type='DATA_TRANSFER')
 
         move_modifier_to_first(object, modifier)
 
@@ -336,7 +336,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
         with bpy_context.Focus_Objects(object_copy):
 
-            edge_split_modifier: bpy.types.EdgeSplitModifier = object_copy.modifiers.new(name='__edge_split__', type='EDGE_SPLIT')
+            edge_split_modifier: bpy.types.EdgeSplitModifier = object_copy.modifiers.new(name='__bc_edge_split', type='EDGE_SPLIT')
             edge_split_modifier.use_edge_angle = False
 
             bpy.ops.object.modifier_apply(modifier=edge_split_modifier.name)
