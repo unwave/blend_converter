@@ -316,7 +316,14 @@ def get_object_info(object: bpy.types.Object):
     )
 
 
-def merge_objects(objects: typing.List[bpy.types.Object], object_name: str = None, generate_merged_objects_info = False):
+def merge_objects(objects: typing.List[bpy.types.Object], *, merge_into: typing.Optional[bpy.types.Object] = None, name: str = None, generate_merged_objects_info = False):
+
+
+    if merge_into is not None:
+        if not merge_into in objects:
+            objects = list(objects) + [merge_into]
+    else:
+        merge_into = objects[0]
 
 
     incompatible_objects = set(objects) - set(get_joinable_objects(objects))
@@ -342,15 +349,15 @@ def merge_objects(objects: typing.List[bpy.types.Object], object_name: str = Non
 
 
     with bpy_context.Focus_Objects(objects):
-        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-        merged_object = bpy.context.view_layer.objects.active
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        bpy.context.view_layer.objects.active = merged_object = merge_into
         bpy.ops.object.join()
         # #126278 - Joining some meshes shows warning "Call save() to ensure ..." in console - blender - Blender Projects
         # https://projects.blender.org/blender/blender/issues/126278
 
 
-    if object_name is not None:
-        merged_object.name = object_name
+    if name is not None:
+        merged_object.name = name
 
 
     if generate_merged_objects_info:
@@ -1975,3 +1982,37 @@ def is_smooth_modifier(modifier: bpy.types.Modifier):
         return False
 
     return 'Smooth by Angle' in modifier.node_group.name
+
+
+
+def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '', ignore_type = set(), ignore_canceled = False):
+    """
+    If `ignore_name` is not empty modifiers with names matching the regular expression will be ignored.
+
+    E.g. `ignore_name = '@'` — ignore all modifiers starting with "@".
+    """
+
+    for object in objects:
+
+
+        modifiers_to_apply = []
+
+        for modifier in list(object.modifiers):
+
+            if modifier.type in ignore_type:
+                continue
+
+            if ignore_name and re.match(ignore_name, modifier.name):
+                continue
+
+            modifiers_to_apply.append(modifier)
+
+
+        with bpy_context.Focus_Objects(object):
+
+            for modifier in modifiers_to_apply:
+
+                result = bpy.ops.object.modifier_apply(modifier = modifier.name, single_user = True)
+
+                if not ignore_canceled and 'CANCELLED' in result:
+                    raise Exception(f"Fail to apply {modifier.type} modifier '{modifier.name}' to object '{object.name_full}'.")

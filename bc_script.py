@@ -18,6 +18,12 @@ import typing
 import sys
 
 
+T = typing.TypeVar('T')
+
+def wraps(func: T) -> typing.Callable[[T], T]:
+    return lambda f: f
+
+
 if 'bpy' in sys.modules:
 
     import re
@@ -275,7 +281,7 @@ def merge_objects(objects: Objects_Like = None, object_name: str = None):
 
     Returns the merged object.
     """
-    return bpy_utils.merge_objects(objects=get_objects_fallback(objects), object_name=object_name)
+    return bpy_utils.merge_objects(objects=get_objects_fallback(objects), name=object_name)
 
 
 def inspect_blend(exit_after = False, executable: typing.Optional[str] = None):
@@ -332,8 +338,9 @@ def merge_objects_respect_materials(objects: Objects_Like):
     return bpy_utils.merge_objects(objects)
 
 
-def merge_objects_and_bake_materials(objects: Objects_Like, image_dir: str, *, px_per_meter = 1024, min_res = 64, max_res = 4096, resolution = 0, uv_layer_bake = '_bc_bake', uv_layer_reuse = '_bc_bake', additional_bake_settings: typing.Optional[dict] = None):
-    bpy_utils.merge_objects_and_bake_materials(get_objects(objects), image_dir, px_per_meter = px_per_meter, min_res = min_res, max_res = max_res, resolution = resolution, uv_layer_bake = uv_layer_bake, uv_layer_reuse = uv_layer_reuse, additional_bake_settings = additional_bake_settings)
+@wraps(bpy_utils.merge_objects_and_bake_materials if typing.TYPE_CHECKING else object)
+def merge_objects_and_bake_materials(objects: Objects_Like, *args, **kwargs):
+    bpy_utils.merge_objects_and_bake_materials(get_objects(objects), *args, **kwargs)
 
 
 def ensure_debugpy():
@@ -385,3 +392,9 @@ def scene_clean_up():
             layer.exclude = False
 
     bpy.ops.outliner.orphans_purge()
+
+
+
+@wraps(bpy_utils.apply_modifiers if typing.TYPE_CHECKING else object)
+def apply_modifiers(objects: Objects_Like, *args, **kwargs):
+    bpy_utils.apply_modifiers(get_objects(objects), *args, **kwargs)
