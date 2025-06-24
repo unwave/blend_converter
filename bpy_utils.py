@@ -469,6 +469,7 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
         vertex_weld=False,
         rasterization_resolution=1,
         packing_iterations=1,
+        timeout=settings.timeout_ministry_of_flat,
     )
 
 
@@ -1701,7 +1702,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         ## unwrap uvs
-        uvs_unwrap_settings = tool_settings.UVs(uv_layer_name = settings.uv_layer_bake)
+        uvs_unwrap_settings = tool_settings.UVs(uv_layer_name = settings.uv_layer_bake, timeout_ministry_of_flat=settings.timeout_ministry_of_flat)
 
         bpy_uv.ensure_uv_layer(objects, settings.uv_layer_bake, init_from = settings.uv_layer_reuse)
 

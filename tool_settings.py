@@ -323,7 +323,11 @@ class Settings:
 
             spec = self._get_attribute_spec(key)
 
-            cmd = spec['properties']['cmd']
+            try:
+                cmd = spec['properties']['cmd']
+            except KeyError as e:
+                raise Exception(f"Fail to get command for: {key}") from e
+
             if cmd is None:
                 continue
 
@@ -1077,6 +1081,14 @@ class UVs(Settings):
     """
 
 
+    timeout_ministry_of_flat: float = 5 * 60.0
+    """
+    Ministry of flat timeout.
+
+    #### Default: `5 * 60.0`
+    """
+
+
     def _set_suggested_padding(self, resolution: typing.Optional[int] = None):
 
         if resolution is None:
@@ -1602,6 +1614,7 @@ class Ministry_Of_Flat(Settings):
     In case of bad geometry it can get into an infinite or a very long inappropriate loop.
 
     #### Default: `5 * 60.0`
+    `cmd`: `None`
     """
 
 
@@ -1739,6 +1752,13 @@ class Bake_Materials(Settings):
     May fix stretched UVs issues or make it worse.
 
     #### Default: `False`
+    """
+
+    timeout_ministry_of_flat: float = 5 * 60.0
+    """
+    Ministry of flat timeout in seconds.
+
+    #### Default: `5 * 60.0`
     """
 
 @dataclasses.dataclass

@@ -261,7 +261,7 @@ def get_island_margin(meshes: typing.Iterable[bpy.types.Mesh], settings: tool_se
     return settings._uv_island_margin_fraction / (aabb_length_sum * 0.1)
 
 
-def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, settings: typing.Optional[tool_settings.Ministry_Of_Flat], uv_layer_name: typing.Optional[str] = None, mark_seams_from_islands = False):
+def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, settings: tool_settings.Ministry_Of_Flat, uv_layer_name: typing.Optional[str] = None, mark_seams_from_islands = False):
     """ Currently operates on per mesh basis, so it is not possible to unwrap only a part of `bpy.types.Mesh`. """
 
     print('ministry_of_flat:', object.name_full)
