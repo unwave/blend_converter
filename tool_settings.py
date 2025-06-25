@@ -189,9 +189,11 @@ class Settings:
 
     _has_been_set: set
 
-    def __init__(self, **kwrags):
+    def __init__(self, **kwargs):
+
         self.__dict__['_has_been_set'] = set()
-        for key, value in kwrags.items():
+
+        for key, value in kwargs.items():
             self._has_been_set.add(key)
             self.__dict__[key] = value
 
@@ -362,7 +364,7 @@ class Settings:
             if not key in other._has_been_set:
                 continue
 
-            if key not in self.__dict__:
+            if key not in type(self).__dict__:
                 continue
 
             setattr(self, key, getattr(other, key))

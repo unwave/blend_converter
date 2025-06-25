@@ -138,7 +138,7 @@ def run_in_area(context: bpy.types.Context, func, *args, **kwargs):
         area=context.area,
         region=context.region
     )
-    return bpy_context.call_with_override(override, func, *args, **kwargs)
+    return bpy_context.call(override, func, *args, **kwargs)
 
 
 @operator_factory.operator(

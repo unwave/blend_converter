@@ -448,33 +448,8 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
                 bpy.ops.uv.select_all(action='DESELECT')
                 bpy.ops.uv.select_overlap()
 
-
-                with bpy_context.State() as state:
-
-                    window = bpy.data.window_managers[0].windows[0]
-
-                    area = window.screen.areas[0]
-                    state.set(area, 'type', 'IMAGE_EDITOR')
-                    state.set(area, 'ui_type', 'UV')
-
-                    space_data = area.spaces.active
-
-                    window_region = next(region for region in area.regions if region.type == 'WINDOW')
-
-                    override = dict(
-                        window=window,
-                        workspace=window.workspace,
-                        screen=window.screen,
-                        area = area,
-                        space_data = space_data,
-                        region = window_region,
-                    )
-                    bpy_context.call_with_override(override, bpy.ops.uv.select_linked)
-                    try:
-                        bpy_context.call_with_override(override, bpy.ops.uv.unwrap)
-                    except Exception as e:
-                        if 'CANCELLED' in str(e):
-                            pass
+                bpy_context.call_in_uv_editor(bpy.ops.uv.select_linked)
+                bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, can_be_canceled = True)
 
                 bpy.ops.uv.reveal()
                 bpy.ops.object.editmode_toggle()
@@ -792,14 +767,9 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
                     if not object.active_material.get(settings.material_key):
                         continue
 
-                    try:
-                        bpy_context.call_with_object_override(object, [object], bpy.ops.object.material_slot_select)
-                        any_material_selected = True
-                    except Exception as e:
-                        if 'CANCELLED' in str(e):
-                            pass  # can be canceled if the material slot is not assigned to any polygon
-                        else:
-                            raise e
+                    result = bpy_context.call_with_object_override(object, [object], bpy.ops.object.material_slot_select, can_be_canceled = True)
+                    any_material_selected = 'CANCELLED' not in result  # can be canceled if the material slot is not assigned to any polygon
+
 
             if not any_material_selected:
                 utils.print_in_color(utils.get_color_code(255, 219, 187, 0,0,0), f"Objects do not use materials with key:\n\tobjects = {', '.join([o.name_full for o in objects])}\n\tmaterial_key = {settings.material_key}")

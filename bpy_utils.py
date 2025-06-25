@@ -499,10 +499,13 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
 
             bmesh.update_edit_mesh(object.data)
 
+            bpy.ops.mesh.reveal()
+            bpy.ops.uv.reveal()
+            bpy_context.call_in_uv_editor(bpy.ops.uv.select_mode, type='VERTEX', can_be_canceled = True)
+            bpy.context.scene.tool_settings.use_uv_select_sync = False
 
             # mark seams by materials
             bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='EDGE')
-            bpy.ops.mesh.reveal()
             bpy.ops.mesh.select_all(action='DESELECT')
 
             for material_index in range(len(object.material_slots)):
@@ -551,6 +554,19 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
                     bpy.ops.uv.smart_project(island_margin = settings._uv_island_margin_fraction / 0.8, angle_limit = math.radians(settings.smart_project_angle_limit))
             finally:
                 restore_sharp_edges(object, sharp_edge_indexes)
+
+                if not 'iterations' in repr(bpy.ops.uv.unwrap):
+                    return
+
+                # re-unwrap overlaps
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.uv.select_all(action='DESELECT')
+
+                bpy.ops.uv.select_overlap()
+                bpy.ops.uv.select_linked()
+
+                # TODO: handle uv seams
+                bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, method='MINIMUM_STRETCH', fill_holes=True, no_flip=True, can_be_canceled=True)
 
 
 def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material_keys: typing.Optional[typing.List[str]] = None):
@@ -1830,7 +1846,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         ## bake materials
         _bake_settings = tool_settings.Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir, make_materials_single_user=False)
         if bake_settings:
-            _bake_settings._update(_bake_settings)
+            _bake_settings._update(bake_settings)
 
         # TODO: this only works for the processed objects, not others in the scene
         environment_has_transparent_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))

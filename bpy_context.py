@@ -51,7 +51,7 @@ TOPOLOGY_CHANGING_MODIFIER_TYPES = {
 PRINT_CONTEXT_CHANGES = False
 
 
-def call_with_override(override: typing.Dict[str, typing.Any], func: typing.Callable, *args, **kwargs):
+def call(override: typing.Dict[str, typing.Any], func: typing.Callable, *args, can_be_canceled = False, **kwargs):
 
     if bpy.app.version > (3,2,0):
         with bpy.context.temp_override(**override):
@@ -59,7 +59,7 @@ def call_with_override(override: typing.Dict[str, typing.Any], func: typing.Call
     else:
         result =  func(override, *args, **kwargs)
 
-    if 'CANCELLED' in result:
+    if not can_be_canceled and 'CANCELLED' in result:
         raise Exception("\n".join(['CANCELLED:', f"func: {repr(func)}", f"args: {args}", f"kwargs: {kwargs}", f"override: {override}"]))
 
     return result
@@ -78,10 +78,10 @@ def get_view3d():
 
 
 def call_in_view3d(func: typing.Callable, *args, **kwargs):
-    return call_with_override(get_view3d(), func, *args, **kwargs)
+    return call(get_view3d(), func, *args, **kwargs)
 
 
-def call_with_object_override(active_object: 'bpy.types.Object', objects: typing.List['bpy.types.Object'], func: typing.Callable, *args, **kwargs):
+def call_with_object_override(active_object: 'bpy.types.Object', objects: typing.List['bpy.types.Object'], func: typing.Callable, *args, can_be_canceled = False, **kwargs):
 
     if not active_object in objects:
         objects.append(active_object)
@@ -96,7 +96,7 @@ def call_with_object_override(active_object: 'bpy.types.Object', objects: typing
         object = active_object
     )
 
-    return call_with_override(override, func, *args, **kwargs)
+    return call(override, func, *args, can_be_canceled = can_be_canceled, **kwargs)
 
 
 def get_local_view_objects(context: bpy.types.Context):
@@ -1509,3 +1509,30 @@ class Composer_Input_Lightmap:
         self.tree.delete_new_nodes()
 
         bpy.context.scene.render.dither_intensity = self.init_dither_intensity
+
+
+def call_in_uv_editor(func, *args, can_be_canceled = False, **kwargs):
+    """ Because some functionally of the operators can change depending on it."""
+
+    with State() as state:
+
+        window = bpy.data.window_managers[0].windows[0]
+
+        area = window.screen.areas[0]
+        state.set(area, 'type', 'IMAGE_EDITOR')
+        state.set(area, 'ui_type', 'UV')
+
+        space_data = area.spaces.active
+
+        window_region = next(region for region in area.regions if region.type == 'WINDOW')
+
+        override = dict(
+            window=window,
+            workspace=window.workspace,
+            screen=window.screen,
+            area = area,
+            space_data = space_data,
+            region = window_region,
+        )
+
+        call(override, func, *args, can_be_canceled = can_be_canceled, **kwargs)

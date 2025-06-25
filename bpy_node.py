@@ -1641,7 +1641,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
                     selected_nodes = list(bl_nodes),
                 )
 
-                bpy_context.call_with_override(override, bpy.ops.node.delete_reconnect)
+                bpy_context.call(override, bpy.ops.node.delete_reconnect)
 
             self.__init__(reference['bl_tree'])
 
@@ -1696,7 +1696,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
             bl_tree.nodes.active = bl_node
 
             # TODO: check changed behavior in old versions, it only ungroups the active node
-            bpy_context.call_with_override(override, bpy.ops.node.group_ungroup)
+            bpy_context.call(override, bpy.ops.node.group_ungroup)
 
             self.__init__(reference['bl_tree'])
 
