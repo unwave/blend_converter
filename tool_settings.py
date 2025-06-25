@@ -352,6 +352,22 @@ class Settings:
         return f"< {type(self).__name__}  {self._to_dict()} >"
 
 
+    def _update(self, other: 'Settings'):
+
+        for key in other.__dict__:
+
+            if key.startswith('_'):
+                continue
+
+            if not key in other._has_been_set:
+                continue
+
+            if key not in self.__dict__:
+                continue
+
+            setattr(self, key, getattr(other, key))
+
+
 @dataclasses.dataclass
 class Image_File_Settings(Settings):
 
@@ -1080,15 +1096,6 @@ class UVs(Settings):
     #### Default: `False`
     """
 
-
-    timeout_ministry_of_flat: float = 5 * 60.0
-    """
-    Ministry of flat timeout.
-
-    #### Default: `5 * 60.0`
-    """
-
-
     mark_seams_from_islands: bool = False
     """
     After unwrapping mark uv seams according the islands.
@@ -1762,13 +1769,6 @@ class Bake_Materials(Settings):
     May fix stretched UVs issues or make it worse.
 
     #### Default: `False`
-    """
-
-    timeout_ministry_of_flat: float = 5 * 60.0
-    """
-    Ministry of flat timeout in seconds.
-
-    #### Default: `5 * 60.0`
     """
 
 @dataclasses.dataclass
