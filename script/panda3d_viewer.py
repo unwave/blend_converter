@@ -87,7 +87,7 @@ class Viewer(ShowBase):
         self.accept('shift-r', self.reload_last_model)
         self.accept('shift-l', self.render.ls)
         self.accept('shift-a', self.render.analyze)
-        self.accept('shift-b', self.breakpoint)
+        self.accept('shift-b', self.debug)
 
         self.accept('a', self.next_animation)
         self.accept('alt-a', self.stop_animations)
@@ -316,7 +316,7 @@ class Viewer(ShowBase):
         self.update_model(self.last_model_path)
 
 
-    def breakpoint(self):
+    def debug(self):
         breakpoint()
 
 

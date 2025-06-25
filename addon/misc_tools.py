@@ -360,17 +360,20 @@ def run_vhacd(operator: bpy.types.Operator, context: bpy.types.Context):
 
 @operator_factory.operator(
     poll = view_3d_poll,
-    __annotations__ = tool_settings.Ministry_Of_Flat._get_ui_properties(),
+    __annotations__ = dict(
+        **tool_settings.Ministry_Of_Flat._get_ui_properties(),
+        mark_seams_from_islands = bpy.props.BoolProperty(default=True),
+    ),
     invoke = lambda operator, context, event: bpy.data.window_managers[0].invoke_props_dialog(operator, width=400),
     bl_options = {'REGISTER', 'UNDO', 'PRESET'},
 )
-def run_ministry_of_flat(operator: bpy.types.Operator, context: bpy.types.Context):
+def ministry_of_flat(operator: bpy.types.Operator, context: bpy.types.Context):
 
     objects = [objects[0] for data, objects in utils.list_by_key(context.selected_objects, lambda x: x.data).items() if hasattr(data, 'uv_layers')]
 
     with tempfile.TemporaryDirectory() as temp_dir:
         for object in objects:
-            bpy_uv.unwrap_ministry_of_flat(object, temp_dir, tool_settings.Ministry_Of_Flat._from_bpy_struct(operator))
+            bpy_uv.unwrap_ministry_of_flat(object, temp_dir, tool_settings.Ministry_Of_Flat._from_bpy_struct(operator), mark_seams_from_islands = operator.mark_seams_from_islands)
 
 
 
@@ -380,7 +383,7 @@ def run_ministry_of_flat(operator: bpy.types.Operator, context: bpy.types.Contex
     invoke = lambda operator, context, event: bpy.data.window_managers[0].invoke_props_dialog(operator, width=400),
     bl_options = {'REGISTER', 'UNDO', 'PRESET'},
 )
-def run_ministry_of_flat_obj_import(operator: bpy.types.Operator, context: bpy.types.Context):
+def obj_only_ministry_of_flat(operator: bpy.types.Operator, context: bpy.types.Context):
 
     selected_objects = context.selected_objects
 
@@ -492,3 +495,73 @@ def align_longest_1(operator: bpy.types.Operator, context: bpy.types.Context):
                     uv_loop.uv += island_center
 
     bmesh.update_edit_mesh(mesh)
+
+
+@operator_factory.operator(
+    poll = view_3d_poll,
+    __annotations__ = dict(
+        resolution = bpy.props.IntProperty(default=1024, min=32),
+        timeout_ministry_of_flat = bpy.props.IntProperty(default=10, min=0),
+        mark_seams_from_islands = bpy.props.BoolProperty(default=False),
+        use_normals = bpy.props.BoolProperty(default=False),
+        use_grids = bpy.props.BoolProperty(default=True),
+        separate_hard_edges = bpy.props.BoolProperty(default=False),
+        stretch = bpy.props.BoolProperty(default=True),
+        non_uniform_average_uv_scale = bpy.props.BoolProperty(default=False),
+        uv_packer_addon_pin_largest_island = bpy.props.BoolProperty(default=True),
+    ),
+    invoke = lambda operator, context, event: bpy.data.window_managers[0].invoke_props_dialog(operator, width=400),
+    bl_options = {'REGISTER', 'UNDO', 'PRESET'},
+)
+def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
+
+    objects = [objects[0] for data, objects in utils.list_by_key(context.selected_objects, lambda x: x.data).items() if hasattr(data, 'uv_layers')]
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        for object in objects:
+
+            uv_layer_name = object.data.uv_layers.active.name
+
+            uvs_unwrap_settings = tool_settings.UVs(
+                uv_layer_name = object.data.uv_layers.active.name,
+                mark_seams_from_islands = operator.mark_seams_from_islands,
+            )
+
+            ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(
+                vertex_weld = False,
+                rasterization_resolution = 1,
+                packing_iterations = 1,
+                timeout = operator.timeout_ministry_of_flat,
+                use_normal = operator.use_normals,
+                grids = operator.use_grids,
+                separate_hard_edges = operator.separate_hard_edges,
+                stretch = operator.stretch,
+            )
+
+            bpy_utils.unwrap_ministry_of_flat_with_fallback([object], uvs_unwrap_settings, ministry_of_flat_settings)
+
+
+            with bpy_context.Focus_Objects(object, mode='EDIT'):
+
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.uv.reveal()
+                bpy.ops.uv.select_all(action='SELECT')
+
+                if operator.non_uniform_average_uv_scale and 'scale_uv' in repr(bpy.ops.uv.average_islands_scale):
+                    bpy.ops.uv.average_islands_scale(scale_uv = True)
+                else:
+                    bpy.ops.uv.average_islands_scale()
+
+
+            pack_uvs_settings = tool_settings.UVs(
+                resolution = operator.resolution,
+                uv_layer_name = uv_layer_name,
+                average_uv_scale = False,
+                uvp_rescale = False,
+                uvp_prerotate = True,
+                do_unwrap = False,
+                uv_packer_addon_pin_largest_island=operator.uv_packer_addon_pin_largest_island,
+            )
+            pack_uvs_settings._set_suggested_padding()
+            bpy_uv.unwrap_and_pack([object], pack_uvs_settings)
+            bpy_uv.ensure_pixel_per_island([object], pack_uvs_settings)

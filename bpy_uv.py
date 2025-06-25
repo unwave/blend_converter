@@ -524,7 +524,8 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
 
         if mark_seams_from_islands:
-            object.data.uv_layers.active = object.data.uv_layers[uv_layer_name]
+            if uv_layer_name is not None:
+                object.data.uv_layers.active = object.data.uv_layers[uv_layer_name]
             bpy.ops.object.editmode_toggle()
             bpy.ops.mesh.reveal()
             bpy.ops.uv.reveal()

@@ -463,23 +463,23 @@ def get_compatible_armature_actions(objects: typing.List[bpy.types.Object]) -> t
     return actions
 
 
-def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object], settings: tool_settings.UVs):
+def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object], settings: tool_settings.UVs, ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None):
 
-    ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(
-        vertex_weld=False,
-        rasterization_resolution=1,
-        packing_iterations=1,
-        timeout=settings.timeout_ministry_of_flat,
-    )
+    if ministry_of_flat_settings is None:
+        ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(
+            vertex_weld=False,
+            rasterization_resolution=1,
+            packing_iterations=1,
+            timeout=settings.timeout_ministry_of_flat,
+        )
 
 
-    def restore_sharp_edges(object: bpy.types.Object):
+    def restore_sharp_edges(object: bpy.types.Object, sharp_edge_indexes: set):
 
         b_mesh = bmesh.from_edit_mesh(object.data)
 
         for edge in b_mesh.edges:
-            if edge.index in sharp_edge_indexes:
-                edge.smooth = False
+            edge.smooth = not edge.index in sharp_edge_indexes
 
         bmesh.update_edit_mesh(object.data)
 
@@ -530,7 +530,7 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
             try:
                 with tempfile.TemporaryDirectory() as temp_dir:
 
-                    bpy_uv.unwrap_ministry_of_flat(object, temp_dir, settings = ministry_of_flat_settings, uv_layer_name = settings.uv_layer_name)
+                    bpy_uv.unwrap_ministry_of_flat(object, temp_dir, settings = ministry_of_flat_settings, uv_layer_name = settings.uv_layer_name, mark_seams_from_islands = settings.mark_seams_from_islands)
             except utils.Fallback as e:
 
                 utils.print_in_color(utils.get_color_code(240,0,0, 0,0,0), f"Fallback to smart_project: {e}")
@@ -549,7 +549,7 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
                     bpy.ops.uv.pin(clear=True)
                     bpy.ops.uv.smart_project(island_margin = settings._uv_island_margin_fraction / 0.8, angle_limit = math.radians(settings.smart_project_angle_limit))
             finally:
-                restore_sharp_edges(object)
+                restore_sharp_edges(object, sharp_edge_indexes)
 
 
 def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material_keys: typing.Optional[typing.List[str]] = None):

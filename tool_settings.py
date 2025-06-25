@@ -1089,6 +1089,16 @@ class UVs(Settings):
     """
 
 
+    mark_seams_from_islands: bool = False
+    """
+    After unwrapping mark uv seams according the islands.
+
+    Only for using ministry_of_flat.
+
+    #### Default: `False`
+    """
+
+
     def _set_suggested_padding(self, resolution: typing.Optional[int] = None):
 
         if resolution is None:
@@ -1634,7 +1644,7 @@ class Ministry_Of_Flat(Settings):
                 parameters[index] = str(item).upper()
             elif isinstance(item, (float, int)):
                 parameters[index] = str(item)
-            elif isinstance(item, tuple):
+            elif isinstance(item, tuple) or 'IDPropertyArray' in str(type(item)):
                 parameters.pop(index)
                 parameters.insert(index, str(item[2]))
                 parameters.insert(index, str(item[1]))
