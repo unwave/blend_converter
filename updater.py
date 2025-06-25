@@ -31,6 +31,8 @@ LOG_DIR = r'D:\Desktop\temp_log_location_bc'
 
 def kill_process(process: multiprocessing.Process):
 
+    print(f"Killing process: {repr(process)}")
+
     try:
         parent_process = psutil.Process(process.pid)
     except ProcessLookupError:
@@ -132,7 +134,7 @@ class Model_Entry:
                 stderr_capture_thread.join()
 
 
-    def _run(self, callback: typing.Callable):
+    def _run(self, callback: typing.Callable, thread_identity: uuid.UUID):
 
         def read_stdout():
             for line in iter(self.stdout_queue.get, None):
@@ -162,7 +164,12 @@ class Model_Entry:
         if process.exitcode == None:
             kill_process(process)
 
-        self.process = None
+        is_superseded = thread_identity != self.thread_identity
+
+        if is_superseded:
+            self.stderr_queue.put_nowait(f"THE UPDATE HAS BEEN SUPERSEDED: {thread_identity}")
+        else:
+            self.process = None
 
         atexit.unregister(exit_func)
 
@@ -172,6 +179,8 @@ class Model_Entry:
         self.stderr_queue.put_nowait(None)
         read_stderr_thread.join()
 
+        if is_superseded:
+            return
 
         if process.exitcode == 0:
             self.status = 'ok'
@@ -200,10 +209,12 @@ class Model_Entry:
 
             self.is_dirty = False
 
+            self.thread_identity = uuid.uuid4()
+
             if self.process:
                 kill_process(self.process)
 
-            threading.Thread(target=self._run, kwargs=dict(callback=callback), daemon = True).start()
+            threading.Thread(target=self._run, kwargs=dict(callback=callback, thread_identity = self.thread_identity), daemon = True).start()
 
             update_ui()
 
