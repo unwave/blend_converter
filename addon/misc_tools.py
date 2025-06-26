@@ -373,7 +373,9 @@ def ministry_of_flat(operator: bpy.types.Operator, context: bpy.types.Context):
 
     with tempfile.TemporaryDirectory() as temp_dir:
         for object in objects:
-            bpy_uv.unwrap_ministry_of_flat(object, temp_dir, tool_settings.Ministry_Of_Flat._from_bpy_struct(operator), mark_seams_from_islands = operator.mark_seams_from_islands)
+            bpy_uv.unwrap_ministry_of_flat(object, temp_dir, tool_settings.Ministry_Of_Flat._from_bpy_struct(operator, ignore_other = True))
+            if operator.mark_seams_from_islands:
+                bpy_uv.mark_seams_from_islands(object)
 
 
 
@@ -505,10 +507,14 @@ def align_longest_1(operator: bpy.types.Operator, context: bpy.types.Context):
         mark_seams_from_islands = bpy.props.BoolProperty(default=False),
         use_normals = bpy.props.BoolProperty(default=False),
         use_grids = bpy.props.BoolProperty(default=True),
+        use_tubes = bpy.props.BoolProperty(default=True),
         separate_hard_edges = bpy.props.BoolProperty(default=False),
         stretch = bpy.props.BoolProperty(default=True),
         non_uniform_average_uv_scale = bpy.props.BoolProperty(default=False),
         uv_packer_addon_pin_largest_island = bpy.props.BoolProperty(default=True),
+        reunwrap_with_minimal_stretch = bpy.props.BoolProperty(default=False),
+        use_uv_packer_for_pre_packing = bpy.props.BoolProperty(default=False),
+        vertex_weld = bpy.props.BoolProperty(default=False),
     ),
     invoke = lambda operator, context, event: bpy.data.window_managers[0].invoke_props_dialog(operator, width=400),
     bl_options = {'REGISTER', 'UNDO', 'PRESET'},
@@ -525,10 +531,11 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
             uvs_unwrap_settings = tool_settings.UVs(
                 uv_layer_name = object.data.uv_layers.active.name,
                 mark_seams_from_islands = operator.mark_seams_from_islands,
+                reunwrap_with_minimal_stretch = operator.reunwrap_with_minimal_stretch,
             )
 
             ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(
-                vertex_weld = False,
+                vertex_weld = operator.vertex_weld,
                 rasterization_resolution = 1,
                 packing_iterations = 1,
                 timeout = operator.timeout_ministry_of_flat,
@@ -536,6 +543,7 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
                 grids = operator.use_grids,
                 separate_hard_edges = operator.separate_hard_edges,
                 stretch = operator.stretch,
+                tubes= operator.use_tubes
             )
 
             bpy_utils.unwrap_ministry_of_flat_with_fallback([object], uvs_unwrap_settings, ministry_of_flat_settings)
@@ -561,6 +569,7 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
                 uvp_prerotate = True,
                 do_unwrap = False,
                 uv_packer_addon_pin_largest_island=operator.uv_packer_addon_pin_largest_island,
+                use_uv_packer_for_pre_packing = operator.use_uv_packer_for_pre_packing,
             )
             pack_uvs_settings._set_suggested_padding()
             bpy_uv.unwrap_and_pack([object], pack_uvs_settings)

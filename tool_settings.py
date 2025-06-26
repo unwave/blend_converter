@@ -235,7 +235,7 @@ class Settings:
 
 
     @classmethod
-    def _from_bpy_struct(cls, bpy_struct: typing.Union['idprop.types.IDPropertyGroup', 'bpy.types.PropertyGroup', 'bpy.types.Operator']):
+    def _from_bpy_struct(cls, bpy_struct: typing.Union['idprop.types.IDPropertyGroup', 'bpy.types.PropertyGroup', 'bpy.types.Operator'], ignore_other = False):
 
         settings = cls()
 
@@ -246,7 +246,13 @@ class Settings:
 
         for key, value in bpy_struct.items():
 
-            spec = cls._get_attribute_spec(key)
+            try:
+                spec = cls._get_attribute_spec(key)
+            except KeyError as e:
+                if ignore_other:
+                    continue
+                else:
+                    raise e
 
             if spec['ui_spec']['type'] == 'EnumProperty':
                 value = spec['ui_spec']['kwargs']['items'][value][0]
@@ -1102,7 +1108,19 @@ class UVs(Settings):
     """
     After unwrapping mark uv seams according the islands.
 
-    Only for using ministry_of_flat.
+    #### Default: `False`
+    """
+
+    reunwrap_with_minimal_stretch: bool = False
+    """
+    Reunwrap all uvs using the Blender's MINIMUM_STRETCH method.
+
+    #### Default: `False`
+    """
+
+    use_uv_packer_for_pre_packing: bool = False
+    """
+    Use the UV-Packer addon for pre-packing to make uv_packer_addon_pin_largest_island option to work better.
 
     #### Default: `False`
     """

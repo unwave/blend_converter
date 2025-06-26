@@ -261,7 +261,22 @@ def get_island_margin(meshes: typing.Iterable[bpy.types.Mesh], settings: tool_se
     return settings._uv_island_margin_fraction / (aabb_length_sum * 0.1)
 
 
-def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, settings: tool_settings.Ministry_Of_Flat, uv_layer_name: typing.Optional[str] = None, mark_seams_from_islands = False):
+def mark_seams_from_islands(object: bpy.types.Object, uv_layer_name: typing.Optional[str] = None):
+
+    with bpy_context.Focus_Objects(object, 'EDIT'), bpy_context.Bpy_State() as bpy_state:
+
+        if uv_layer_name is not None:
+            bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
+
+        bpy.ops.mesh.reveal()
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.uv.reveal()
+        bpy.ops.uv.select_all(action='SELECT')
+        bpy.ops.uv.mark_seam(clear=True)
+        bpy.ops.uv.seams_from_islands()
+
+
+def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, settings: tool_settings.Ministry_Of_Flat, uv_layer_name: typing.Optional[str] = None):
     """ Currently operates on per mesh basis, so it is not possible to unwrap only a part of `bpy.types.Mesh`. """
 
     print('ministry_of_flat:', object.name_full)
@@ -498,19 +513,6 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
                 raise utils.Fallback(line)
 
 
-        if mark_seams_from_islands:
-            if uv_layer_name is not None:
-                object.data.uv_layers.active = object.data.uv_layers[uv_layer_name]
-            bpy.ops.object.editmode_toggle()
-            bpy.ops.mesh.reveal()
-            bpy.ops.uv.reveal()
-            bpy.ops.mesh.select_all(action='SELECT')
-            bpy.ops.uv.select_all(action='SELECT')
-            bpy.ops.uv.mark_seam(clear=True)
-            bpy.ops.uv.seams_from_islands()
-            bpy.ops.object.editmode_toggle()
-
-
 def get_uv_triangles(b_mesh: bmesh.types.BMesh, uv_layer):
 
     face_to_uv_triangles: typing.Dict[bmesh.types.BMFace, typing.List[typing.Tuple[mathutils.Vector, mathutils.Vector, mathutils.Vector]]]
@@ -728,6 +730,44 @@ def aabb_pack(margin = 0.001, merge_overlap = False):
         bpy.ops.uv.pack_islands(margin = margin)
 
 
+def uv_packer_pack(uvp_width: int, uvp_height: int, uvp_padding: int, uvp_prerotate: bool, uvp_rescale: bool):
+
+    uv_packer_props: uv_packer.UVPackProperty = bpy.context.scene.UVPackerProps
+
+    uv_packer_props.uvp_fullRotate = False
+    uv_packer_props.uvp_rotate = '1'
+
+    uv_packer_props.uvp_engine = 'OP1' # HQ
+
+    uv_packer_props.uvp_width = uvp_width
+    uv_packer_props.uvp_height = uvp_height
+    uv_packer_props.uvp_padding = uvp_padding
+
+    uv_packer_props.uvp_selection_only = True
+    uv_packer_props.uvp_combine = True
+
+    uv_packer_props.uvp_prerotate = uvp_prerotate
+    uv_packer_props.uvp_rescale = uvp_rescale
+
+    bpy.ops.ed.flush_edits()
+    # Exception: Input data validation for object InvisibleCollisions Cylinder failed, packing not possible: There are not enough vertices for provided geoIndex 427.
+
+
+    # bpy.ops.uvpackeroperator.packbtn()
+
+    class Dummy():
+        pass
+
+    class Dummy_Context():
+        selected_objects = bpy.context.selected_objects
+        scene = bpy.context.scene
+
+    for _object in bpy.context.selected_objects:
+        assert  _object.mode == 'EDIT', _object
+
+    execute_uv_packer_addon(Dummy(), Dummy_Context())
+
+
 def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_settings.UVs) -> str:
     """ Assumes the objects are selected and in the object mode. """
 
@@ -784,9 +824,9 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
         if settings.average_uv_scale:
             scale_uv_to_world_per_uv_island(objects)
 
-        aabb_pack(merge_overlap=settings.merge_overlap)
 
         bpy.ops.uv.pin(clear=True)
+
 
         for object in objects:
             # prevent the material to act as a source of the uv aspect ratio
@@ -803,49 +843,23 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
                 angle_limit = math.radians(settings.smart_project_angle_limit),
             )
 
-        print('Packing UV islands...')
 
+        print('Pre-packing UV islands...')
+
+        if settings.use_uv_packer_addon and settings.use_uv_packer_for_pre_packing and enable_uv_packer_addon():
+            uv_packer_pack(settings._actual_width, settings._actual_height, settings.padding, settings.uvp_prerotate, settings.uvp_rescale)
+        else:
+            aabb_pack(merge_overlap=settings.merge_overlap)
+
+
+        print('Packing UV islands...')
 
         if settings.use_uv_packer_addon and enable_uv_packer_addon():
 
             if settings.uv_packer_addon_pin_largest_island:
                 pin_largest_island(bpy.context.object.data)
 
-            uv_packer_props: uv_packer.UVPackProperty = bpy.context.scene.UVPackerProps
-
-            uv_packer_props.uvp_fullRotate = False
-            uv_packer_props.uvp_rotate = '1'
-
-            uv_packer_props.uvp_engine = 'OP1' # HQ
-
-            uv_packer_props.uvp_width = settings._actual_width
-            uv_packer_props.uvp_height = settings._actual_height
-            uv_packer_props.uvp_padding = settings.padding
-
-            uv_packer_props.uvp_selection_only = True
-            uv_packer_props.uvp_combine = True
-
-            uv_packer_props.uvp_prerotate = settings.uvp_prerotate
-            uv_packer_props.uvp_rescale = settings.uvp_rescale
-
-
-            # bpy.ops.object.editmode_toggle()
-            # bpy.ops.object.editmode_toggle()
-            bpy.ops.ed.flush_edits()
-            # Exception: Input data validation for object InvisibleCollisions Cylinder failed, packing not possible: There are not enough vertices for provided geoIndex 427.
-
-            class Dummy():
-                pass
-
-            class Dummy_Context():
-                selected_objects = objects
-                scene = bpy.context.scene
-
-            # bpy.ops.uvpackeroperator.packbtn()
-            for _object in objects:
-               assert  _object.mode == 'EDIT', _object
-            execute_uv_packer_addon(Dummy(), Dummy_Context())
-
+            uv_packer_pack(settings._actual_width, settings._actual_height, settings.padding, settings.uvp_prerotate, settings.uvp_rescale)
 
             if settings.uv_packer_addon_pin_largest_island:
                 bpy.ops.uv.pin(clear=True)
