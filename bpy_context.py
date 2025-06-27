@@ -51,16 +51,25 @@ TOPOLOGY_CHANGING_MODIFIER_TYPES = {
 PRINT_CONTEXT_CHANGES = False
 
 
+
+def format_call_error(name, reason, func, args, kwargs, override):
+    return "\n".join([name, f"reason: {reason}", f"func: {repr(func)}", f"args: {args}", f"kwargs: {kwargs}", f"override: {override}"])
+
+
 def call(override: typing.Dict[str, typing.Any], func: typing.Callable, *args, can_be_canceled = False, **kwargs):
 
-    if bpy.app.version > (3,2,0):
-        with bpy.context.temp_override(**override):
-            result = func(*args, **kwargs)
-    else:
-        result =  func(override, *args, **kwargs)
+    try:
+        if bpy.app.version > (3,2,0):
+            with bpy.context.temp_override(**override):
+                result = func(*args, **kwargs)
+        else:
+            result =  func(override, *args, **kwargs)
+
+    except Exception as e:
+        raise Exception(format_call_error('ERROR', e, func, args, kwargs, override)) from e
 
     if not can_be_canceled and 'CANCELLED' in result:
-        raise Exception("\n".join(['CANCELLED:', f"func: {repr(func)}", f"args: {args}", f"kwargs: {kwargs}", f"override: {override}"]))
+        raise Exception(format_call_error('CANCELLED', 'unknown', func, args, kwargs, override))
 
     return result
 

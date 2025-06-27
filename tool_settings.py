@@ -10,6 +10,9 @@ import typing
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
+SENTINEL = object()
+
+
 if typing.TYPE_CHECKING:
     # need only __init__ hints
     import dataclasses
@@ -184,21 +187,52 @@ def _get_specs(cls):
     return specs
 
 
-
+@dataclasses.dataclass
 class Settings:
 
-    _has_been_set: set
+
+    ignore_default_settings: bool = False
+    """
+    If `True` setting a default value to a default value will be ignored.
+
+    Can be useful when trying to avoid unnecessary updates while setting the settings programmatically.
+
+    #### Beware of the `_update` usage and cases where settings are required to be explicitly set to defaults.
+
+    It is safer to conditionally replace the whole setting rather than set its members.
+
+    #### Default: `False`
+    """
+
+
+    allow_non_default_settings: bool = False
+    """
+    If `True` non-existent settings or settings with no default value will be allowed.
+
+    #### Default: `False`
+    """
+
 
     def __init__(self, **kwargs):
 
         self.__dict__['_has_been_set'] = set()
+        self._has_been_set: set
 
         for key, value in kwargs.items():
-            self._has_been_set.add(key)
-            self.__dict__[key] = value
+            self.__setattr__(key, value)
 
 
     def __setattr__(self, name, value):
+
+        default = getattr(type(self), name, SENTINEL)
+        current = getattr(self, name, SENTINEL)
+
+        if self.ignore_default_settings and current == default == value:
+            return
+
+        if not self.allow_non_default_settings and default is SENTINEL:
+            raise Exception(f"Unexpected setting for {type(self).__name__}: {name} = {repr(value)}\nUse allow_non_default_settings=True.")
+
         self._has_been_set.add(name)
         super().__setattr__(name, value)
 
@@ -1111,7 +1145,14 @@ class UVs(Settings):
     #### Default: `False`
     """
 
-    reunwrap_with_minimal_stretch: bool = False
+    reunwrap_overlaps_with_minimal_stretch: bool = False
+    """
+    Reunwrap overlapping uvs using the Blender's MINIMUM_STRETCH method.
+
+    #### Default: `False`
+    """
+
+    reunwrap_all_with_minimal_stretch: bool = False
     """
     Reunwrap all uvs using the Blender's MINIMUM_STRETCH method.
 

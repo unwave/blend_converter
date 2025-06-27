@@ -22,6 +22,9 @@ class Settings_GLTF(tool_settings.Settings):
     """
 
 
+    allow_non_default_settings = True
+
+
     check_existing: bool
     """
     Check Existing, Check and warn on overwriting existing files

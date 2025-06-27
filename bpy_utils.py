@@ -379,14 +379,18 @@ def get_block_abspath(block: typing.Union[bpy.types.Library, bpy.types.Image]):
     return abspath(block.filepath, block.library)  # type: ignore
 
 
-def inspect_blend(blender_executable: typing.Optional[str] = None, exit_after = False,):
+def inspect_blend(blender_executable: typing.Optional[str] = None, exit_after = False, detached = False):
     """ Blocking blend file inspection. """
 
     if blender_executable is None:
         blender_executable = bpy.app.binary_path
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        filepath = os.path.join(temp_dir, f'DEBUG_{utils.ensure_valid_basename(bpy.context.scene.name)}.blend')
+
+        if detached:
+            filepath = os.path.join(bpy.app.tempdir, f'DEBUG_{utils.ensure_valid_basename(bpy.context.scene.name)}.blend')
+        else:
+            filepath = os.path.join(temp_dir, f'DEBUG_{utils.ensure_valid_basename(bpy.context.scene.name)}.blend')
 
         for image in bpy.data.images:
             if image.source == 'GENERATED' and image.is_dirty:
@@ -397,7 +401,10 @@ def inspect_blend(blender_executable: typing.Optional[str] = None, exit_after = 
         except RuntimeError as e:
             print(e, file=sys.stderr)
 
-        subprocess.run([blender_executable, filepath])
+        if detached:
+            utils.open_blender_detached(blender_executable, filepath)
+        else:
+            subprocess.run([blender_executable, filepath])
 
     if exit_after:
         raise SystemExit('DEBUG EXIT')
@@ -567,12 +574,13 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
             finally:
                 restore_sharp_edges(object, sharp_edge_indexes)
 
+                do_reunwrap = settings.reunwrap_overlaps_with_minimal_stretch or settings.reunwrap_all_with_minimal_stretch
                 # re-unwrap overlaps
-                if 'iterations' in repr(bpy.ops.uv.unwrap):
+                if do_reunwrap and 'iterations' in repr(bpy.ops.uv.unwrap):
 
                     bpy_uv.mark_seams_from_islands(object, settings.uv_layer_name)
 
-                    if settings.reunwrap_with_minimal_stretch:
+                    if settings.reunwrap_all_with_minimal_stretch:
                         bpy.ops.mesh.select_all(action='SELECT')
                         bpy.ops.uv.select_all(action='SELECT')
                     else:
@@ -924,6 +932,7 @@ def unify_color_attributes_format(objects: typing.List[bpy.types.Object]):
 
         for object in objects:
             if color_attribute_name in object.data.color_attributes.keys():
+                object.data.color_attributes.active_color = object.data.color_attributes[color_attribute_name]
                 bpy_context.call_with_object_override(object, [object], bpy.ops.geometry.color_attribute_convert, domain='POINT', data_type='FLOAT_COLOR')
 
 
@@ -1987,6 +1996,8 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
         ## copy materials
         for orig, copy in map_original_to_copy.items():
+            with bpy_context.Focus_Objects(copy):
+                bpy.ops.object.material_slot_remove_unused()  # when called with call_with_object_override gives CANCELLED
             bpy_context.call_with_object_override(copy, [orig, copy], bpy.ops.object.material_slot_copy)
 
         merge_material_slots_with_the_same_materials(objects)
