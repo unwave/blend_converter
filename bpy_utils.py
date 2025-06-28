@@ -2043,7 +2043,7 @@ def is_smooth_modifier(modifier: bpy.types.Modifier):
 
 
 
-def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '', ignore_type = set(), ignore_canceled = False):
+def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '', include_name = '', ignore_type = set(), include_type = set(), ignore_canceled = False):
     """
     If `ignore_name` is not empty modifiers with names matching the regular expression will be ignored.
 
@@ -2057,10 +2057,16 @@ def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '',
 
         for modifier in list(object.modifiers):
 
-            if modifier.type in ignore_type:
+            if ignore_type and modifier.type in ignore_type:
+                continue
+
+            if include_type and modifier.type not in include_type:
                 continue
 
             if ignore_name and re.match(ignore_name, modifier.name):
+                continue
+
+            if include_name and not re.match(include_name, modifier.name):
                 continue
 
             modifiers_to_apply.append(modifier)

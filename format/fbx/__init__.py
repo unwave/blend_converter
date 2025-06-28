@@ -17,6 +17,9 @@ class Settings_Fbx(tool_settings.Settings):
     """ Official Blender FBX Exporter `4.29.1` """
 
 
+    allow_non_default_settings = True
+
+
     check_existing: bool
     """
     Check Existing

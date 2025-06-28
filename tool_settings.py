@@ -312,12 +312,14 @@ class Settings:
 
         settings = cls()
 
-        if only_matching:
-            for key in cls.__annotations__:
-                if key in data:
-                    setattr(settings, key, data[key])
-        else:
-            for key, value in data.items():
+        for key, value in data.items():
+
+            if only_matching and not key in cls.__annotations__:
+                continue
+
+            if cls.__annotations__.get(key) is set:
+                setattr(settings, key, set(value))
+            else:
                 setattr(settings, key, value)
 
         return settings
@@ -341,8 +343,8 @@ class Settings:
                 data[key] = value._to_dict()
             elif isinstance(value, set):
                 data[key] = list(value)
-
-            data[key] = value
+            else:
+                data[key] = value
 
 
         return data
