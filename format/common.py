@@ -232,6 +232,8 @@ class Generic_Exporter(Blend_Base):
         self._debug = False
         self._inspect_all = False
         self._ignore_inspect = False
+        self._skip =  False
+        self._ignore_breakpoint = False
 
         self.return_values_file: typing.Optional[str] = None
         """ A file where the scripts return values will be written. """
@@ -273,7 +275,9 @@ class Generic_Exporter(Blend_Base):
                 inspect = self._inspect,
                 debug = self._debug,
                 inspect_all = self._inspect_all,
-                ignore_inspect = self._ignore_inspect
+                ignore_inspect = self._ignore_inspect,
+                skip = self._skip,
+                ignore_breakpoint = self._ignore_breakpoint
             ), default= lambda x: x._to_dict()),
         ]
 

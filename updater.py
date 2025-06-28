@@ -252,7 +252,7 @@ class Updater:
 
         self.is_paused = True
 
-        self.entries: dict[str, Model_Entry] = {}
+        self.entries: list[Model_Entry] = []
 
         self.modules: list[types.ModuleType] = []
 
@@ -281,7 +281,7 @@ class Updater:
 
         self.observer.unschedule_all()
 
-        dirs = set(os.path.dirname(blend_path) for blend_path in self.entries)
+        dirs = set(os.path.dirname(entry.blend_path) for entry in self.entries)
         for dir in dirs:
             os.makedirs(dir, exist_ok=True)
             self.observer.schedule(self.event_handler, dir, recursive=True)
@@ -335,7 +335,7 @@ class Updater:
 
     def set_entires_from_modules(self):
 
-        for entry in self.entries.values():
+        for entry in self.entries:
             entry.terminate()
 
         self.entries.clear()
@@ -343,14 +343,13 @@ class Updater:
         for module in self.modules:
             for value in getattr(module, '__blends__').values():
                 if isinstance(value, common.Blend_Base):
-                    entry = Model_Entry(value)
-                    self.entries[entry.blend_path] = entry
+                    self.entries.append(Model_Entry(value))
 
 
     def has_non_updated_dependency(self, entry: Model_Entry):
         return any(
             _entry.result_path == entry.blend_path
-            for _entry in self.entries.values()
+            for _entry in self.entries
             if not _entry is entry and _entry.status != 'ok'
         )
 
@@ -359,13 +358,13 @@ class Updater:
 
     def poke_waiting_for_dependency(self):
 
-        for entry in self.entries.values():
+        for entry in self.entries:
             if entry.status == 'waiting_for_dependency':
                 self.poke_entry(entry)
 
     def poke_all(self):
 
-        entries = list(self.entries.values())
+        entries = list(self.entries)
 
         # at the start entries has unknown status
         # TODO: dependency map
@@ -376,7 +375,7 @@ class Updater:
 
     def reload_targets(self):
 
-        for entry in self.entries.values():
+        for entry in self.entries:
             entry.terminate()
 
         self.observer.unschedule_all()
@@ -396,12 +395,12 @@ class Updater:
 
     def poking(self):
         for path in iter(self.queue.get, None):
-            entry = self.entries.get(path)
-            if entry:
-                self.poke_entry(entry)
+            for entry in self.entries:
+                if entry.blend_path == path:
+                    self.poke_entry(entry)
 
     def max_updating_entries_exceeded(self):
-        updating_entires = len([entry for entry in self.entries.values() if entry.status == 'updating'])
+        updating_entires = len([entry for entry in self.entries if entry.status == 'updating'])
         return updating_entires >= MAX_AMOUNT_OF_UPDATING_ENTRIES
 
     def despatching(self):
@@ -409,7 +408,7 @@ class Updater:
 
             if not self.is_paused:
 
-                for entry in self.entries.values():
+                for entry in self.entries:
 
                     if entry.status != 'needs_update':
                         continue

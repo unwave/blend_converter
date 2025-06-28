@@ -22,6 +22,10 @@ from . import bpy_utils
 from . import tool_settings
 
 
+SKIP_UNWRAP_AND_PACK = False
+""" For debugging. """
+
+
 def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, *, init_from: str = ''):
 
     # TODO: need to ensure the name is unique
@@ -280,6 +284,10 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
     """ Currently operates on per mesh basis, so it is not possible to unwrap only a part of `bpy.types.Mesh`. """
 
     print('ministry_of_flat:', object.name_full)
+
+
+    if SKIP_UNWRAP_AND_PACK:
+        raise utils.Fallback('SKIP_UNWRAP_AND_PACK')
 
 
     if object.type != 'MESH':
@@ -846,7 +854,9 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
 
         print('Pre-packing UV islands...')
 
-        if settings.use_uv_packer_addon and settings.use_uv_packer_for_pre_packing and enable_uv_packer_addon():
+        if SKIP_UNWRAP_AND_PACK:
+            pass
+        elif settings.use_uv_packer_addon and settings.use_uv_packer_for_pre_packing and enable_uv_packer_addon():
             uv_packer_pack(settings._actual_width, settings._actual_height, settings.padding, settings.uvp_prerotate, settings.uvp_rescale)
         else:
             aabb_pack(merge_overlap=settings.merge_overlap)
@@ -854,7 +864,10 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
 
         print('Packing UV islands...')
 
-        if settings.use_uv_packer_addon and enable_uv_packer_addon():
+        if SKIP_UNWRAP_AND_PACK:
+            aabb_pack(merge_overlap=settings.merge_overlap)
+
+        elif settings.use_uv_packer_addon and enable_uv_packer_addon():
 
             if settings.uv_packer_addon_pin_largest_island:
                 pin_largest_island(bpy.context.object.data)

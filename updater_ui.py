@@ -495,7 +495,7 @@ class Result_Panel(wx.Panel):
 
     def get_search_result(self, query: str):
 
-        result = list(self.main_frame.updater.entries.values())
+        result = list(self.main_frame.updater.entries)
 
         if not query:
             return result
@@ -550,7 +550,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         if not self.updater.entries:
             raise Exception("Nothing to do. No models provided in __blends__.")
 
-        blender_executable = collections.Counter([entry.model.blender_executable for entry in self.updater.entries.values()]).most_common(1)[0][0]
+        blender_executable = collections.Counter([entry.model.blender_executable for entry in self.updater.entries]).most_common(1)[0][0]
 
         self.blender_server = blender_server.Blender_Server(blender_executable)
 
@@ -590,7 +590,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     def set_blends(self):
-        blend_paths = utils.list_by_key(self.updater.entries.values(), lambda entry: os.path.realpath(entry.model._source_path))
+        blend_paths = utils.list_by_key(self.updater.entries, lambda entry: os.path.realpath(entry.model._source_path))
         self.blend_panel.load_data(blend_paths)
 
 
@@ -678,7 +678,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
     def on_mark_update_all(self, event):
 
-        for entry in self.updater.entries.values():
+        for entry in self.updater.entries:
             entry.status = 'needs_update'
 
         updater.update_ui()
@@ -689,7 +689,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         if not self.updater.is_paused:
             self.on_updater_pause_toggle()
 
-        for entry in self.updater.entries.values():
+        for entry in self.updater.entries:
             entry.terminate()
 
         self.updater.poke_all()
@@ -697,7 +697,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
     def on_restart(self, event):
 
-        for entry in self.updater.entries.values():
+        for entry in self.updater.entries:
             entry.terminate()
 
         # TODO: does not work for argv with spaces

@@ -263,6 +263,23 @@ if __name__ == '__main__':
         bpy_utils.inspect_blend = dummy_inspect
 
 
+    if ARGS['ignore_breakpoint']:
+
+        import builtins
+
+        def dummy_breakpoint(*args, **kwargs):
+            pass
+
+        setattr(builtins, 'breakpoint', dummy_breakpoint)
+
+
+    if ARGS['skip']:
+        from blend_converter import tool_settings
+        tool_settings.Bake.fake_bake = True
+        from blend_converter import bpy_uv
+        bpy_uv.SKIP_UNWRAP_AND_PACK = True
+
+
     if ARGS['profile']:
         with Profiled() as prof:
             prof.profile.runcall(process)
