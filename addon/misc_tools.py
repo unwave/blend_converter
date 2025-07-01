@@ -574,3 +574,16 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
             pack_uvs_settings._set_suggested_padding()
             bpy_uv.unwrap_and_pack([object], pack_uvs_settings)
             bpy_uv.ensure_pixel_per_island([object], pack_uvs_settings)
+
+
+@operator_factory.operator(
+    poll = edit_mode_poll,
+    __annotations__ = dict(
+        only_select = bpy.props.BoolProperty(default=False),
+        divide_by_mean = bpy.props.BoolProperty(default=True),
+    ),
+    bl_options = {'REGISTER', 'UNDO'},
+)
+def reunwrap_bad_uvs(operator: bpy.types.Operator, context: bpy.types.Context):
+    objects = [object for object in context.selected_objects if object.data and hasattr(object.data, 'uv_layers') and object.data.is_editmode]
+    bpy_uv.reunwrap_bad_uvs(objects, only_select=operator.only_select, divide_by_mean=operator.divide_by_mean)

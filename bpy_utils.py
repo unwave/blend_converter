@@ -587,7 +587,7 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
             finally:
                 restore_sharp_edges(object, sharp_edge_indexes)
 
-                do_reunwrap = settings.reunwrap_overlaps_with_minimal_stretch or settings.reunwrap_all_with_minimal_stretch
+                do_reunwrap = settings.reunwrap_bad_uvs_with_minimal_stretch or settings.reunwrap_all_with_minimal_stretch
                 # re-unwrap overlaps
                 if do_reunwrap and 'iterations' in repr(bpy.ops.uv.unwrap):
 
@@ -596,14 +596,9 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
                     if settings.reunwrap_all_with_minimal_stretch:
                         bpy.ops.mesh.select_all(action='SELECT')
                         bpy.ops.uv.select_all(action='SELECT')
+                        bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, method='MINIMUM_STRETCH', fill_holes=True, no_flip=True, can_be_canceled=True)
                     else:
-                        bpy.ops.mesh.select_all(action='SELECT')
-                        bpy.ops.uv.select_all(action='DESELECT')
-
-                        bpy.ops.uv.select_overlap()
-                        bpy.ops.uv.select_linked()
-
-                    bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, method='MINIMUM_STRETCH', fill_holes=True, no_flip=True, can_be_canceled=True)
+                        bpy_uv.reunwrap_bad_uvs([object])
 
                     restore_seam_edges(object, seam_edge_indexes)
 
@@ -1883,9 +1878,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
                     material_key = material_key,
                     average_uv_scale = False,
                     uvp_rescale = False,
-                    uvp_prerotate = False,
                     do_unwrap = False,
-                    uv_packer_addon_pin_largest_island=True,
                 )
 
                 if pack_settings:

@@ -172,10 +172,10 @@ def _get_specs(cls):
             raise Exception(f"The attribute does not include a default: {name}")
 
         if attribute_properties['default_repr'] != default_repr:
-            raise Exception(f"The default representation does not mach:\n\t{attribute_properties['default_repr']}\n\t{default_repr}")
+            raise Exception(f"The default representation of `{name}` does not mach:\n\t{attribute_properties['default_repr']}\n\t{default_repr}")
 
         if attr_type != type(default).__name__:
-            raise Exception(f"Default value and type do not mach:\n\tdefault={default}\n\tattr_type={attr_type}")
+            raise Exception(f"Default value and type of `{name}` do not mach:\n\tdefault={default}\n\tattr_type={attr_type}")
 
         try:
             ui_spec = get_blender_prop_specs(default, attribute_properties)
@@ -193,7 +193,7 @@ def _get_specs(cls):
 
 
 @dataclasses.dataclass
-class Settings:
+class Settings():
 
 
     ignore_default_settings: bool = False
@@ -1136,18 +1136,18 @@ class UVs(Settings):
     #### Default: `True`
     """
 
-    uvp_rescale: bool = False
+    uvp_rescale: bool = True
     """
     Rescale UVs before packing.
 
-    #### Default: `False`
+    #### Default: `True`
     """
 
-    uvp_prerotate: bool = False
+    uvp_prerotate: bool = True
     """
     Pre-rotate UVs before packing. This can make them be no longer axis aligned.
 
-    #### Default: `False`
+    #### Default: `True`
     """
 
     mark_seams_from_islands: bool = False
@@ -1157,11 +1157,11 @@ class UVs(Settings):
     #### Default: `False`
     """
 
-    reunwrap_overlaps_with_minimal_stretch: bool = False
+    reunwrap_bad_uvs_with_minimal_stretch: bool = True
     """
-    Reunwrap overlapping uvs using the Blender's MINIMUM_STRETCH method.
+    Reunwrap bad uvs using the Blender's MINIMUM_STRETCH method.
 
-    #### Default: `False`
+    #### Default: `True`
     """
 
     reunwrap_all_with_minimal_stretch: bool = False

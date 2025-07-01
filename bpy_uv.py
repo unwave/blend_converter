@@ -541,7 +541,7 @@ def get_uv_triangles(b_mesh: bmesh.types.BMesh, uv_layer):
     return face_to_uv_triangles
 
 
-def scale_uv_to_world_per_uv_island(objects: typing.List[bpy.types.Object], use_selected = True, divide_by_mean = False):
+def scale_uv_to_world_per_uv_island(objects: typing.List[bpy.types.Object], use_selected = False, divide_by_mean = True):
     """ Works on the active uv layer. """
     print(f"{scale_uv_to_world_per_uv_island.__name__}...")
 
@@ -574,9 +574,7 @@ def scale_uv_to_world_per_uv_island(objects: typing.List[bpy.types.Object], use_
 
             face_to_uv_triangles = get_uv_triangles(bm, uv_layer)
 
-            islands_data = []
             multipliers = []
-
 
             for island in islands:
 
@@ -589,85 +587,34 @@ def scale_uv_to_world_per_uv_island(objects: typing.List[bpy.types.Object], use_
                 if math.isnan(island_uv_area):
                     island_uv_area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face] if all(not map(math.isnan, vert) for vert in loop))
 
-                if island_uv_area == 0 or island_mesh_area == 0:
-                    continue
-
-                scale_multiplier = math.sqrt(island_mesh_area/island_uv_area)
+                try:
+                    scale_multiplier = math.sqrt(island_mesh_area/island_uv_area)
+                except ZeroDivisionError:
+                    scale_multiplier = 0
 
                 multipliers.append(scale_multiplier)
 
-                islands_data.append(dict(
-                    island_mesh_area = island_mesh_area,
-                    island_uv_area = island_uv_area,
-                    scale_multiplier = scale_multiplier,
-                ))
 
-            if not multipliers:
-                continue
-
-            mean = statistics.mean(multipliers)
-
-            if len(multipliers) == 1:
-                minimum = float('-inf')
-                maximum = float('inf')
-                new_mean = 1
-            else:
-                stdev = statistics.stdev(multipliers, mean)
-
-                minimum = mean - 3 * stdev
-                maximum = mean + 3 * stdev
-
-                new_mean = statistics.mean(multiplier for multiplier in multipliers if multiplier <= maximum and multiplier >= minimum)
+            mean = statistics.harmonic_mean([n for n in multipliers if n > 0])
 
 
-            def select(state, faces: typing.Iterable[bmesh.types.BMFace], value):
-                for face in faces:
-                    for vert in face.verts:
-                        state.set(vert, 'hide', not value)
-                        state.set(vert, 'select', value)
-                    state.set(face, 'hide', not value)
-                    state.set(face, 'select', value)
-                    for loop in face.loops:
-                        state.set(loop[uv_layer], 'select', value)
+            for scale_multiplier, island in zip(multipliers, islands):
 
-
-            for index, (island_data, island) in enumerate(zip(islands_data, islands)):
-
-                scale_multiplier = island_data['scale_multiplier']
-
-                if scale_multiplier > maximum or scale_multiplier < minimum:
-
-                    utils.print_in_color(utils.get_color_code(255,255,255, 148,0,211), f"Outlier island: {index}/{len(islands)}")
-                    # scale_multiplier = new_mean
-
-                    # with bpy_context.State(print=False) as state:
-
-                    #     select(state, bm.faces, False)
-                    #     select(state, island, True)
-
-                    #     utils.print_in_color(utils.get_color_code(255,255,255, 148,0,211), f"Unwrapping outlier island: {index}/{len(islands)}")
-                    #     bpy.ops.uv.unwrap()
-
-                    # island_uv_area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face])
-                    # island_mesh_area = island_data['island_mesh_area']
-
-                    # if island_uv_area == 0 or island_mesh_area == 0:
-                    #     continue
-
-                    # scale_multiplier = math.sqrt(island_mesh_area/island_uv_area)
+                if scale_multiplier == 0:
+                    scale_multiplier = mean
 
                 island_vertices = [loop[uv_layer].uv for face in island for loop in face.loops]
                 island_center = sum(island_vertices, mathutils.Vector((0,0)))/len(island_vertices)
 
                 if not divide_by_mean:
-                    new_mean = 1
+                    mean = 1
 
                 for face in island:
                     for loop in face.loops:
 
                         uv_loop = loop[uv_layer]
                         uv_loop.uv -= island_center
-                        uv_loop.uv *= scale_multiplier / new_mean
+                        uv_loop.uv *= scale_multiplier / mean
                         uv_loop.uv += island_center
 
             bpy.ops.ed.flush_edits()
@@ -1172,3 +1119,151 @@ def unwrap(objects: typing.List[bpy.types.Object], *, uv_layer = tool_settings.D
         bpy_utils.unwrap_ministry_of_flat_with_fallback(objects, settings, ministry_of_flat_settings)
 
         scale_uv_to_world_per_uv_layout(objects)
+
+
+def get_stdev_mean(values: typing.Union[typing.Sized, typing.Iterable]):
+
+    mean = statistics.mean(values)
+
+    if len(values) == 1:
+        minimum = float('-inf')
+        maximum = float('inf')
+        stdev_mean = 1
+    else:
+        stdev = statistics.stdev(values, mean)
+
+        minimum = mean - 3 * stdev
+        maximum = mean + 3 * stdev
+
+        stdev_mean = statistics.mean(multiplier for multiplier in values if multiplier <= maximum and multiplier >= minimum)
+
+    return stdev_mean
+
+
+def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False, divide_by_mean = True):
+    print(f"{reunwrap_bad_uvs.__name__}...")
+
+    from mathutils.geometry import area_tri
+
+    for object in objects:
+
+        with bpy_context.Focus_Objects(object, mode='EDIT'):
+
+            bm = bmesh.from_edit_mesh(object.data)
+
+            if not bm.faces:
+                continue
+
+            # collect islands data
+            mesh_areas: typing.List[float] = []
+            uv_areas: typing.List[float] = []
+            world_to_uv_ratios: typing.List[float] = []
+            bound_box_ratios: typing.List[float] = []
+
+            bm_copy = bm.copy()
+            bm_copy.transform(object.matrix_world)
+
+            bm_copy.faces.ensure_lookup_table()
+
+            uv_layer = bm.loops.layers.uv.verify()
+
+            islands = get_linked_uv_islands(bm, uv_layer)
+
+            # if use_selected:
+                # islands = list(filter(None, [[face for face in island if face.select] for island in islands]))
+
+
+            if not islands:
+                continue
+
+            face_to_uv_triangles = get_uv_triangles(bm, uv_layer)
+
+            for island in islands:
+
+                island_mesh_area = sum(bm_copy.faces[face.index].calc_area() for face in island)
+
+                island_uv_area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face])
+
+                # #79775 - Something in Blender can generate invalid (Nan) values in UVMaps
+                # https://projects.blender.org/blender/blender/issues/79775
+                if math.isnan(island_uv_area):
+                    island_uv_area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face] if all(not map(math.isnan, vert) for vert in loop))
+
+                try:
+                    world_to_uv_ratio = island_mesh_area / island_uv_area
+                    if world_to_uv_ratio < 1:
+                        world_to_uv_ratio = 1 / world_to_uv_ratio
+                except ZeroDivisionError:
+                    world_to_uv_ratio = 0
+
+                try:
+                    xs, ys = zip(*(bm_loop[uv_layer].uv for face in island for bm_loop in face.loops))
+                    bound_box_ratio = ( abs(max(xs) - min(xs)) ) / ( abs(max(ys) - min(ys)) )
+                    if bound_box_ratio < 1:
+                        bound_box_ratio = 1 / bound_box_ratio
+                except ZeroDivisionError:
+                    bound_box_ratio = 0
+
+                mesh_areas.append(island_mesh_area)
+                uv_areas.append(island_uv_area)
+                world_to_uv_ratios.append(world_to_uv_ratio)
+                bound_box_ratios.append(bound_box_ratio)
+
+
+            maximum_bound_box_ratio = pow(statistics.geometric_mean([n for n in bound_box_ratios if n > 0]), 3)
+
+            is_bad_islands = [bound_box_ratio > maximum_bound_box_ratio or world_to_uv_ratio == 0 or bound_box_ratio == 0 for world_to_uv_ratio, bound_box_ratio in zip( world_to_uv_ratios, bound_box_ratios)]
+
+            mean_scale_multiplier = get_stdev_mean([math.sqrt(world_to_uv_ratio) for is_bad, world_to_uv_ratio in zip(is_bad_islands, world_to_uv_ratios) if not is_bad])
+
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.uv.select_all(action='DESELECT')
+
+            for index, (island, mesh_area, uv_area, world_to_uv_ratio, bound_box_ratio, is_bad) in enumerate(zip(islands, mesh_areas, uv_areas, world_to_uv_ratios, bound_box_ratios, is_bad_islands)):
+
+                if is_bad:
+
+                    utils.print_in_color(utils.get_color_code(255,255,255, 148,0,211), f"Outlier island: {index}/{len(islands)}")
+
+                    if not only_select:
+                        bpy.ops.mesh.select_all(action='SELECT')
+                        bpy.ops.uv.select_all(action='DESELECT')
+
+                    for face in island:
+                        face.select = True
+                        for loop in face.loops:
+                            loop[uv_layer].select = True
+
+                    if only_select:
+                        continue
+
+                    bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, method='MINIMUM_STRETCH', fill_holes=True, no_flip=True, can_be_canceled=True)
+
+                    mesh_area = sum(bm_copy.faces[face.index].calc_area() for face in island)
+                    uv_area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face])
+
+
+                if uv_area == 0:
+                    scale_multiplier = 1
+                else:
+                    scale_multiplier = math.sqrt(mesh_area/uv_area)
+
+                island_vertices = [loop[uv_layer].uv for face in island for loop in face.loops]
+                island_center = sum(island_vertices, mathutils.Vector((0,0)))/len(island_vertices)
+
+                if divide_by_mean:
+                    scale_multiplier /= mean_scale_multiplier
+
+                for face in island:
+                    for loop in face.loops:
+
+                        uv_loop = loop[uv_layer]
+                        uv_loop.uv -= island_center
+                        uv_loop.uv *= scale_multiplier
+                        uv_loop.uv += island_center
+
+
+            bpy.ops.ed.flush_edits()
+            bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
+
+            bm_copy.free()
