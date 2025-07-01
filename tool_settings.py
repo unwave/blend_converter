@@ -13,9 +13,14 @@ ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 SENTINEL = object()
 
 
+DEFAULT_UV_LAYER_NAME = '__bc_uv'
+
+
 if typing.TYPE_CHECKING:
     # need only __init__ hints
     import dataclasses
+
+    import typing_extensions
 else:
     class dataclasses:
         dataclass = lambda x: x
@@ -380,7 +385,7 @@ class Settings:
         return command
 
 
-    def __eq__(self, other: typing.Union[dict, 'Settings']):
+    def __eq__(self, other: typing.Union[dict, 'typing_extensions.Self']):
 
         if isinstance(other, dict):
             return self._to_dict() == other
@@ -388,7 +393,7 @@ class Settings:
             return self._to_dict() == other._to_dict()
 
 
-    def __ne__(self, other: typing.Union[dict, 'Settings']):
+    def __ne__(self, other: typing.Union[dict, 'typing_extensions.Self']):
         return not self.__eq__(other)
 
 
@@ -396,7 +401,10 @@ class Settings:
         return f"< {type(self).__name__}  {self._to_dict()} >"
 
 
-    def _update(self, other: 'Settings'):
+    def _update(self, other: 'typing_extensions.Self'):
+
+        if not other:
+            return self
 
         for key in other.__dict__:
 
@@ -410,6 +418,8 @@ class Settings:
                 continue
 
             setattr(self, key, getattr(other, key))
+
+        return self
 
 
 @dataclasses.dataclass
@@ -859,11 +869,11 @@ class Bake(Settings):
     """
 
 
-    uv_layer_name: str = '__bc_bake_uv_map'
+    uv_layer_name: str = DEFAULT_UV_LAYER_NAME
     """
     The UV layer to use for baking.
 
-    #### Default: `'__bc_bake_uv_map'`
+    #### Default: `DEFAULT_UV_LAYER_NAME`
     """
 
     use_inpaint: bool = True
@@ -1039,10 +1049,10 @@ class UVs(Settings):
     #### Default: `0`
     """
 
-    uv_layer_name: str = Bake.uv_layer_name
+    uv_layer_name: str = DEFAULT_UV_LAYER_NAME
     """
     The UV layer to use for baking.
-    #### Default: `Bake.uv_layer_name`
+    #### Default: `DEFAULT_UV_LAYER_NAME`
     """
 
     merge: bool = True
@@ -1770,11 +1780,11 @@ class Bake_Materials(Settings):
     #### Default: `4096`
     """
 
-    uv_layer_bake: str = '_bc_bake'
+    uv_layer_bake: str = DEFAULT_UV_LAYER_NAME
     """
     The name of a uv layer that will be used for baking.
 
-    #### Default: `'_bc_bake'`
+    #### Default: `DEFAULT_UV_LAYER_NAME`
     """
 
     uv_layer_reuse: str = ''

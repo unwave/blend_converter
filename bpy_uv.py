@@ -26,7 +26,10 @@ SKIP_UNWRAP_AND_PACK = False
 """ For debugging. """
 
 
-def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, *, init_from: str = ''):
+def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, *, init_from: str = '', init_from_does_not_exist_ok = False):
+
+    if not name:
+        raise ValueError(f"The uv layer name cannot be empty: {[o.name_full for o in objects]}")
 
     # TODO: need to ensure the name is unique
     added_uvs_names = set()
@@ -43,9 +46,14 @@ def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, *, init_f
             raise Exception(f"Fail to create uv layer: '{name}'. Only 8 UV maps maximum per mesh is allowed. The mesh already has the maximum: {mesh.name_full}")
 
         if init_from:
-            with bpy_context.Bpy_State() as bpy_state:
-                bpy_state.set(mesh.uv_layers, 'active', mesh.uv_layers[init_from])
-                uvs = mesh.uv_layers.new(name = name, do_init = True)
+            if mesh.uv_layers.get(init_from):
+                with bpy_context.Bpy_State() as bpy_state:
+                    bpy_state.set(mesh.uv_layers, 'active', mesh.uv_layers[init_from])
+                    uvs = mesh.uv_layers.new(name = name, do_init = True)
+            elif init_from_does_not_exist_ok:
+                uvs = mesh.uv_layers.new(name = name, do_init = False)
+            else:
+                raise Exception(f"The source uv layer `{init_from}` does not exist: {mesh.name_full}")
         else:
             uvs = mesh.uv_layers.new(name = name, do_init = False)
 
@@ -306,8 +314,6 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
         modifier: bpy.types.DataTransferModifier = object.modifiers.new(name='__bc_uv_transfer', type='DATA_TRANSFER')
 
-        move_modifier_to_first(object, modifier)
-
         modifier.object = target_object
 
         modifier.use_loop_data = True
@@ -517,7 +523,9 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
 
         for line in capture.lines.queue:
-            if 'cannot be' in line:
+            if "Source and destination meshes do not have the same number of face corners, 'Topology' mapping cannot be used in this case" in line:
+                pass
+            elif 'cannot be' in line:
                 raise utils.Fallback(line)
 
 
@@ -1125,3 +1133,42 @@ def clear_uv_layers_from_objects(objects: typing.List[bpy.types.Object], uv_laye
 
     for mesh in meshes:
         clear_uv_layers(mesh, uv_layer_name_to_remain, unified_name)
+
+
+
+def unwrap(objects: typing.List[bpy.types.Object], *, uv_layer = tool_settings.DEFAULT_UV_LAYER_NAME, uv_layer_reuse = '', settings: typing.Optional[tool_settings.UVs] = None, ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None):
+
+
+    incompatible_objects = set(objects) - set(object for object in objects if object.data and hasattr(object.data, 'uv_layers'))
+    if incompatible_objects:
+        raise ValueError(f"Specified objects cannot be unwrapped: {[o.name_full for o in objects]}\nIncompatible: {[o.name_full for o in incompatible_objects]}")
+
+
+    objects = bpy_utils.get_unique_mesh_objects(objects)
+
+    settings = tool_settings.UVs(uv_layer_name = uv_layer)._update(settings)
+
+
+    ensure_uv_layer(objects, settings.uv_layer_name, init_from = uv_layer_reuse, init_from_does_not_exist_ok=True)
+
+
+    with bpy_context.Bpy_State() as bpy_state, bpy_context.Global_Optimizations():
+
+        for object in bpy_utils.get_view_layer_objects():
+            if object.animation_data:
+                for driver in object.animation_data.drivers:
+                    bpy_state.set(driver, 'mute', True)
+
+                for nla_track in object.animation_data.nla_tracks:
+                    bpy_state.set(nla_track, 'mute', True)
+
+        for object in bpy_utils.get_view_layer_objects():
+            for modifier in object.modifiers:
+                bpy_state.set(modifier, 'show_viewport', False)
+
+        for object in objects:
+            bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
+
+        bpy_utils.unwrap_ministry_of_flat_with_fallback(objects, settings, ministry_of_flat_settings)
+
+        scale_uv_to_world_per_uv_layout(objects)

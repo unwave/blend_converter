@@ -33,6 +33,7 @@ if 'bpy' in sys.modules:
     from blend_converter import bpy_context
     from blend_converter import bpy_utils
     from blend_converter import tool_settings
+    from blend_converter import bpy_uv
 
 
 
@@ -416,3 +417,16 @@ def scene_clean_up():
 @wraps(bpy_utils.apply_modifiers if typing.TYPE_CHECKING else object)
 def apply_modifiers(objects: Objects_Like, *args, **kwargs):
     bpy_utils.apply_modifiers(get_objects(objects), *args, **kwargs)
+
+
+
+@wraps(bpy_uv.unwrap if typing.TYPE_CHECKING else object)
+def unwrap(objects: Objects_Like, **kwargs):
+
+    if 'settings' in kwargs:
+        kwargs['settings'] = tool_settings.UVs._from_dict(kwargs['settings'])
+
+    if 'ministry_of_flat_settings' in kwargs:
+        kwargs['ministry_of_flat_settings'] = tool_settings.Ministry_Of_Flat._from_dict(kwargs['ministry_of_flat_settings'])
+
+    bpy_uv.unwrap(get_objects(objects), **kwargs)

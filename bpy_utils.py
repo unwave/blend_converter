@@ -340,6 +340,20 @@ def merge_objects(objects: typing.List[bpy.types.Object], *, merge_into: typing.
 
     objects = convert_to_mesh(objects)
 
+
+    # if there are more than 8 unique uv layer names among the objects there are not going to be preserved
+    uv_layers = []
+
+    for object in objects:
+        for uv_layer in object.data.uv_layers:
+            uv_layers.append(uv_layer.name)
+
+    uv_layers = utils.deduplicate(uv_layers)
+
+    if len(uv_layers) > 8:
+        raise RuntimeError(f"Fail to joint objects, more than 8 uv layers total: {[o.name_full for o in objects]}")
+
+
     make_object_data_unique(objects)
 
     if generate_merged_objects_info:
@@ -472,14 +486,8 @@ def get_compatible_armature_actions(objects: typing.List[bpy.types.Object]) -> t
 
 def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object], settings: tool_settings.UVs, ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None):
 
-    _ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(
-        vertex_weld=False,
-        rasterization_resolution=1,
-        packing_iterations=1,
-    )
 
-    if ministry_of_flat_settings:
-        _ministry_of_flat_settings._update(ministry_of_flat_settings)
+    ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(vertex_weld=False, rasterization_resolution=1, packing_iterations=1)._update(ministry_of_flat_settings)
 
 
     def restore_sharp_edges(object: bpy.types.Object, sharp_edge_indexes: set):
@@ -511,6 +519,11 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
 
             # tag sharp edges
             b_mesh = bmesh.from_edit_mesh(object.data)
+
+            if not b_mesh.faces:
+                utils.print_in_color(utils.get_foreground_color_code(217, 103, 41), f"Object has no faces: {object.name_full}")
+                continue
+
             b_mesh.edges.ensure_lookup_table()
 
             sharp_edge_indexes.update(edge.index for edge in b_mesh.edges if not edge.smooth)
@@ -553,7 +566,7 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
             try:
                 with tempfile.TemporaryDirectory() as temp_dir:
 
-                    bpy_uv.unwrap_ministry_of_flat(object, temp_dir, settings = _ministry_of_flat_settings, uv_layer_name = settings.uv_layer_name)
+                    bpy_uv.unwrap_ministry_of_flat(object, temp_dir, settings = ministry_of_flat_settings, uv_layer_name = settings.uv_layer_name)
             except utils.Fallback as e:
 
                 utils.print_in_color(utils.get_color_code(240,0,0, 0,0,0), f"Fallback to smart_project: {e}")
@@ -734,7 +747,7 @@ def split_into_alpha_and_non_alpha_groups(objects: typing.List[bpy.types.Object]
 
 def bake_materials(objects: typing.List[bpy.types.Object], image_dir: str, resolution: int, **bake_kwargs):
 
-    with bpy_context.Global_Bake_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
+    with bpy_context.Global_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
         for o in bpy.data.objects:
@@ -972,6 +985,18 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
             if layer.active_render:
                 return layer
 
+    def is_valid_uv_map(uv_map: str, object: bpy.types.Object):
+
+        # TODO: handle non mesh objects
+
+        if not object.data:
+            return False
+
+        if not hasattr(object.data, 'uv_layers'):
+            return False
+
+        return uv_map in object.data.uv_layers.keys()
+
 
     depsgraph = bpy.context.evaluated_depsgraph_get()
 
@@ -1085,7 +1110,10 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
                 elif node.be('ShaderNodeUVMap'):
 
                     if get_active_render_uv_layer(object):
-                        node.uv_map = get_active_render_uv_layer(object).name
+                        if node.uv_map and is_valid_uv_map(node.uv_map, object):
+                            pass
+                        else:
+                            node.uv_map = get_active_render_uv_layer(object).name
                     elif object.type == 'MESH':
                         warn(f"A mesh does not have any uv layers the output of the UV socket is (0, 0, 0): {object.data.name_full}")
                         replacement_node = tree.new('ShaderNodeCombineXYZ')
@@ -1098,7 +1126,10 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
                 elif node.be('ShaderNodeNormalMap') and node.space == 'TANGENT':
 
                     if get_active_render_uv_layer(object):
-                        node.uv_map = get_active_render_uv_layer(object).name
+                        if node.uv_map and is_valid_uv_map(node.uv_map, object):
+                            pass
+                        else:
+                            node.uv_map = get_active_render_uv_layer(object).name
                     elif object.type == 'MESH':
                         # TODO: undefined behavior
                         warn(f"A mesh does not have any uv layers for tangent space: {object.data.name_full}")
@@ -1247,7 +1278,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
     objects = get_meshable_objects(objects)
 
 
-    with bpy_context.Global_Bake_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
+    with bpy_context.Global_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
         for o in bpy.data.objects:
@@ -1729,7 +1760,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         raise ValueError(f"Specified objects cannot be baked, type must be MESH or convertible to MESH: {[o.name_full for o in objects]}\nIncompatible: {[o.name_full for o in incompatible_objects]}")
 
 
-    with bpy_context.Global_Bake_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.Bpy_State() as bpy_state_0:
+    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.Bpy_State() as bpy_state_0:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
         for object in bpy.data.objects:

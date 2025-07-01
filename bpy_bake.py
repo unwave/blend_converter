@@ -1091,7 +1091,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
         return
 
 
-    with bpy_context.Bake_Settings(settings), bpy_context.Global_Bake_Optimizations(), bpy_context.Focus_Objects(objects) as focus_context, bpy_context.Bpy_State() as bpy_state, bpy_context.State() as state:
+    with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects) as focus_context, bpy_context.Bpy_State() as bpy_state, bpy_context.State() as state:
 
         # ensure object render visibility
         objects_in_temp_collection = set(focus_context.hidden_by_hierarchy_collection.objects)

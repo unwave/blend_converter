@@ -495,7 +495,7 @@ class Bake_Settings(Bpy_State):
         return self
 
 
-class Global_Bake_Optimizations(State):
+class Global_Optimizations(State):
 
     @staticmethod
     def dummy_view_layer_update(_):
