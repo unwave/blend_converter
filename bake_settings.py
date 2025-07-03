@@ -229,7 +229,7 @@ class Normal(_Principled_Input):
         if hasattr(bpy.context.scene.render.bake, 'margin_type'):
             return bpy_context.Bpy_State([(bpy.context.scene.render.bake, 'margin_type', 'EXTEND')])
         else:
-            contextlib.nullcontext()
+            return contextlib.nullcontext()
 
     def _get_material_context(self, material: 'bpy.types.Material'):
         return bpy_context.Output_Socket_World_Space_To_Tangent_Space(material, _get_principled_socket(material, 'Normal'), self.uv_layer)
@@ -628,7 +628,7 @@ class View_Space_Normal(_Bake_Type, tool_settings.Settings):
         if hasattr(bpy.context.scene.render.bake, 'margin_type'):
             return bpy_context.Bpy_State([(bpy.context.scene.render.bake, 'margin_type', 'EXTEND')])
         else:
-            contextlib.nullcontext()
+            return contextlib.nullcontext()
 
 
     def _get_material_context(self, material):

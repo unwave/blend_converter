@@ -787,38 +787,6 @@ class Bake(Settings):
     #### Default: `False`
     """
 
-    convert_to_mesh: bool = True
-    """
-    Convert to mesh before baking.
-
-    Also see: `do_convert_to_mesh_only_non_mesh_object`: the default is `True`
-
-    #### This will apply armature modifiers.
-
-    #### Default: `True`
-    """
-
-    do_convert_to_mesh_only_non_mesh_object: bool = True
-    """
-    Convert to mesh only non mesh object, like curves or metaballs.
-
-    #### Default: `True`
-    """
-
-    remove_unused_material_slot: bool = True
-    """
-    Remove all materials slot that are not assign to any mesh polygon or reserved for particle systems.
-
-    #### Default: `True`
-    """
-
-    make_materials_single_user: bool = True
-    """
-    Make all materials unique to the scene.
-
-    #### Default: `True`
-    """
-
     samples: int = 1
     """
     The cycles render samples. Higher values result in a smoother and less aliased image at an increased render time.
@@ -891,12 +859,6 @@ class Bake(Settings):
     #### Default: `True`
     """
 
-    duplicates_make_real: bool = False
-    """
-    WIP. Make instanced objects real.
-
-    #### Default: `False`
-    """
 
     create_materials: bool = True
     """
@@ -913,13 +875,6 @@ class Bake(Settings):
     #### Default: `True`
     """
 
-
-    raise_errors: bool = False
-    """
-    If a tolerable error is encountered it will be raised.
-
-    #### Default: `False`
-    """
 
     raise_warnings: bool = False
     """

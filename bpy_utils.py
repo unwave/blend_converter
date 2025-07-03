@@ -1349,7 +1349,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
 
 
         ## bake
-        bake_settings = tool_settings.Bake(image_dir = image_dir, make_materials_single_user=False)
+        bake_settings = tool_settings.Bake(image_dir = image_dir)
 
         if additional_bake_settings:
             for key, value in additional_bake_settings.items():
@@ -1899,7 +1899,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         ## bake materials
-        _bake_settings = tool_settings.Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir, make_materials_single_user=False)
+        _bake_settings = tool_settings.Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)
         if bake_settings:
             _bake_settings._update(bake_settings)
 

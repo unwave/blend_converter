@@ -44,15 +44,14 @@ def print_done(*args):
     utils.print_in_color(utils.CONSOLE_COLOR.BOLD + utils.CONSOLE_COLOR.BG_GREEN, *args)
 
 
-def do_error(*args, settings: tool_settings.Bake):
+def do_error(*args):
     print_error(*args)
-    if settings.raise_errors:
-        raise Exception("ERROR: " + ' '.join(str(arg) for arg in args))
+    raise Exception("ERROR: " + ' '.join(str(arg) for arg in args))
 
 
-def do_warning(*args, settings: tool_settings.Bake):
+def do_warning(*args, do_raise = False):
     print_warning(*args)
-    if settings.raise_warnings:
+    if do_raise:
         raise Exception("WARNING: " + ' '.join(str(arg) for arg in args))
 
 
@@ -68,7 +67,7 @@ def is_property_missing(object: bpy.types.Object, attribute_type: str, attribute
         return is_property_missing(object, 'OBJECT', attribute_name) # not correct if has the instancer
 
 
-def report_missing_attributes(node_tree: bpy.types.NodeTree, object: bpy.types.Object):
+def report_missing_attributes(node_tree: bpy.types.NodeTree, object: bpy.types.Object, do_raise = False):
     """ does not check if the node is connect or not """
 
     tree = bpy_node.Shader_Tree_Wrapper(node_tree)
@@ -85,11 +84,11 @@ def report_missing_attributes(node_tree: bpy.types.NodeTree, object: bpy.types.O
                 continue
 
             if is_property_missing(object, node.attribute_type, node.attribute_name):
-                print_warning(f"An attribute node refers to the property '{node.attribute_name}' that does not exist in object '{object.name}'.")
+                do_warning(f"An attribute node refers to the property '{node.attribute_name}' that does not exist in object '{object.name}'.", do_raise=do_raise)
 
         elif node.be('ShaderNodeGroup'):
             if node.node_tree:
-                report_missing_attributes(node.node_tree, object)
+                report_missing_attributes(node.node_tree, object, do_raise=do_raise)
 
 
 def get_images(bl_tree: bpy.types.NodeTree):
@@ -113,15 +112,12 @@ def get_images(bl_tree: bpy.types.NodeTree):
 
     return images
 
-def report_missing_files(node_tree: bpy.types.NodeTree):
+
+def report_missing_files(node_tree: bpy.types.NodeTree, do_raise = False):
 
     for image in utils.deduplicate(get_images(node_tree)):
         if not image.packed_file and not os.path.exists(bpy_utils.get_block_abspath(image)):
-            print_warning(f"Image is missing in path: {image.filepath}.")
-
-
-
-
+            do_warning(f"Image is missing in path: {image.filepath}.", do_raise=do_raise)
 
 
 NORMAL_SOCKETS = {
@@ -544,14 +540,13 @@ def get_conformed_pass_filter():
         return {'NONE'}
 
 
-def set_all_image_nodes_interpolation_to_smart(bl_tree: bpy.types.NodeTree):
-    # TODO: make a context manager
+def set_all_image_nodes_interpolation_to_smart(bl_tree: bpy.types.ShaderNodeTree, bpy_state: bpy_context.Bpy_State):
     for node in bl_tree.nodes:
         if node.bl_idname == 'ShaderNodeTexImage':
-            node.interpolation = 'Smart'  # type: ignore
+            bpy_state.set(node, 'interpolation', 'Smart')
         elif node.bl_idname == 'ShaderNodeGroup':
             if node.node_tree:  # type: ignore
-                set_all_image_nodes_interpolation_to_smart(node.node_tree)  # type: ignore
+                set_all_image_nodes_interpolation_to_smart(node.node_tree, bpy_state)  # type: ignore
 
 
 def ensure_unique_name(name, taken_names = set()):
@@ -588,31 +583,6 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
         if settings.material_key and not material.get(settings.material_key):
             continue
 
-        print_bold('Preparing material:', material.name_full)
-
-        if not material.use_nodes:
-            print_warning(f'Material does not use nodes: {material.__repr__()}')
-            continue
-
-        for object in _objects:
-            report_missing_attributes(material.node_tree, object)
-
-        report_missing_files(material.node_tree)
-
-        if settings.use_smart_texture_interpolation:
-            set_all_image_nodes_interpolation_to_smart(material.node_tree)
-
-        tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
-        tree.convert_to_pbr()
-
-        shader_node = tree.output['Surface']
-
-        if shader_node is None:
-            raise Exception(f'No shader in {material.__repr__()}')
-
-        if not shader_node.be('ShaderNodeBsdfPrincipled'):
-            raise Exception(f'Only Principled BSDF is supported: {material.__repr__()}')
-
         materials_to_bake.append(material)
 
 
@@ -645,6 +615,9 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
 
                 for object in objects:
                     bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer])
+
+                if settings.use_smart_texture_interpolation:
+                    set_all_image_nodes_interpolation_to_smart(material.node_tree, bpy_state)
 
 
                 for sub_task in bake_task:
@@ -690,7 +663,7 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
 
                         current_time = time.time()
                         if current_time - last_updated > 2:
-                            print('.', sep='', end='', flush=True, file=sys.stderr)
+                            print(f"Baking in progress: {time.strftime('%H:%M:%S %Y-%m-%d')}", flush=True, file=sys.stderr)
                             last_updated = current_time
 
 
@@ -713,7 +686,6 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                             objects[0],
                             objects,
                             bpy.ops.object.bake,
-                            # uv_layer = uv_layer,  # TODO: set it active instead
                             **kwargs,
                         )
 
@@ -900,7 +872,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
                     break
 
         if not objects_in_group:
-            print_warning(f"No objects found for specified materials to be baked:\n\tmaterials_to_bake={materials_to_bake}\n\tobjects={objects}")
+            do_warning(f"No objects found for specified materials to be baked:\n\tmaterials_to_bake={materials_to_bake}\n\tobjects={objects}", do_raise=settings.raise_warnings)
             return
 
         print_bold('\nMaterial Baking: ', [m.name_full for m in materials_to_bake], '\nfor objects:', [o.name_full for o in objects_in_group])
@@ -954,71 +926,13 @@ def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings
     print_accent('Start baking:\n', '\n'.join((o.name_full for o in objects)))
 
 
-    # bpy.ops.object.make_local(type='ALL')
-    # bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-
-
-    # remove unused materials
-    if settings.remove_unused_material_slot:
-        bpy.ops.object.material_slot_remove_unused()
-
-
-    # assign a default material to empty material slots and mesh with not materials
-    for object in objects:
-
-        if not object.material_slots:
-            mesh: bpy.types.Mesh = object.data
-            mesh.materials.append(get_default_material())
-            continue
-
-        for slot in object.material_slots:
-
-            if slot.material:
-                continue
-
-            print_warning(f"The material socket {slot.__repr__()} of the object {object.__repr__()} does not have a material assigned.")
-
-            slot.material = get_default_material()
-
-    # convert all non-node materials to nodes
-    for object in objects:
-
-        for slot in object.material_slots:
-
-            material: bpy.types.Material = slot.material
-
-            if material.use_nodes:
-                continue
-
-            material.use_nodes = True
-
-            tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
-
-            tree.reset_nodes()
-
-            principled = tree.output[0]
-
-            principled.set_input('Base Color', material.diffuse_color)
-            principled.set_input('Metallic', material.metallic)
-            principled.set_input('Specular', material.specular_intensity)
-            principled.set_input('Roughness', material.roughness)
-
-
-    # make all material unique
-    if settings.make_materials_single_user:
-        if settings.material_key:
-            bpy_utils.make_materials_unique(objects, lambda material: material.get(settings.material_key))
-        else:
-            bpy_utils.make_materials_unique(objects)
-
-
     with contextlib.ExitStack() as exit_stack:
 
         state = exit_stack.enter_context(bpy_context.Bpy_State())
 
         # hide other object in render
         if settings.isolate_objects:
-            for object in bpy.data.objects:
+            for object in bpy_utils.get_view_layer_objects():
                 state.set(object, 'hide_render', object not in objects)
 
         for object in objects:
@@ -1055,93 +969,87 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
 
 
     bake_start_time = time.perf_counter()
-    baked_objects_count = 0
 
     utils.print_separator(char='░')
     utils.print_in_color(utils.get_color_code(0,0,0,128,128,0), f"Preparing bake...")
 
 
-    # filter invalid objects
+    if any(o.type != 'MESH' for o in objects):
+        raise Exception("\n\t".join([
+            "Bake target objects must be of type MESH:",
+            f"objects = {[o.name_full for o in objects]}",
+            f"incompatible = {[o.name_full for o in objects if o.type != 'MESH']}",
+        ]))
+
+
+    # validate
+
     view_layer_objects = bpy_utils.get_view_layer_objects()
 
-    _objects = []
+    requires_single_principled_bsdf = True  # TODO: currently all bake types assume principled bsdf
+
     for object in objects:
 
-        if object.type != 'MESH':
-            do_warning(object.name_full, 'is not a mesh object. Skipped.', settings=settings)
-            continue
-
         if len(object.data.polygons) == 0:
-            do_warning(object.name_full, 'has no polygons. Skipped.', settings=settings)
-            continue
+            do_warning(f"Object has no polygons: {object.name_full}", do_raise=settings.raise_warnings)
 
         if object not in view_layer_objects:
-            do_warning(object.name_full, 'is not in the scene. Skipped.', settings=settings)
-            continue
+            do_warning(f"Object is not in the scene: {object.name_full}", do_raise=settings.raise_warnings)
 
         if object.display_type in ('BOUNDS', 'WIRE'):
-            do_warning(object.name_full, 'is a supporting object. Displayed as bounds or wire. Skipped.', settings=settings)
-            continue
+            do_warning(f"Object is displayed as bounds or wire: {object.name_full}")
 
-        _objects.append(object)
+        if not object.material_slots:
+            do_warning(f"Object does not have materials: {object.name_full}", do_raise=settings.raise_warnings)
 
-    objects = _objects
-    if not objects:
-        print_warning('No valid objects found for the baking.')
-        return
+        for slot in object.material_slots:
+
+            material = slot.material
+
+            if material:
+
+                if not material.use_nodes:
+                    do_warning(f"Object's material does not use nodes: {object.name_full}, {material.name_full}")
+
+                report_missing_attributes(material.node_tree, object, do_raise=settings.raise_warnings)
+                report_missing_files(material.node_tree, do_raise=settings.raise_warnings)
+
+                if requires_single_principled_bsdf:
+
+                    tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+
+                    shader_node = tree.output['Surface']
+
+                    if shader_node is None or not shader_node.be('ShaderNodeBsdfPrincipled'):
+                        do_error(f"A single Principled BSDF is required: {material.name_full}")
+
+            else:
+                do_warning(f"The material socket {repr(slot)} of the object {object.name_full} does not have a material assigned.", do_raise=settings.raise_warnings)
+
+                if requires_single_principled_bsdf:
+                    do_error(f"A single Principled BSDF is required: {repr(slot)}")
 
 
-    with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects) as focus_context, bpy_context.Bpy_State() as bpy_state, bpy_context.State() as state:
+    settings._images = []
+    settings._raw_images = []
+
+
+    with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects) as focus_context, bpy_context.Bpy_State() as bpy_state:
 
         # ensure object render visibility
         objects_in_temp_collection = set(focus_context.hidden_by_hierarchy_collection.objects)
         for object in objects:
 
             if object.animation_data:
+                # drivers can modify render visibility
                 for driver in object.animation_data.drivers:
-                    # ValueError: FCurve.path_from_id() does not support path creation for this type
-                    state.set(driver, 'mute', True)
+                    bpy_state.set(driver, 'mute', True)
 
             bpy_state.set(object, 'hide_render', False)
 
             if not objects_in_temp_collection:
                 # object might be hidden for render by a hierarchy
                 focus_context.hidden_by_hierarchy_collection.objects.link(object)
-
-
-        # for object in objects:
-        #     for modifier in object.modifiers:
-        #         bpy_state.set(modifier, 'show_viewport', False)
-
-
-        if settings.duplicates_make_real:
-            prev_objects = set(bpy.data.objects)
-            bpy.ops.object.duplicates_make_real(use_base_parent=False, use_hierarchy=True)
-            objects = list(set(bpy.data.objects).difference(prev_objects))
-
-
-        # convert to mesh
-        if settings.convert_to_mesh:
-
-            if settings.do_convert_to_mesh_only_non_mesh_object:
-                _objects_to_convert = [object for object in objects if object.type != 'MESH']
-            else:
-                _objects_to_convert = objects
-
-            if _objects_to_convert:
-                try:
-                    bpy_utils.convert_to_mesh(_objects_to_convert)
-                except Exception as e:
-                    message = f"Conversion to mesh failed: {_objects_to_convert}"
-                    if settings.raise_errors:
-                        raise Exception(message) from e
-                    else:
-                        print_error(message)
-
-
-        settings._images = []
-        settings._raw_images = []
-
 
         # bake objects
         if settings.merge_materials_between_objects:
@@ -1152,27 +1060,17 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
                 bpy_state.set(bpy.context.scene.render.bake, 'margin', min(1, settings.margin))
 
             if objects:
-
                 with bpy_context.Focus_Objects(objects):
                     bake_objects(objects, settings)
 
-                baked_objects_count += len(objects)
         else:
             for object in objects:
-
                 with bpy_context.Focus_Objects(object):
                     bake_objects([object], settings)
 
-                baked_objects_count += 1
-
-
-        return settings._images
-
-
 
     # overall report
-    print_done(f'Baking of {baked_objects_count}/{len(objects)} objects is done in {round(time.perf_counter() - bake_start_time, 2)} secs.')
+    print_done(f'Baking of {len(objects)} objects is done in {round(time.perf_counter() - bake_start_time, 2)} secs.')
 
-    skipped_count = len(objects) - baked_objects_count
-    if skipped_count:
-        print_warning(f'{skipped_count} objects are skipped.')
+
+    return settings._images
