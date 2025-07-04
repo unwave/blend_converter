@@ -673,7 +673,7 @@ def convert_materials_to_principled(objects: typing.List[bpy.types.Object], remo
 
 
     for material in materials:
-        print('pre_convert_materials:', material.name_full)
+        print('convert_to_pbr:', material.name_full)
 
         tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
 
@@ -910,6 +910,7 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
 
     The main use case is speedup texture baking.
     """
+    print(f"{make_material_independent_from_object.__name__}...")
 
     texture_coordinates_collection = bpy.data.collections.new(f'__bc_temp_texture_coordinates_{uuid.uuid1().hex}')
     bpy.context.view_layer.layer_collection.collection.children.link(texture_coordinates_collection)
@@ -1110,10 +1111,21 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
                             if object.data and hasattr(object.data, 'texture_mesh') and object.data.texture_mesh:
                                 warn("texture_mesh is not handled.")
 
+                            for other_socket in output.connections:
+                                replacement_node.outputs['Object'].join(other_socket, move=False)
+
                         elif output.identifier == 'Object':
-                            replacement_node = tree.new('ShaderNodeTexCoord')
-                            replacement_node.object = get_texture_coordinates_object_empty(evaluated_object)
-                            texture_coordinates_collection.objects.link(replacement_node.object)
+
+                            replacement_node = tree.new('ShaderNodeNewGeometry').outputs['Position'].new('ShaderNodeMapping', vector_type='TEXTURE')
+
+                            location, rotation, scale = evaluated_object.matrix_world.decompose()
+
+                            replacement_node['Location'] = location
+                            replacement_node['Rotation'] = rotation.to_euler()
+                            replacement_node['Scale'] = scale
+
+                            for other_socket in output.connections:
+                                replacement_node.outputs[0].join(other_socket, move=False)
 
                         elif output.identifier == 'UV':
 
@@ -1128,17 +1140,9 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
                                 replacement_node = tree.new('ShaderNodeUVMap')
                                 replacement_node.uv_map = 'UVMap'
 
-
                             for other_socket in output.connections:
                                 replacement_node.outputs[0].join(other_socket, move=False)
 
-                            continue
-
-                        else:
-                            continue
-
-                        for other_socket in output.connections:
-                            replacement_node.outputs['Object'].join(other_socket, move=False)
 
                 elif node.be('Ambient Occlusion') and node.only_local == True:
                    # TODO: as the node ignores all the shader context a way is to explode the mesh
@@ -1734,8 +1738,8 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
                 for nla_track in object.animation_data.nla_tracks:
                     bpy_state_0.set(nla_track, 'mute', True)
 
-
-        convert_materials_to_principled(objects, remove_unused=False)
+        if settings.convert_materials:
+            convert_materials_to_principled(objects, remove_unused=False)
 
         set_out_of_range_material_indexes_to_zero(objects)
         merge_material_slots_with_the_same_materials(objects)
@@ -1775,7 +1779,8 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
         objects_copy = deep_copy_objects(objects)
 
-        texture_coordinates_collection = make_material_independent_from_object(objects_copy)
+        if settings.convert_materials:
+            texture_coordinates_collection = make_material_independent_from_object(objects_copy)
 
         if settings.bake_original_topology:
             for object in objects_copy:
@@ -1969,8 +1974,9 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         ## delete temp objects
-        bpy.data.batch_remove(set(texture_coordinates_collection.objects))
-        bpy.data.collections.remove(texture_coordinates_collection)
+        if settings.convert_materials:
+            bpy.data.batch_remove(set(texture_coordinates_collection.objects))
+            bpy.data.collections.remove(texture_coordinates_collection)
 
 
         return objects

@@ -1799,6 +1799,13 @@ class Bake_Materials(Settings):
     #### Default: `False`
     """
 
+    convert_materials: bool = True
+    """
+    Convert materials to use a single Principled BSDF shader.
+
+    #### Default: `True`
+    """
+
 @dataclasses.dataclass
 class Future_Bake_Materials(Settings):
 
