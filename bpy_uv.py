@@ -289,18 +289,44 @@ def mark_seams_from_islands(object: bpy.types.Object, uv_layer_name: typing.Opti
         bpy.ops.uv.seams_from_islands()
 
 
+def get_object_copy_for_uv_unwrap(object: bpy.types.Object):
+
+    with bpy_context.Focus_Objects(object):
+
+        object_copy = object.copy()
+        object_copy.data = object.data.copy()
+
+        object_copy.rotation_mode = 'XYZ'
+        object_copy.location = (0,0,0)
+
+        object_copy.rotation_euler = (0,0,0)
+        object_copy.delta_location = (0,0,0)
+        object_copy.delta_rotation_euler = (0,0,0)
+
+        object_copy.modifiers.clear()
+
+        object_copy.vertex_groups.clear()
+
+        if object_copy.data.shape_keys:
+            for key_block in reversed(object_copy.data.shape_keys.key_blocks):
+                object_copy.shape_key_remove(key_block)
+
+        bpy_context.call_with_object_override(object_copy, [object_copy], bpy.ops.object.transform_apply, location=False, rotation=False, scale=True)
+
+    return object_copy
+
+
+
 def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, settings: tool_settings.Ministry_Of_Flat, uv_layer_name: typing.Optional[str] = None):
     """ Currently operates on per mesh basis, so it is not possible to unwrap only a part of `bpy.types.Mesh`. """
-
-    print('ministry_of_flat:', object.name_full)
-
-
-    if SKIP_UNWRAP_AND_PACK:
-        raise utils.Fallback('SKIP_UNWRAP_AND_PACK')
+    print(unwrap_ministry_of_flat.__name__, object.name_full)
 
 
     if object.type != 'MESH':
         raise Exception(f"Object is not of MESH type: {object.name_full}")
+
+    if SKIP_UNWRAP_AND_PACK:
+        raise utils.Fallback('SKIP_UNWRAP_AND_PACK')
 
 
     def print_output(capture_stdout, capture_stderr, stderr_color = utils.get_color_code(255, 94, 14, 0,0,0)):
@@ -317,32 +343,10 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
     with bpy_context.Focus_Objects(object), bpy_context.Bpy_State() as bpy_state:
 
-
-        if not object.data.polygons:
-            raise utils.Fallback(f"Object has no faces: {object.name_full}")
-
-
-        object_copy = object.copy()
-        object_copy.data = object.data.copy()
-
-        object_copy.rotation_mode = 'XYZ'
-        object_copy.location = (0,0,0)
-
-        object_copy.rotation_euler = (0,0,0)
-        object_copy.delta_location = (0,0,0)
-        object_copy.delta_rotation_euler = (0,0,0)
-
-        object_copy.modifiers.clear()
-
-        # Error: Modifier cannot be applied to a mesh with shape keys
-        if object_copy.data.shape_keys:
-            for key_block in reversed(object_copy.data.shape_keys.key_blocks):
-                object_copy.shape_key_remove(key_block)
-
+        object_copy = get_object_copy_for_uv_unwrap(object)
+        object_copy.name = "EXPORT_" + object_copy.name
 
         with bpy_context.Focus_Objects(object_copy):
-
-            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
             edge_split_modifier: bpy.types.EdgeSplitModifier = object_copy.modifiers.new(name='__bc_edge_split', type='EDGE_SPLIT')
             edge_split_modifier.use_edge_angle = False
@@ -419,6 +423,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
                 raise utils.Fallback('Fail to import obj.') from e
 
         imported_object = bpy.context.selected_objects[0]
+        imported_object.name = "IMPORT_" + imported_object.name
 
         print('validate')
         with utils.Capture_Stdout() as capture_stdout:
@@ -468,7 +473,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         bpy_utils.focus(object)
 
         if not object.data.uv_layers:
-            object.data.uv_layers.new()
+            object.data.uv_layers.new(do_init=False)
 
         if uv_layer_name is None:
             uv_layer_name = object.data.uv_layers.active.name
@@ -1067,7 +1072,8 @@ def unwrap(objects: typing.List[bpy.types.Object], *, uv_layer = tool_settings.D
         for object in objects:
             bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
 
-        bpy_utils.unwrap_ministry_of_flat_with_fallback(objects, settings, ministry_of_flat_settings)
+        with bpy_context.Isolate_Focus(objects):
+            bpy_utils.unwrap_ministry_of_flat_with_fallback(objects, settings, ministry_of_flat_settings)
 
         scale_uv_to_world_per_uv_layout(objects)
 

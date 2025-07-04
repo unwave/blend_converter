@@ -816,6 +816,8 @@ def create_material(name: str, uv_layer: str, images: typing.Iterable[bpy.types.
         if 'Emission Strength' in principled.inputs.identifiers and not principled['Emission Strength']:
             principled['Emission Strength'] = 1
 
+    if principled['Base Color']:
+        tree.bl_tree.nodes.active = principled['Base Color'].bl_node
 
     return material
 

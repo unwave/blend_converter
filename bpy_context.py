@@ -1202,7 +1202,8 @@ class Focus_Objects:
         return list(filter(None, (ref for index, ref in enumerate(self.ref_list) if index in self.init_object_indexes)))
 
 
-    def set_mode(self, objects: typing.List[bpy.types.Object], mode: str):
+    @staticmethod
+    def set_mode(objects: typing.List[bpy.types.Object], mode: str, visible_collection: bpy.types.Collection, view_layer: bpy.types.ViewLayer):
         """
         `bpy.ops.object.mode_set` works for multiple selected objects, but.
 
@@ -1222,20 +1223,19 @@ class Focus_Objects:
         https://projects.blender.org/blender/blender/issues/88051
         """
 
-        view_layer = self.view_layer
-
         for object_type, objects_of_type in utils.list_by_key(objects, operator.attrgetter('type')).items():
 
 
             bpy_utils.focus(objects_of_type, view_layer=view_layer)
 
+
             for object in objects_of_type:
                 if not object.visible_get(view_layer=view_layer):
-                    self.hidden_by_hierarchy_collection.objects.link(object)
-                    object.hide_set(False)
+                    visible_collection.objects.link(object)
+                    object.hide_set(False, view_layer=view_layer)
                     object.hide_viewport = False
                     object.hide_select = False
-                    object.select_set(True)
+                    object.select_set(True, view_layer=view_layer)
 
 
             for object in objects_of_type:
@@ -1299,10 +1299,10 @@ class Focus_Objects:
 
 
         if self.mode == 'OBJECT':
-            self.set_mode(affected_objects, 'OBJECT')
+            self.set_mode(affected_objects, 'OBJECT', self.hidden_by_hierarchy_collection, self.view_layer)
         else:
-            self.set_mode(tuple(object for object in affected_objects if object not in self._objects), 'OBJECT')
-            self.set_mode(self._objects, self.mode)
+            self.set_mode(tuple(object for object in affected_objects if object not in self._objects), 'OBJECT', self.hidden_by_hierarchy_collection, self.view_layer)
+            self.set_mode(self._objects, self.mode, self.hidden_by_hierarchy_collection, self.view_layer)
 
         bpy_utils.focus(self._objects)
 
@@ -1321,7 +1321,7 @@ class Focus_Objects:
         objects = self.affected_objects
 
         for mode, objects_in_mode in utils.list_by_key(objects, operator.itemgetter(self.MODE_KEY)).items():
-            self.set_mode(objects_in_mode, mode)
+            self.set_mode(objects_in_mode, mode, self.hidden_by_hierarchy_collection, self.view_layer)
 
         for object in objects:
 
@@ -1547,3 +1547,51 @@ def call_in_uv_editor(func, *args, can_be_canceled = False, **kwargs):
         )
 
         call(override, func, *args, can_be_canceled = can_be_canceled, **kwargs)
+
+
+class Empty_Scene:
+
+    def __enter__(self):
+        bpy.ops.scene.new(type='EMPTY')
+        return self
+
+    def __exit__(self, type, value, traceback):
+        bpy.ops.scene.delete()
+
+
+class Isolate_Focus:
+
+
+    def __init__(self, objects: typing.List[bpy.types.Object], mode = 'OBJECT'):
+        self.objects = objects
+        self.mode = mode
+
+
+    def __enter__(self):
+
+        bpy.ops.scene.new(type='EMPTY')
+        bpy.ops.scene.view_layer_add(type='EMPTY')
+
+        view_layer = bpy.context.view_layer
+
+        affected_objects = [object for object in bpy_utils.get_view_layer_objects(view_layer) if object.visible_get(view_layer=view_layer)] + self.objects
+        affected_objects = list(dict.fromkeys(affected_objects))
+
+        if self.mode == 'OBJECT':
+            Focus_Objects.set_mode(affected_objects, 'OBJECT', bpy.context.scene.collection, view_layer)
+        else:
+            Focus_Objects.set_mode(tuple(object for object in affected_objects if object not in self.objects), 'OBJECT', bpy.context.scene.collection, view_layer)
+            Focus_Objects.set_mode(self.objects, self.mode, bpy.context.scene.collection, view_layer)
+
+        bpy_utils.focus(self.objects)
+
+        for object in self.objects:
+            if not object.visible_get(view_layer=view_layer):
+                raise Exception(f"Fail to focus object: not visible: {object.name_full}")
+
+        return self
+
+
+    def __exit__(self, type, value, traceback):
+        bpy.ops.scene.view_layer_remove()
+        bpy.ops.scene.delete()
