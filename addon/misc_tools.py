@@ -432,6 +432,7 @@ def obj_only_ministry_of_flat(operator: bpy.types.Operator, context: bpy.types.C
 )
 def uv_to_world_scale(operator: bpy.types.Operator, context: bpy.types.Context):
     objects = [object for object in context.selected_objects if object.data and hasattr(object.data, 'uv_layers') and object.data.is_editmode]
+    objects = bpy_utils.get_unique_data_objects(objects)
     bpy_uv.scale_uv_to_world_per_uv_island(objects, use_selected=operator.use_selected, divide_by_mean=operator.divide_by_mean)
 
 
@@ -451,6 +452,7 @@ def merge_objects_respect_materials(operator: bpy.types.Operator, context: bpy.t
 )
 def scale_uv_to_world_per_uv_layout_median(operator: bpy.types.Operator, context: bpy.types.Context):
     objects = [object for object in context.selected_objects if object.data and hasattr(object.data, 'uv_layers') and object.data.is_editmode]
+    objects = bpy_utils.get_unique_data_objects(objects)
     bpy_uv.scale_uv_to_world_per_uv_layout(objects)
 
 
@@ -522,6 +524,7 @@ def align_longest_1(operator: bpy.types.Operator, context: bpy.types.Context):
 def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
 
     objects = [objects[0] for data, objects in utils.list_by_key(context.selected_objects, lambda x: x.data).items() if hasattr(data, 'uv_layers')]
+    objects = bpy_utils.get_unique_data_objects(objects)
 
     with tempfile.TemporaryDirectory() as temp_dir:
         for object in objects:
@@ -579,11 +582,12 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
 @operator_factory.operator(
     poll = edit_mode_poll,
     __annotations__ = dict(
-        only_select = bpy.props.BoolProperty(default=False),
+        only_select = bpy.props.BoolProperty(default=True),
         divide_by_mean = bpy.props.BoolProperty(default=True),
     ),
     bl_options = {'REGISTER', 'UNDO'},
 )
 def reunwrap_bad_uvs(operator: bpy.types.Operator, context: bpy.types.Context):
     objects = [object for object in context.selected_objects if object.data and hasattr(object.data, 'uv_layers') and object.data.is_editmode]
+    objects = bpy_utils.get_unique_data_objects(objects)
     bpy_uv.reunwrap_bad_uvs(objects, only_select=operator.only_select, divide_by_mean=operator.divide_by_mean)

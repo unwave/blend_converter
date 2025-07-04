@@ -11,6 +11,7 @@ import platform
 import threading
 import queue
 import sys
+import array
 
 import bpy
 import mathutils
@@ -302,27 +303,6 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         raise Exception(f"Object is not of MESH type: {object.name_full}")
 
 
-    def move_modifier_to_first(object, modifier):
-        if bpy.app.version < (2,90,0):
-            for _ in range(len(object.modifiers)):
-                bpy.ops.object.modifier_move_up(modifier = modifier.name)
-        else:
-            bpy.ops.object.modifier_move_to_index(modifier = modifier.name, index=0)
-
-
-    def create_uv_transfer_modifier(object: bpy.types.Object, target_object: bpy.types.Object):
-
-        modifier: bpy.types.DataTransferModifier = object.modifiers.new(name='__bc_uv_transfer', type='DATA_TRANSFER')
-
-        modifier.object = target_object
-
-        modifier.use_loop_data = True
-        modifier.data_types_loops = {'UV'}
-        modifier.loop_mapping = 'TOPOLOGY'
-
-        return modifier
-
-
     def print_output(capture_stdout, capture_stderr, stderr_color = utils.get_color_code(255, 94, 14, 0,0,0)):
         for line in capture_stdout.lines.queue:
             print(line, end='')
@@ -348,14 +328,11 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         object_copy.rotation_mode = 'XYZ'
         object_copy.location = (0,0,0)
 
-        object_copy.scale = (1,1,1)
         object_copy.rotation_euler = (0,0,0)
         object_copy.delta_location = (0,0,0)
-        object_copy.delta_scale = (1,1,1)
         object_copy.delta_rotation_euler = (0,0,0)
 
         object_copy.modifiers.clear()
-
 
         # Error: Modifier cannot be applied to a mesh with shape keys
         if object_copy.data.shape_keys:
@@ -365,6 +342,8 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
         with bpy_context.Focus_Objects(object_copy):
 
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
             edge_split_modifier: bpy.types.EdgeSplitModifier = object_copy.modifiers.new(name='__bc_edge_split', type='EDGE_SPLIT')
             edge_split_modifier.use_edge_angle = False
 
@@ -372,7 +351,6 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
 
             with bpy_context.Focus_Objects(object_copy, 'EDIT'):
-
 
                 bpy.ops.mesh.reveal()
                 bpy.ops.mesh.select_all(action='SELECT')
@@ -382,7 +360,6 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
                 bpy_state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'INDIVIDUAL_ORIGINS')
                 bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(0.1, 0.1, 0.1), mirror=False, use_proportional_edit=False, snap=False)
-
 
 
             filepath_input = utils.ensure_unique_path(os.path.join(temp_dir, utils.ensure_valid_basename(object.name_full + '.obj')))
@@ -494,39 +471,13 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
             object.data.uv_layers.new()
 
         if uv_layer_name is None:
-            imported_object.data.uv_layers[0].name = object.data.uv_layers.active.name
-        else:
-            imported_object.data.uv_layers[0].name = uv_layer_name
+            uv_layer_name = object.data.uv_layers.active.name
 
+        imported_object.data.uv_layers[0].name = uv_layer_name
 
-        if bpy_utils.is_single_user(object.data):
-            modifier = create_uv_transfer_modifier(object, imported_object)
-
-            with utils.Capture_Stdout() as capture:
-                bpy.ops.object.modifier_apply(modifier=modifier.name)
-
-        else:
-            orig_mesh = object.data
-            object.data = object.data.copy()
-
-            modifier = create_uv_transfer_modifier(object, imported_object)
-
-            with utils.Capture_Stdout() as capture:
-                bpy.ops.object.modifier_apply(modifier=modifier.name)
-
-            orig_mesh.user_remap(object.data)
-
-            bpy.data.meshes.remove(orig_mesh)
-
+        copy_uv(imported_object, object, uv_layer_name)
 
         bpy.data.objects.remove(imported_object)
-
-
-        for line in capture.lines.queue:
-            if "Source and destination meshes do not have the same number of face corners, 'Topology' mapping cannot be used in this case" in line:
-                pass
-            elif 'cannot be' in line:
-                raise utils.Fallback(line)
 
 
 def get_uv_triangles(b_mesh: bmesh.types.BMesh, uv_layer):
@@ -1126,31 +1077,57 @@ def get_stdev_mean(values: typing.Union[typing.Sized, typing.Iterable]):
     mean = statistics.mean(values)
 
     if len(values) == 1:
-        minimum = float('-inf')
-        maximum = float('inf')
-        stdev_mean = 1
+        return mean
     else:
         stdev = statistics.stdev(values, mean)
 
         minimum = mean - 3 * stdev
         maximum = mean + 3 * stdev
 
-        stdev_mean = statistics.mean(multiplier for multiplier in values if multiplier <= maximum and multiplier >= minimum)
-
-    return stdev_mean
+        return statistics.mean(multiplier for multiplier in values if multiplier <= maximum and multiplier >= minimum)
 
 
 def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False, divide_by_mean = True):
     print(f"{reunwrap_bad_uvs.__name__}...")
 
+
     from mathutils.geometry import area_tri
+
+
+    def get_bound_box_ratio(island: typing.List[bmesh.types.BMFace]):
+        xs, ys = zip(*(bm_loop[uv_layer].uv for face in island for bm_loop in face.loops))
+        return ( abs(max(xs) - min(xs)) ) / ( abs(max(ys) - min(ys)) )
+
+
+    all_bound_box_ratios: typing.List[float] = []
+
+    with bpy_context.Focus_Objects(objects, mode='EDIT'):
+
+        for object in objects:
+
+            bm = bmesh.from_edit_mesh(object.data)
+
+            uv_layer = bm.loops.layers.uv.verify()
+
+            for island in get_linked_uv_islands(bm, uv_layer):
+
+                try:
+                    bound_box_ratio = get_bound_box_ratio(island)
+                    if bound_box_ratio < 1:
+                        bound_box_ratio = 1 / bound_box_ratio
+                except ZeroDivisionError:
+                   continue
+
+                all_bound_box_ratios.append(bound_box_ratio)
+
+    maximum_bound_box_ratio = pow(statistics.harmonic_mean(all_bound_box_ratios), 3)
+
 
     for object in objects:
 
         with bpy_context.Focus_Objects(object, mode='EDIT'):
 
             bm = bmesh.from_edit_mesh(object.data)
-
             if not bm.faces:
                 continue
 
@@ -1168,11 +1145,6 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
             uv_layer = bm.loops.layers.uv.verify()
 
             islands = get_linked_uv_islands(bm, uv_layer)
-
-            # if use_selected:
-                # islands = list(filter(None, [[face for face in island if face.select] for island in islands]))
-
-
             if not islands:
                 continue
 
@@ -1191,14 +1163,11 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
 
                 try:
                     world_to_uv_ratio = island_mesh_area / island_uv_area
-                    if world_to_uv_ratio < 1:
-                        world_to_uv_ratio = 1 / world_to_uv_ratio
                 except ZeroDivisionError:
                     world_to_uv_ratio = 0
 
                 try:
-                    xs, ys = zip(*(bm_loop[uv_layer].uv for face in island for bm_loop in face.loops))
-                    bound_box_ratio = ( abs(max(xs) - min(xs)) ) / ( abs(max(ys) - min(ys)) )
+                    bound_box_ratio = get_bound_box_ratio(island)
                     if bound_box_ratio < 1:
                         bound_box_ratio = 1 / bound_box_ratio
                 except ZeroDivisionError:
@@ -1210,11 +1179,9 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
                 bound_box_ratios.append(bound_box_ratio)
 
 
-            maximum_bound_box_ratio = pow(statistics.geometric_mean([n for n in bound_box_ratios if n > 0]), 3)
-
             is_bad_islands = [bound_box_ratio > maximum_bound_box_ratio or world_to_uv_ratio == 0 or bound_box_ratio == 0 for world_to_uv_ratio, bound_box_ratio in zip( world_to_uv_ratios, bound_box_ratios)]
 
-            mean_scale_multiplier = get_stdev_mean([math.sqrt(world_to_uv_ratio) for is_bad, world_to_uv_ratio in zip(is_bad_islands, world_to_uv_ratios) if not is_bad])
+            mean_scale_multiplier = statistics.harmonic_mean([math.sqrt(world_to_uv_ratio) for is_bad, world_to_uv_ratio in zip(is_bad_islands, world_to_uv_ratios) if not is_bad])
 
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.uv.select_all(action='DESELECT')
@@ -1237,14 +1204,18 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
                     if only_select:
                         continue
 
-                    bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, method='MINIMUM_STRETCH', fill_holes=True, no_flip=True, can_be_canceled=True)
+                    bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, method='MINIMUM_STRETCH', fill_holes=True, no_flip=True, can_be_canceled=True, iterations=30)
 
-                    mesh_area = sum(bm_copy.faces[face.index].calc_area() for face in island)
                     uv_area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face])
+                    if math.isnan(uv_area):
+                        uv_area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face] if all(not map(math.isnan, vert) for vert in loop))
 
+
+                if only_select:
+                    continue
 
                 if uv_area == 0:
-                    scale_multiplier = 1
+                    scale_multiplier = mean_scale_multiplier
                 else:
                     scale_multiplier = math.sqrt(mesh_area/uv_area)
 
@@ -1263,7 +1234,59 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
                         uv_loop.uv += island_center
 
 
+                # stretch the bad uv island to make it no large than the maximum
+                # to make packing more efficient
+                try:
+                    bound_box_ratio_raw = get_bound_box_ratio(island)
+                    if bound_box_ratio_raw < 1:
+                        bound_box_ratio = 1 / bound_box_ratio_raw
+                    else:
+                        bound_box_ratio = bound_box_ratio_raw
+                except ZeroDivisionError as e:
+                    continue
+
+                if bound_box_ratio > maximum_bound_box_ratio:
+
+                    for face in island:
+                        for loop in face.loops:
+                            uv_loop = loop[uv_layer]
+                            uv_loop.uv -= island_center
+                            if bound_box_ratio_raw > 1:
+                                uv_loop.uv[0] /= bound_box_ratio/maximum_bound_box_ratio
+                            else:
+                                uv_loop.uv[1] /= bound_box_ratio/maximum_bound_box_ratio
+                            uv_loop.uv += island_center
+
+
             bpy.ops.ed.flush_edits()
             bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
 
             bm_copy.free()
+
+
+def copy_uv(from_object: bpy.types.Object, to_object: bpy.types.Object, uv_layer_name: str):
+
+
+    if not(from_object.type == to_object.type == 'MESH'):
+        raise ValueError("\n\t".join([
+            "Objects must be of type MESH:",
+            f"{from_object.name_full}: {from_object.type}",
+            f"{to_object.name_full}: {to_object.type}",
+        ]))
+
+
+    if len(from_object.data.loops) != len(to_object.data.loops):
+        raise ValueError("\n\t".join([
+            "Mesh loops count mismatch:",
+            f"{from_object.name_full}: {from_object.data.loops}",
+            f"{to_object.name_full}: {to_object.data.loops}",
+        ]))
+
+
+    with bpy_context.Focus_Objects([from_object, to_object]):
+
+        uvs = array.array('f', [0.0, 0.0]) * len(from_object.data.loops)
+
+        from_object.data.uv_layers[uv_layer_name].data.foreach_get('uv', uvs)
+
+        to_object.data.uv_layers[uv_layer_name].data.foreach_set('uv', uvs)

@@ -1987,35 +1987,9 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         for orig, copy in map_original_to_copy.items():
 
             if settings.bake_original_topology:
-
-                with bpy_context.Bpy_State() as bpy_state:
-
-                    for modifier in orig.modifiers:
-                        bpy_state.set(modifier, 'show_viewport', False)
-
-                    data_transfer_modifier = add_data_transfer_modifier()
-
-                    # TODO: this is for testing, it is not necessary
-                    try:
-                        with utils.Capture_Stdout() as capture:
-                            move_modifier_to_first(orig, data_transfer_modifier)
-                    except Exception as e:
-                        error = 'Cannot move above a modifier requiring original data'
-                        if any(error in line for line in capture.lines.queue):
-                            utils.print_in_color(utils.get_color_code(240,0,0, 0,0,0), f"Fail to move modifier '{modifier.name}' for object '{object.name_full}': {error}\n")
-                        else:
-                            raise e
-
-                    # Info: Applied modifier was not first, result may not be as expected
-                    # Error: Source and destination meshes do not have the same number of face corners, 'Topology' mapping cannot be used in this case
-
-                    make_object_data_unique([orig])
-
-                    bpy_context.call_with_object_override(orig, [orig], bpy.ops.object.modifier_apply, modifier = data_transfer_modifier.name)
-
+                bpy_uv.copy_uv(copy, orig, settings.uv_layer_bake)
             else:
                 add_data_transfer_modifier()
-
 
 
         ## copy materials

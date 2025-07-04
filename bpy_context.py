@@ -1257,12 +1257,14 @@ class Focus_Objects:
             if all(object.mode == mode for object in objects_of_type):
                 continue
 
-            if any(len(objects) > 1 for objects in utils.list_by_key(objects, lambda x: x.data).values()):
-                info = json.dumps(utils.list_by_key(objects, lambda x: x.data.name_full), indent=4, default=lambda x: x.name_full)
+            if any(len(objects) > 1 for objects in utils.list_by_key(objects_of_type, lambda x: x.data).values()):
+                info = json.dumps(utils.list_by_key(objects_of_type, lambda x: x.data.name_full), indent=4, default=lambda x: x.name_full)
                 raise Exception(f"Fail to set '{mode}' mode for '{object_type}': multiple data users: {info}")
             else:
-                info = '\n'.join([f"{o.name_full}: {o.mode}" for o in objects_of_type])
-                raise Exception(f"Fail to set '{mode}' mode for '{object_type}': unknown reason: {info}")
+                raise Exception('\n\t'.join([
+                    f"Fail to set '{mode}' mode for '{object_type}': unknown reason.",
+                    *[f"{o.name_full}: {o.mode}" for o in objects_of_type]
+                ]))
 
 
     def __enter__(self):
