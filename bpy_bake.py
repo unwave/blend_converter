@@ -257,11 +257,15 @@ class Baked_Image:
     displacement_map_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '16', compression = 15, color_mode = 'BW')
     """ Default: PNG 16-bit BW """
 
+    bake_buffer_map_settings = tool_settings.Image_File_Settings(file_format = 'OPEN_EXR', color_depth = '32', exr_codec = 'ZIP', color_mode = 'RGB')
+
 
     @property
     def image_file_settings(self):
         if self.bake_types[0]._identifier in NORMAL_SOCKETS:
             return self.normal_map_settings
+        elif self.bake_types[0]._identifier.startswith('buffer'):
+            return self.bake_buffer_map_settings
         else:
             return self.default_map_settings
 
@@ -311,7 +315,7 @@ class Baked_Image:
                 # Blender 2.83 does not have save_as_render but uses the render color transform
                 pass
 
-            file_name = self.image_name + '.' + self.image_file_settings.file_format.lower()
+            file_name = self.image_name + '.' + self.image_file_settings._file_extension.lower()
             # https://docs.blender.org/manual/en/latest/compositing/types/output/file_output.html#properties
             file_name = file_name.replace('#', '_')
 
@@ -568,7 +572,7 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
     materials_to_bake: typing.List[bpy.types.Material] = []
     objects_by_material = bpy_utils.group_objects_by_material(objects)
 
-    material_name = ensure_unique_name(get_common_name(objects_by_material.keys(), objects[0].name))
+    material_name = ensure_unique_name(get_common_name(filter(None, objects_by_material.keys()), objects[0].name))
 
     baking_images = [Baked_Image(map, material_name, settings) for map in settings.bake_types]
 
@@ -967,7 +971,7 @@ def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings
     utils.print_separator(char='▓')
 
 
-def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
+def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -> typing.List[bpy.types.Image]:
 
 
     bake_start_time = time.perf_counter()
@@ -988,7 +992,15 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
 
     view_layer_objects = bpy_utils.get_view_layer_objects()
 
-    requires_single_principled_bsdf = True  # TODO: currently all bake types assume principled bsdf
+
+    requires_single_principled_bsdf = False
+    for bake_type in settings.bake_types:
+        if isinstance(bake_type, bake_settings._Bake_Type):
+            requires_single_principled_bsdf |= bake_type._requires_principled_bsdf
+        else:
+            for sub_type in bake_type:
+                requires_single_principled_bsdf |= sub_type._requires_principled_bsdf
+
 
     for object in objects:
 
@@ -1012,6 +1024,10 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
 
                 if not material.use_nodes:
                     do_warning(f"Object's material does not use nodes: {object.name_full}, {material.name_full}")
+
+                if not material.node_tree:
+                    do_warning(f"Material does not have a node tree: {object.name_full}, {material.name_full}")
+                    continue
 
                 report_missing_attributes(material.node_tree, object, do_raise=settings.raise_warnings)
                 report_missing_files(material.node_tree, do_raise=settings.raise_warnings)

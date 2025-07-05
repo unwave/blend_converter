@@ -1865,9 +1865,8 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         ## bake materials
-        _bake_settings = tool_settings.Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)
-        if bake_settings:
-            _bake_settings._update(bake_settings)
+        _bake_settings = tool_settings.Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)._update(bake_settings)
+
 
         # TODO: this only works for the processed objects, not others in the scene
         environment_has_transparent_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))
@@ -2045,3 +2044,15 @@ def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '',
 
                 if not ignore_canceled and 'CANCELLED' in result:
                     raise Exception(f"Fail to apply {modifier.type} modifier '{modifier.name}' to object '{object.name_full}'.")
+
+
+def get_unique_materials(objects: typing.List[bpy.types.Object]):
+
+    materials = []
+
+    for object in objects:
+        for slot in object.material_slots:
+            if slot.material:
+                materials.append(slot.material)
+
+    return utils.deduplicate(materials)

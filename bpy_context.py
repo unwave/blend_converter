@@ -1595,3 +1595,60 @@ class Isolate_Focus:
     def __exit__(self, type, value, traceback):
         bpy.ops.scene.view_layer_remove()
         bpy.ops.scene.delete()
+
+
+
+class Composer_Input_Factor:
+
+
+    def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, use_denoise = False):
+
+        self.tree = bpy_node.Compositor_Tree_Wrapper(bpy.context.scene.node_tree)
+        self.input_socket = self.tree.get_socket_wrapper(input_socket)
+        self.image = image
+
+        self.use_denoise = use_denoise
+
+
+    def __enter__(self):
+
+        image_node = self.input_socket.new('CompositorNodeImage', image = self.image)
+
+        init_alpha_node = image_node.outputs[0].insert_new('CompositorNodeSetAlpha')
+        math_node = image_node.outputs[1].new('CompositorNodeMath', operation = 'GREATER_THAN')
+        math_node.inputs[1].default_value = 0.9999
+        math_node.outputs[0].join(init_alpha_node.inputs[1])
+
+        if self.use_denoise:
+            denoise_node = init_alpha_node.outputs[0].insert_new('CompositorNodeDenoise')
+            denoise_node.prefilter = 'NONE'
+            denoise_node.use_hdr = False
+            denoise_node.inputs['Albedo'].join(image_node.outputs['Alpha'], move=False)
+
+            denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=2)
+
+            pre_set_alpha = denoise_node.inputs[0].insert_new('CompositorNodeSetAlpha')
+            math_node.outputs[0].join(pre_set_alpha.inputs[1], move=False)
+            pre_set_alpha.inputs[1].insert_new('CompositorNodeDilateErode', mode='DISTANCE', distance=1)
+
+
+            post_set_alpha = denoise_node.outputs[0].insert_new('CompositorNodeSetAlpha')
+            math_node.outputs[0].join(post_set_alpha.inputs[1], move=False)
+
+            post_set_alpha.outputs[0].insert_new('CompositorNodeInpaint', distance = 16)
+
+            pre_map_range = denoise_node.inputs[0].insert_new('CompositorNodeMapRange')
+            pre_map_range['To Min'] = 0.4
+            pre_map_range['To Max'] = 0.6
+            pre_map_range.use_clamp = True
+
+            post_map_range = denoise_node.outputs[0].insert_new('CompositorNodeMapRange')
+            post_map_range['From Min'] = 0.4
+            post_map_range['From Max'] = 0.6
+
+        else:
+            init_alpha_node.outputs[0].insert_new('CompositorNodeInpaint', distance = 16)
+
+
+    def __exit__(self, type, value, traceback):
+        self.tree.delete_new_nodes()

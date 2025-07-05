@@ -32,8 +32,12 @@ class _Socket_Type:
     VECTOR = 'vector'
     SHADER = 'shader'
 
-
+@typing.runtime_checkable
 class _Bake_Type(typing.Protocol):
+
+    @property
+    def _requires_principled_bsdf(self) -> bool:
+        """ Whether or not a Principled BSDF is assumed. """
 
 
     @property
@@ -131,6 +135,8 @@ class Fill_Color(_Bake_Type, tool_settings.Settings):
     _socket_type = _Socket_Type.COLOR
     _identifier = 'None'
 
+    _requires_principled_bsdf = False
+
 
     @property
     def _default_color(self) -> float:
@@ -167,6 +173,8 @@ class _Principled_Input(_Bake_Type, tool_settings.Settings):
         _not_versioned_socket_identifier = ''
 
     use_denoise: bool = False
+
+    _requires_principled_bsdf = True
 
 
     @property
@@ -301,6 +309,7 @@ class _AO(_Bake_Type, tool_settings.Settings):
 
     _identifier = 'Ambient Occlusion'
     _default_color = (1.0, 1.0, 1.0)
+    _requires_principled_bsdf = True
 
 
 
@@ -411,6 +420,7 @@ class Diffuse(_Bake_Type, tool_settings.Settings):
     _socket_type = _Socket_Type.SHADER
     _identifier = 'Diffuse'
     _default_color = (0.5, 0.5, 0.5)
+    _requires_principled_bsdf = False
 
 
     use_pass_direct: bool = True
@@ -467,6 +477,7 @@ class Glossy(_Bake_Type, tool_settings.Settings):
     _socket_type = _Socket_Type.SHADER
     _identifier = 'Glossy'
     _default_color = (0.5, 0.5, 0.5)
+    _requires_principled_bsdf = False
 
 
     use_pass_direct: bool = True
@@ -567,6 +578,7 @@ class AOV(_Bake_Type, tool_settings.Settings):
 
 
     _default_color = (0.0, 0.0, 0.0)
+    _requires_principled_bsdf = False
     name: str
     type: str
 
@@ -622,6 +634,7 @@ class View_Space_Normal(_Bake_Type, tool_settings.Settings):
     _default_color = (0.0, 0.0, 1.0)
     _identifier = 'View Space Normal'
     _socket_type = _Socket_Type.VECTOR
+    _requires_principled_bsdf = True
 
 
     def _get_setup_context(self):
@@ -653,6 +666,7 @@ class Lightmap(_Bake_Type, tool_settings.Settings):
 
         _identifier = 'Light Map'
         _default_color = (0.0, 0.0, 0.0)
+        _requires_principled_bsdf = True
 
 
         samples: int = 16
@@ -685,3 +699,62 @@ class Lightmap(_Bake_Type, tool_settings.Settings):
                 image = images[0]
 
             return bpy_context.Composer_Input_Lightmap(input_socket, image)
+
+
+
+@contextlib.contextmanager
+def _Output_Label(material: 'bpy.types.Material', node_label: str, socket: typing.Union[str, int] = 0) -> typing.Union['bpy.types.NodeSocketColor', 'bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketVector']:
+    try:
+        tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+
+        found = False
+
+        for node in tree.output.inputs[0].descendants:
+            if node.label == node_label:
+                found = True
+                yield node.outputs[socket].bl_socket
+
+        if not found:
+            raise RuntimeError(f"Node with label `{node_label}` not found in: {material.name_full}")
+
+    finally:
+        tree.delete_new_nodes()
+
+@dataclass
+class Buffer_Factor(_Bake_Type, tool_settings.Settings):
+
+        _requires_principled_bsdf = False
+
+        _default_color: tuple = (0.0, 0.0, 0.0)
+
+        _socket_type = _Socket_Type.VALUE
+
+        _identifier = 'buffer_factor'
+
+        use_denoise: bool = True
+
+        node_label: str = ''
+
+
+        def _get_setup_context(self):
+            if hasattr(bpy.context.scene.render.bake, 'margin_type'):
+                return bpy_context.Bpy_State([
+                    (bpy.context.scene.render.bake, 'margin', 1),
+                    (bpy.context.scene.render.bake, 'margin_type', 'ADJACENT_FACES'),
+                ])
+            else:
+                return bpy_context.Bpy_State([(bpy.context.scene.render.bake, 'margin', 1)])
+
+
+        def _get_material_context(self, material: 'bpy.types.Material'):
+            return _Output_Label(material, self.node_label)
+
+
+        def _get_composer_context(self, input_socket, images):
+
+            if isinstance(images, bpy.types.Image):
+                image = images
+            else:
+                image = images[0]
+
+            return bpy_context.Composer_Input_Factor(input_socket, image, use_denoise=self.use_denoise)

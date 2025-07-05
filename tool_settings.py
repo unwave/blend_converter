@@ -422,8 +422,35 @@ class Settings():
         return self
 
 
+FILE_EXTENSION = dict(
+    BMP = 'bmp',
+    IRIS = 'rgb',
+    PNG = 'png',
+    JPEG = 'jpg',
+    JPEG2000 = 'jp2',
+    TARGA = 'tga',
+    TARGA_RAW = 'tga',
+    CINEON = 'cin',
+    DPX = 'dpx',
+    OPEN_EXR_MULTILAYER = 'exr',
+    OPEN_EXR = 'exr',
+    HDR = 'hdr',
+    TIFF = 'tif',
+    WEBP = 'webp',
+
+    AVI_JPEG = 'avi',
+    AVI_RAW = 'avi',
+    FFMPEG = 'mp4',
+)
+
+
 @dataclasses.dataclass
 class Image_File_Settings(Settings):
+
+
+    @property
+    def _file_extension(self):
+        return FILE_EXTENSION[self.file_format]
 
 
     file_format: str = 'PNG'

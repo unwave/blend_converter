@@ -279,8 +279,21 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
 
     def join(self, socket: 'typing_extensions.Self', move = True):
 
+        # reroute sockets are being rebuild when connected to a socket of a different type invalidating the wrapper
+        self_pointer = self.as_pointer()
+        socket_pointer = socket.as_pointer()
+
+
         if socket.is_output:
             bl_link = self.bl_socket.id_data.links.new(self.bl_socket, socket.bl_socket)
+
+
+            if self_pointer != bl_link.to_socket.as_pointer():
+                object.__setattr__(self, 'bl_socket', bl_link.to_socket)
+
+            if socket_pointer != bl_link.from_socket.as_pointer():
+                object.__setattr__(socket, 'bl_socket', bl_link.from_socket)
+
 
             if VALIDATE_NEW_LINKS and not bl_link.is_valid:
                 raise RuntimeError(f"Invalid link created: from node: '{socket.node.name}' [{socket.node.bl_idname}] and socket: '{socket.identifier}' to node: '{self.node.name}' [{self.node.bl_idname}] and socket: '{self.identifier}'")
@@ -303,8 +316,17 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
                 socket.node.location = tuple(map(operator.add, socket.node.location, shift))
                 for node in socket.node.descendants:
                     node.location = tuple(map(operator.add, node.location, shift))
+
         else:
             bl_link = self.bl_socket.id_data.links.new(socket.bl_socket, self.bl_socket)
+
+
+            if self_pointer != bl_link.from_socket.as_pointer():
+                object.__setattr__(self, 'bl_socket', bl_link.from_socket)
+
+            if socket_pointer != bl_link.to_socket.as_pointer():
+                object.__setattr__(socket, 'bl_socket', bl_link.to_socket)
+
 
             if VALIDATE_NEW_LINKS and not bl_link.is_valid:
                 raise RuntimeError(f"Invalid link created: from node: '{self.node.name}' [{self.node.bl_idname}] and socket: '{self.identifier}' to node: '{socket.node.name}' [{socket.node.bl_idname}] and socket: '{socket.identifier}'")
