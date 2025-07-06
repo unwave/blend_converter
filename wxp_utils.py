@@ -734,6 +734,8 @@ class Generic_Selector_Dialog(wx.Dialog):
                 self.add_bool_entry(key, value)
             elif value_type == int:
                 self.add_int_entry(key, value)
+            elif value_type == float:
+                self.add_float_entry(key, value)
             elif value_type == dict:
                 self.add_named_enum_entry(key, value)
             elif value_type == tuple:
@@ -751,7 +753,7 @@ class Generic_Selector_Dialog(wx.Dialog):
         data = {}
 
         for key, entry in self.entries.items():
-            if isinstance(entry, (wx.TextCtrl, wx.CheckBox, IntCtrl, Date_Time_Picker, TextEditor)):
+            if isinstance(entry, (wx.TextCtrl, wx.CheckBox, IntCtrl, Date_Time_Picker, TextEditor, wx.SpinCtrlDouble)):
                 data[key] = entry.GetValue()
             elif isinstance(entry, wx.ComboBox):
                 data[key] = entry.GetClientData(entry.GetSelection())
@@ -861,6 +863,14 @@ class Generic_Selector_Dialog(wx.Dialog):
         self.entries[key] = entry
         self.entry_sizer.Add(entry, 1, wx.EXPAND)
         self.entry_sizer.AddGrowableRow(self.entry_sizer.GetEffectiveRowsCount() - 1)
+
+
+    def add_float_entry(self, key: str, value: float):
+        self.add_title(key)
+        entry = wx.SpinCtrlDouble(self, value = str(value))
+        entry.SetDigits(3)
+        self.entries[key] = entry
+        self.entry_sizer.Add(entry, 0, wx.EXPAND)
 
 
 class Generic_Frame(wx.Frame):

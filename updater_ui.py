@@ -221,6 +221,11 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         menu_item = menu.append_item(f"Force Update", get_func(self.on_entry_force_update, entry))
 
+        menu.append_separator()
+
+        menu_item = menu.append_item(f"Set Config", get_func(self.on_set_config, entry))
+        menu_item.Enable(bool(entry.model.config))
+
         self.PopupMenu(menu)
         menu.Destroy()
 
@@ -352,6 +357,32 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         if not main_frame.updater.max_updating_entries_exceeded():
             entry.status = 'needs_update'
             entry.update(main_frame.updater.poke_waiting_for_dependency)
+
+
+    def on_set_config(self, entry: updater.Model_Entry):
+
+        config = entry.model.config
+        if not config:
+            return
+
+        with wxp_utils.Generic_Selector_Dialog(self, config.to_ui_data(), title = f"Config: {os.path.basename(entry.blend_path)}") as dialog:
+
+            dialog.ok_button.SetLabel("Restart")
+
+            dialog.CenterOnScreen()
+
+            result = dialog.ShowModal()
+
+            if result != wx.ID_OK:
+                return
+
+            config.from_ui_data(dialog.get_data())
+
+            config.save()
+
+        self.main_frame.on_restart()
+
+
 
 
 class Output_Lines(wxp_utils.Item_Viewer_Native):
@@ -596,10 +627,21 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
     @classmethod
     def get_app(cls, files, columns = None):
+
+        print(sys.argv)
+
         app = wxp_utils.App()
         frame = cls(files=files, columns = columns)
+
+        if '__restart__' in sys.argv:
+            x, y, width, height = map(int, sys.argv[sys.argv.index('__restart__') + 1:])
+            frame.SetPosition(wx.Point(x, y))
+            frame.SetSize(wx.Size(width, height))
+            frame.Raise()
+
         frame.Show()
         frame.show_console(False)
+
         return app
 
 
@@ -620,18 +662,22 @@ class Main_Frame(wxp_utils.Generic_Frame):
         menu = wx.Menu()
         self.menubar.Append(menu, "&Updater")
 
-        self.Bind(wx.EVT_MENU, self.on_show_app_scripts, menu.Append(wx.ID_ANY, "Show Scripts"))
+        self.Bind(wx.EVT_MENU, self.on_show_app_scripts, menu.Append(wx.ID_ANY, "Show Scripts In Explorer"))
 
-        self.Bind(wx.EVT_MENU, self.on_open_scripts_VSCode, menu.Append(wx.ID_ANY, "Open Scripts VSCode"))
+        self.Bind(wx.EVT_MENU, self.on_open_VSCode_workspace, menu.Append(wx.ID_ANY, "Open .code-workspace"))
 
-        self.pause_menu_item: wx.MenuItem = menu.Append(wx.ID_ANY, "Pause")
+        menu.AppendSeparator()
+
+        self.pause_menu_item: wx.MenuItem = menu.Append(wx.ID_ANY, "Pause\tCtrl+P")
         self.Bind(wx.EVT_MENU, self.on_updater_pause_toggle, self.pause_menu_item)
 
         menu.AppendSeparator()
 
-        self.Bind(wx.EVT_MENU, self.on_reload_updater, menu.Append(wx.ID_ANY, "Reload Scripts\tCtrl+R"))
+        # self.Bind(wx.EVT_MENU, self.on_reload_updater, menu.Append(wx.ID_ANY, "Reload Scripts\tCtrl+R"))
 
-        self.Bind(wx.EVT_MENU, self.on_restart, menu.Append(wx.ID_ANY, "Restart"))
+        self.Bind(wx.EVT_MENU, self.on_restart, menu.Append(wx.ID_ANY, "Restart\tCtrl+R"))
+
+        menu.AppendSeparator()
 
         self.Bind(wx.EVT_MENU, self.on_mark_update_all, menu.Append(wx.ID_ANY, "Mark All As Needing Update"))
 
@@ -652,8 +698,11 @@ class Main_Frame(wxp_utils.Generic_Frame):
         utils.os_show(utils.deduplicate(self.updater.init_files))
 
 
-    def on_open_scripts_VSCode(self, event = None):
-        subprocess.Popen(['code', '-n', *self.updater.init_files], shell = True)
+    def on_open_VSCode_workspace(self, event = None):
+        for init_file in self.updater.init_files:
+            for path in os.scandir(os.path.dirname(init_file)):
+                if path.is_file() and path.name.endswith('.code-workspace'):
+                    utils.os_open(path)
 
 
     def on_updater_pause_toggle(self, event = None):
@@ -664,10 +713,10 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.updater.is_paused = value
         if self.updater.is_paused:
             self.SetTitle(self.init_title + ' [Paused]')
-            self.pause_menu_item.SetItemLabel("Unpause")
+            self.pause_menu_item.SetItemLabel("Unpause\tCtrl+P")
         else:
             self.SetTitle(self.init_title)
-            self.pause_menu_item.SetItemLabel("Pause")
+            self.pause_menu_item.SetItemLabel("Pause\tCtrl+P")
 
 
     def on_reload_updater(self, event):
@@ -695,13 +744,24 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.updater.poke_all()
 
 
-    def on_restart(self, event):
+    def on_restart(self, event = None):
+
+        self.show_console(True)
 
         for entry in self.updater.entries:
             entry.terminate()
 
         # TODO: does not work for argv with spaces
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+        position = self.GetPosition()
+        size = self.GetSize()
+
+        argv = sys.argv
+
+        if '__restart__' in argv:
+            argv = argv[:argv.index('__restart__')]
+
+        os.execv(sys.executable, [sys.executable] + argv + ['__restart__', str(position.x), str(position.y), str(size.width), str(size.height)])
 
 
     def on_settings(self, event):

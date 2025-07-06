@@ -8,6 +8,7 @@ import uuid
 import tempfile
 from datetime import datetime
 import shutil
+import configparser
 
 from .. import utils
 from .. import tool_settings
@@ -95,6 +96,11 @@ class Blend_Base:
         A name for the generate files.
 
         By default the same as the `.blend`'s base name without the file extension.
+        """
+
+        self.config: typing.Optional[Config_Base] = None
+        """
+        Pre model configuration.
         """
 
 
@@ -376,3 +382,119 @@ class Generic_Exporter(Blend_Base):
         if self.return_values_file is not None:
             with open(self.return_values_file, encoding='utf-8') as f:
                     self.result = {int(key): value for key, value in json.load(f).items()}
+
+
+class Config_Base:
+
+
+    def __init__(self, path: os.PathLike):
+
+        self._path = path
+
+        self._config = configparser.ConfigParser()
+        self._config.read(self._path)
+
+        for section_name, section_class in type(self).__annotations__.items():
+
+            if section_name.startswith('_'):
+                continue
+
+            section_instance = section_class()
+            setattr(self, section_name, section_instance)
+
+            for option, fallback in section_class.__dict__.items():
+
+                if option.startswith('_'):
+                    continue
+
+                if type(fallback) is int:
+                    value = self._config.getint(section_name, option, fallback=fallback)
+                elif type(fallback) is float:
+                    value = self._config.getfloat(section_name, option, fallback=fallback)
+                elif type(fallback) is bool:
+                    value = self._config.getboolean(section_name, option, fallback=fallback)
+                else:
+                    value = self._config.get(section_name, option, fallback=fallback)
+
+                setattr(section_instance, option, value)
+
+
+    def iter_options(self):
+
+        section: str
+        option: str
+
+        for section, section_instance in self.__dict__.items():
+
+            if section.startswith('_'):
+                continue
+
+            for option, value in section_instance.__dict__.items():
+
+                if option.startswith('_'):
+                    continue
+
+                yield section, option, value
+
+
+    def set_option(self, section: str, option: str, value):
+        setattr(getattr(self, section), option, value)
+
+
+    def get_default(self, section: str, option: str):
+        return type(getattr(self, section)).__dict__[option]
+
+
+    def get_enum(self, section: str, option: str):
+        option_type = type(getattr(self, section)).__annotations__[option]
+        if typing.get_origin(option_type) is typing.Literal:
+            return list(typing.get_args(option_type))
+        else:
+            return None
+
+
+    def save(self):
+
+        config = configparser.ConfigParser()
+
+        for section, option, value in self.iter_options():
+
+            if self.get_default(section, option) == value:
+                continue
+
+            if not config.has_section(section):
+                config.add_section(section)
+
+            config.set(section, option, str(value))
+
+        with open(self._path, 'w', encoding='utf-8') as f:
+            config.write(f)
+
+
+    def to_ui_data(self):
+
+        data = {}
+
+        for section, option, value in self.iter_options():
+
+            key = section + ' @ ' + option
+
+            if isinstance(value, (int, float, bool)):
+                data[key] = value
+            else:
+                enum = self.get_enum(section, option)
+                if enum is None:
+                    data[key] = value
+                else:
+                    data[key] = (enum, value)
+
+        return data
+
+
+    def from_ui_data(self, data: dict[str]):
+
+        for key, value in data.items():
+
+            section, option = key.split(' @ ', maxsplit= 1)
+
+            self.set_option(section, option, value)

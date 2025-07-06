@@ -6,6 +6,7 @@ import textwrap
 import tempfile
 import json
 import typing
+import traceback
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -390,7 +391,11 @@ class Settings():
         if isinstance(other, dict):
             return self._to_dict() == other
         else:
-            return self._to_dict() == other._to_dict()
+            try:
+                return self._to_dict() == other._to_dict()
+            except AttributeError:
+                traceback.print_exc()
+                return False
 
 
     def __ne__(self, other: typing.Union[dict, 'typing_extensions.Self']):
