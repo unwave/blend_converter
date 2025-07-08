@@ -914,6 +914,7 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
 
     texture_coordinates_collection = bpy.data.collections.new(f'__bc_temp_texture_coordinates_{uuid.uuid1().hex}')
     bpy.context.view_layer.layer_collection.collection.children.link(texture_coordinates_collection)
+    bpy.context.view_layer.layer_collection.children.get(texture_coordinates_collection.name).exclude = True
 
     objects = get_meshable_objects(objects)
 
@@ -1701,7 +1702,7 @@ def unwrap_unique_meshes(objects: typing.List[bpy.types.Object], settings: tool_
         for object in objects:
             bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
 
-        with bpy_context.Isolate_Focus(objects):
+        with bpy_context.Empty_Scene():
             unwrap_ministry_of_flat_with_fallback(objects, settings, ministry_of_flat_settings)
 
             bpy_uv.scale_uv_to_world_per_uv_layout(objects)
@@ -2036,7 +2037,11 @@ def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '',
             modifiers_to_apply.append(modifier)
 
 
-        with bpy_context.Focus_Objects(object):
+        if not modifiers_to_apply:
+            continue
+
+
+        with bpy_context.Isolate_Focus([object]):
 
             for modifier in modifiers_to_apply:
 

@@ -117,14 +117,12 @@ def duplicates_make_real():
 
 
 def apply_scale(objects: Objects_Like = None):
-    """ Apply object scale, non uniform scale cause bugs in bullet physics. """
 
     objects = get_objects_fallback(objects)
 
-    if bpy.app.version > (4, 0, 0):  # supports multi-user meshes, but result can be different
-        with bpy_context.Focus_Objects(objects):
-            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-        return
+    objects = [o for o in objects if o.scale != (1,1,1)]
+
+    objects = bpy_utils.get_unique_data_objects(objects)
 
     for object in objects:
 

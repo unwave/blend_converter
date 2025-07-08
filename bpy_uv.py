@@ -1072,7 +1072,7 @@ def unwrap(objects: typing.List[bpy.types.Object], *, uv_layer = tool_settings.D
         for object in objects:
             bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
 
-        with bpy_context.Isolate_Focus(objects):
+        with bpy_context.Empty_Scene():
             bpy_utils.unwrap_ministry_of_flat_with_fallback(objects, settings, ministry_of_flat_settings)
 
         scale_uv_to_world_per_uv_layout(objects)

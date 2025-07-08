@@ -186,10 +186,13 @@ def process():
 
                 append_sys_path(os.path.dirname(script['filepath']))
                 print_script_info(script)
+                script_start_time = time.perf_counter()
 
                 module = import_module_from_file(script['filepath'])
                 result = getattr(module, script['name'])(*replace_return_values(script['args']), **replace_return_values(script['kwargs']))
                 return_values[index] = result
+
+                utils.print_in_color(utils.get_color_code(56, 199, 134, 0, 0, 0), f"Processed in {round(time.perf_counter() - script_start_time, 2)} seconds.", flush=True)
 
             elif script['type'] == 'module':
                 setattr(builtins, '__KWARGS__', replace_return_values(script['kwargs']))

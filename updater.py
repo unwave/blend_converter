@@ -341,9 +341,12 @@ class Updater:
         self.entries.clear()
 
         for module in self.modules:
-            for value in getattr(module, '__blends__').values():
+            for key, value in getattr(module, '__blends__').items():
                 if isinstance(value, common.Blend_Base):
                     self.entries.append(Model_Entry(value))
+                else:
+                    utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"`{key}` is not a model: {repr(value)}", file=sys.stderr)
+
 
 
     def has_non_updated_dependency(self, entry: Model_Entry):
