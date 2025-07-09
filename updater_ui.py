@@ -36,9 +36,12 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.main_frame: Main_Frame = self.GetTopLevelParent()
 
         self.columns = [
-            ('path', 800, self.get_column_path),
+            # ('path', 800, self.get_column_path),
+            ('live', 40, self.get_column_live_update),
+            ('ℹ️', 40, self.get_column_icon_status),
+            ('path_parts', 600, self.get_column_path_parts),
             ('ext', 100, self.get_column_result_type),
-            ('poke_time', 200, self.get_column_poke_time),
+            # ('poke_time', 200, self.get_column_poke_time),
             ('status', 200, self.get_column_status),
         ]
 
@@ -94,6 +97,31 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def OnGetItemText(self, row: int, col: int) -> str:
         return self.columns[col][2](self.data[row])
+
+
+    def get_column_icon_status(self, item: updater.Model_Entry):
+        if item.status == 'ok':
+            return '✔️'
+        elif item.status == 'updating':
+            return '⏳'
+        else:
+            return ''
+
+
+    def get_column_live_update(self, item: updater.Model_Entry):
+        if item.is_manual_update:
+            return '🚀'
+        elif item.is_live_update:
+            return '⚡'
+        else:
+            return ''
+
+
+    def get_column_path_parts(self, item: updater.Model_Entry):
+        if item.model._is_dir:
+            return " • ".join(item.path_list[-3:-1])
+        else:
+            return " • ".join(item.path_list[-3:])
 
 
     def get_column_path(self, item: updater.Model_Entry):
@@ -214,20 +242,33 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         menu.append_separator()
 
-        menu_item = menu.append_item(f"Mark As Needing Update", get_func(self.on_make_update, entry))
+        menu_item = menu.append_item(f"Mark As Needs Update", get_func(self.on_mark_as_needs_update))
         menu_item = menu.append_item(f"Poke", get_func(self.on_entry_poke, entry))
 
         menu.append_separator()
 
-        menu_item = menu.append_item(f"Force Update", get_func(self.on_entry_force_update, entry))
+        # menu_item = menu.append_item(f"Force Update", get_func(self.on_entry_force_update, entry))
+
+        menu_item = menu.append_item(f"Update Selected", get_func(self.on_update_selected))
 
         menu.append_separator()
 
         menu_item = menu.append_item(f"Set Config", get_func(self.on_set_config, entry))
         menu_item.Enable(bool(entry.model.config))
 
+        menu.append_separator()
+        menu_item = menu.append_item(f"Enable Live Update", get_func(self.on_enable_live_update, True))
+        menu_item = menu.append_item(f"Disable Live Update", get_func(self.on_enable_live_update, False))
+
+
         self.PopupMenu(menu)
         menu.Destroy()
+
+
+    def on_enable_live_update(self, value):
+        for entry in self.get_selected_items():
+            entry.is_live_update = value
+        self.Refresh()
 
 
     def on_item_selected(self, event: wx.ListEvent):
@@ -346,17 +387,21 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         wxp_utils.set_clipboard_text("\n".join((entry.blend_path for entry in self.get_selected_items())))
 
 
-    def on_make_update(self, entry: updater.Model_Entry):
-        entry.status = 'needs_update'
+    def on_mark_as_needs_update(self):
+        for entry in self.get_selected_items():
+            entry.status = 'needs_update'
 
 
     def on_entry_force_update(self, entry: updater.Model_Entry):
 
         main_frame: Main_Frame = self.GetTopLevelParent()
 
-        if not main_frame.updater.max_updating_entries_exceeded():
-            entry.status = 'needs_update'
-            entry.update(main_frame.updater.poke_waiting_for_dependency)
+        if main_frame.updater.max_updating_entries_exceeded():
+            wx.MessageBox("Max amount of simultaneous updates exceeded.", "Error", style= wx.OK | wx.ICON_ERROR)
+            return
+
+        entry.status = 'needs_update'
+        entry.update(main_frame.updater.poke_waiting_for_dependency)
 
 
     def on_set_config(self, entry: updater.Model_Entry):
@@ -382,6 +427,11 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         self.main_frame.on_restart()
 
+    def on_update_selected(self):
+        for entry in self.get_selected_items():
+            if entry.status in ('needs_update', 'error'):
+                entry.is_manual_update = True
+        self.Refresh()
 
 
 
@@ -546,6 +596,14 @@ class Result_Panel(wx.Panel):
                 column, fragment = fragment.split(':', maxsplit=1)
                 function = self.search_column_dict[column]
                 result = [entry for entry in result if fragment in function(entry).lower()]
+                continue
+
+            # is_live_update
+            if fragment == ':live':
+                result = [entry for entry in result if entry.is_live_update]
+                continue
+            elif fragment == ':-live':
+                result = [entry for entry in result if not entry.is_live_update]
                 continue
 
             # simple search

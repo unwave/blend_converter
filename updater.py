@@ -63,12 +63,17 @@ class Model_Entry:
 
         self.process: typing.Optional[multiprocessing.Process] = None
 
+        self.is_live_update = True
+
+        self.is_manual_update = False
 
         self.module = module
         """ A module where the model was collected from. """
 
         self.result_path = model.result_path
         self.blend_path = model.blend_path
+
+        self.path_list = os.path.realpath(model.blend_path).split(os.path.sep)
 
         self.lock = multiprocessing.Lock()
 
@@ -407,7 +412,19 @@ class Updater:
         return updating_entires >= MAX_AMOUNT_OF_UPDATING_ENTRIES
 
     def despatching(self):
+
         while 1:
+
+            time.sleep(1)
+
+            if self.max_updating_entries_exceeded():
+                continue
+
+            for entry in self.entries:
+
+                if entry.is_manual_update:
+                    entry.is_manual_update = False
+                    entry.update(self.poke_waiting_for_dependency)
 
             if not self.is_paused:
 
@@ -416,13 +433,11 @@ class Updater:
                     if entry.status != 'needs_update':
                         continue
 
-                    if self.max_updating_entries_exceeded():
-                        break
-
-                    if entry.poke_timeout:
+                    if entry.is_live_update and entry.poke_timeout:
                         entry.update(self.poke_waiting_for_dependency)
 
-            time.sleep(1)
+
+
 
     def terminate_observer(self):
         self.observer.unschedule_all()
