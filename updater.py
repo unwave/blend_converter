@@ -417,10 +417,10 @@ class Updater:
 
             time.sleep(1)
 
-            if self.max_updating_entries_exceeded():
-                continue
-
             for entry in self.entries:
+
+                if self.max_updating_entries_exceeded():
+                    break
 
                 if entry.is_manual_update:
                     entry.is_manual_update = False
@@ -429,6 +429,9 @@ class Updater:
             if not self.is_paused:
 
                 for entry in self.entries:
+
+                    if self.max_updating_entries_exceeded():
+                        break
 
                     if entry.status != 'needs_update':
                         continue
