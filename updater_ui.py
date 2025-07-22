@@ -7,6 +7,7 @@ import typing
 import json
 import subprocess
 import collections
+import base64
 
 import pyperclip
 import wx
@@ -545,7 +546,8 @@ class Result_Panel(wx.Panel):
         self.search_column_tuple = tuple(f"{column[0]}:" for column in self.model_list.columns)
         self.search_column_dict = {column[0]: column[2] for column in self.model_list.columns}
 
-        self.execute_search('')
+        if not '__restart__' in sys.argv:
+            self.execute_search('')
 
 
         self.output_timer = wx.Timer(self)
@@ -574,12 +576,9 @@ class Result_Panel(wx.Panel):
             self.stderr_need_update = True
 
 
-    def get_search_result(self, query: str):
+    def _get_search_result(self, query: str):
 
         result = list(self.main_frame.updater.entries)
-
-        if not query:
-            return result
 
         query_list: typing.List[str] = self.re_query_fragment.findall(query.lower().strip())
 
@@ -588,32 +587,59 @@ class Result_Panel(wx.Panel):
             # status
             if fragment.startswith('status:'):
                 fragment = fragment[len('status:'):]
-                result = [entry for entry in result if fragment in entry.status]
-                continue
+
+                do_negate = False
+                if fragment.startswith('not:'):
+                    _ , fragment = fragment.split(':', maxsplit=1)
+                    do_negate = True
+
+                if do_negate:
+                    result = [entry for entry in result if fragment not in entry.status]
+                else:
+                    result = [entry for entry in result if fragment in entry.status]
 
             # column
-            if fragment.startswith(self.search_column_tuple):
+            elif fragment.startswith(self.search_column_tuple):
                 column, fragment = fragment.split(':', maxsplit=1)
-                function = self.search_column_dict[column]
-                result = [entry for entry in result if fragment in function(entry).lower()]
-                continue
+
+                do_negate = False
+                if fragment.startswith('not:'):
+                    _ , fragment = fragment.split(':', maxsplit=1)
+                    do_negate = True
+
+                column_function = self.search_column_dict[column]
+
+                if do_negate:
+                    result = [entry for entry in result if fragment not in column_function(entry).lower()]
+                else:
+                    result = [entry for entry in result if fragment in column_function(entry).lower()]
 
             # is_live_update
-            if fragment == ':live':
+            elif fragment == ':live':
                 result = [entry for entry in result if entry.is_live_update]
-                continue
+
             elif fragment == ':-live':
                 result = [entry for entry in result if not entry.is_live_update]
-                continue
 
             # simple search
-            if fragment.startswith('-'):
+            elif fragment.startswith('-'):
                 fragment = fragment[1:]
                 result = [entry for entry in result if not fragment.lower() in entry.blend_path.lower()]
+
             else:
                 result = [entry for entry in result if fragment.lower() in entry.blend_path.lower()]
 
         return result
+
+
+    def get_search_result(self, query: str):
+
+        result = []
+
+        for sub_query in query.split(' OR '):
+            result.extend(self._get_search_result(sub_query))
+
+        return list(dict.fromkeys(result))
 
 
     def execute_search(self, query: str):
@@ -623,6 +649,10 @@ class Result_Panel(wx.Panel):
 
     def refresh(self):
         self.execute_search(self.search.search.GetValue().strip())
+
+
+    def set_query(self, query: str):
+        self.search.search.SetValue(query)
 
 
 Event_Stdout_Line_Printed, EVT_STDOUT_LINE_PRINTED = wx.lib.newevent.NewEvent()
@@ -692,9 +722,13 @@ class Main_Frame(wxp_utils.Generic_Frame):
         frame = cls(files=files, columns = columns)
 
         if '__restart__' in sys.argv:
-            x, y, width, height = map(int, sys.argv[sys.argv.index('__restart__') + 1:])
-            frame.SetPosition(wx.Point(x, y))
-            frame.SetSize(wx.Size(width, height))
+
+            restart_info = json.loads(sys.argv[sys.argv.index('__restart__') + 1])
+
+            frame.SetPosition(wx.Point(restart_info['x'], restart_info['y']))
+            frame.SetSize(wx.Size(restart_info['width'], restart_info['height']))
+            wx.CallAfter(frame.result_panel.set_query, restart_info['search_query'])
+
             frame.Raise()
 
         frame.Show()
@@ -819,7 +853,21 @@ class Main_Frame(wxp_utils.Generic_Frame):
         if '__restart__' in argv:
             argv = argv[:argv.index('__restart__')]
 
-        os.execv(sys.executable, [sys.executable] + argv + ['__restart__', str(position.x), str(position.y), str(size.width), str(size.height)])
+        restart_info = dict(
+            x = position.x,
+            y = position.y,
+            width = size.width,
+            height = size.height,
+            search_query = self.result_panel.search.search.GetValue().strip(),
+        )
+
+        command = [
+            sys.executable,
+            *argv,
+            utils.get_command_from_list(['__restart__', json.dumps(restart_info)]),
+        ]
+
+        os.execv(sys.executable, command)
 
 
     def on_settings(self, event):
