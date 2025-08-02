@@ -1863,14 +1863,10 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
             # but to match the final resolution, we have to pack a second time
             pack_uvs(get_closest_power_of_two((settings.min_resolution + settings.max_resolution)/2))
 
-
         ## bake materials
-        _bake_settings = tool_settings.Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)._update(bake_settings)
-
 
         # TODO: this only works for the processed objects, not others in the scene
         environment_has_transparent_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))
-
 
         for material_key in (opaque_material_key, alpha_material_key):
 
@@ -1878,6 +1874,8 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
             if not material_group:
                 continue
 
+
+            _bake_settings = tool_settings.Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)._update(bake_settings)
 
             if settings.resolution:
                 _bake_settings.resolution = settings.resolution
@@ -1918,6 +1916,16 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
             _bake_settings.material_key = material_key
             _bake_settings.bake_types = bake_types
 
+            if _bake_settings.material_name:
+                if material_key == alpha_material_key:
+                    _bake_settings.material_name = _bake_settings.material_name + '_alpha'
+                else:
+                    _bake_settings.material_name = _bake_settings.material_name
+            else:
+                if material_key == alpha_material_key:
+                    _bake_settings.material_name = merged_object.name + '_alpha'
+                else:
+                    _bake_settings.material_name = merged_object.name
 
             bpy_bake.bake([merged_object], _bake_settings)
 

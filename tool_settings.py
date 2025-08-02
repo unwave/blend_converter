@@ -984,6 +984,15 @@ class Bake(Settings):
     #### Default: `1.0`
     """
 
+    material_name: str = ''
+    """
+    A name to use for newly created combined materials and textures.
+
+    If an empty string, then a common part of the materials names or the objects names will be used.
+
+    #### Default: `''`
+    """
+
 
 
 @dataclasses.dataclass

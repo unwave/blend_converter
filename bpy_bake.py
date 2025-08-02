@@ -572,7 +572,10 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
     materials_to_bake: typing.List[bpy.types.Material] = []
     objects_by_material = bpy_utils.group_objects_by_material(objects)
 
-    material_name = ensure_unique_name(get_common_name(filter(None, objects_by_material.keys()), objects[0].name))
+    if settings.material_name:
+        material_name = settings.material_name
+    else:
+        material_name = ensure_unique_name(get_common_name(filter(None, objects_by_material.keys()), objects[0].name))
 
     baking_images = [Baked_Image(map, material_name, settings) for map in settings.bake_types]
 
@@ -858,7 +861,11 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
         if settings.create_materials:
             bpy_uv.clear_uv_layers_from_objects(objects, uv_layer_name, 'UVMap')
 
-            material = create_material(get_common_name(objects), 'UVMap', images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+            material_name = settings.material_name
+            if not material_name:
+                material_name = get_common_name(objects)
+
+            material = create_material(material_name, 'UVMap', images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
             for object in objects:
                 mesh: bpy.types.Mesh = object.data
 
@@ -886,7 +893,12 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
         settings._images.extend(images)
 
         if settings.create_materials:
-            material = create_material(get_common_name(materials_to_bake), uv_layer_name, images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+
+            material_name = settings.material_name
+            if not material_name:
+                material_name = get_common_name(materials_to_bake)
+
+            material = create_material(material_name, uv_layer_name, images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
 
             for object in objects_in_group:
 
