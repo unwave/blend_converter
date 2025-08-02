@@ -158,7 +158,7 @@ def add_actions_to_nla(regex: typing.Optional[str] = None):
         if armature.animation_data.nla_tracks:
             return
 
-        armature_bones_names = bpy_utils.get_visible_armature_bones(armature)
+        armature_bones_names = bpy_utils.get_visible_armature_bones(armature.data)
         if not armature_bones_names:
             return
 

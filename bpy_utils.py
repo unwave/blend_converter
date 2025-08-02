@@ -70,15 +70,14 @@ def duplicates_make_real():
         bpy.ops.object.duplicates_make_real()
 
 
-def get_visible_armature_bones(armature: bpy.types.Object):
-    """ Get a set of visible bones. """
-
-    if bpy.app.version >= (4, 0, 0):
-        armature_collections = {c for c in armature.data.collections if c.is_visible}
-        return {bone.name for bone in armature.pose.bones if not armature_collections.isdisjoint(bone.bone.collections)}
-    else:
-        armature_layers = armature.data.layers
-        return {bone.name for bone in armature.pose.bones if any(a and b for a, b in zip(armature_layers, bone.bone.layers))}
+if bpy.app.version >= (4, 0, 0):
+    def get_visible_armature_bones(armature: bpy.types.Armature):
+        visible_armature_collections = {c for c in armature.collections_all if c.is_visible}
+        return tuple(bone.name for bone in armature.bones if not bone.hide and (not visible_armature_collections.isdisjoint(bone.collections) or not bone.collections))
+else:
+    def get_visible_armature_bones(armature: bpy.types.Armature):
+        armature_layers = armature.layers
+        return tuple(bone.name for bone in armature.bones if not bone.hide and any(a and b for a, b in zip(armature_layers, bone.layers)))
 
 
 def get_armature(object: bpy.types.Object):
@@ -93,7 +92,7 @@ def get_armature(object: bpy.types.Object):
 def get_actions(armature: bpy.types.Object) -> typing.List[bpy.types.Action]:
     """ Get actions associated with the armature object. """
 
-    armature_bones_names = get_visible_armature_bones(armature)
+    armature_bones_names = set(get_visible_armature_bones(armature.data))
     if not armature_bones_names:
         return []
 
