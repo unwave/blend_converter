@@ -938,27 +938,6 @@ class Bake(Settings):
     #### Default: `True`
     """
 
-    inspect_bake_pre: bool = False
-    """
-    Open .blend before every texture bake.
-
-    #### Default: `False`
-    """
-
-    inspect_bake_after: bool = False
-    """
-    Open .blend after every texture bake.
-
-    #### Default: `False`
-    """
-
-    inspect_compositor_pre: bool = False
-    """
-    Open .blend before every compositor processing.
-
-    #### Default: `False`
-    """
-
     _MAP_IDENTIFIER_KEY = '__bc_map_identifier'
     """
     The key for an `bpy.types.Image` ID property that contains the type of the image.

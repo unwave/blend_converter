@@ -18,7 +18,7 @@ from . import bpy_utils
 from . import tool_settings
 from . import bpy_uv
 from . import bake_settings
-
+from . import blend_inspector
 
 
 
@@ -468,9 +468,8 @@ class Baked_Image:
                 bpy_state.set(bpy.context.scene.render, 'resolution_percentage', 100)
 
 
-
-                if self.settings.inspect_compositor_pre:
-                    bpy_utils.inspect_blend()
+                if blend_inspector.has_identifier('bake:comp'):
+                    blend_inspector.inspect_blend()
 
                 if not self.settings.fake_bake:
                     with utils.Capture_Stdout() as capture:
@@ -595,6 +594,29 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
 
     for baking_image in baking_images:
 
+        do_inspect = False
+
+        def search_identifier(regex: str):
+            for match in blend_inspector.search_identifier(regex):
+                for bake_type in baking_image.bake_types:
+                    if re.search(match.group(1), bake_type._identifier, flags=re.IGNORECASE):
+                        return True
+            return False
+
+
+        if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_BAKE_PRE):
+            do_inspect = True
+
+        elif search_identifier(r'inspect:bake:map=(.+)'):
+            do_inspect = True
+
+        elif search_identifier(r'skip:bake:map=(.+)'):
+            continue
+
+        elif blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_BAKE_ALL):
+            continue
+
+
         for bake_task in baking_image.bakeable_tasks:
 
             print()
@@ -660,8 +682,9 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                                 disable_material_state.set(slot, 'material', None)
 
 
-                if settings.inspect_bake_pre:
-                    bpy_utils.inspect_blend()
+                if do_inspect:
+                    blend_inspector.inspect_blend()
+
 
                 def capturing():
                     last_updated = 0
@@ -689,6 +712,7 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                     print('Baking...')
 
                     def the_bake():
+                        """ wrapped into a function to be shown separately in a profile"""
                         bpy_context.call_with_object_override(
                             objects[0],
                             objects,
@@ -703,8 +727,8 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                         capture.lines.put_nowait(None)
 
 
-            if settings.inspect_bake_after:
-                bpy_utils.inspect_blend()
+            if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_BAKE_AFTER):
+                blend_inspector.inspect_blend()
 
         if settings.save_images:
             baking_image.save()

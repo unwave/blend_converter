@@ -233,13 +233,12 @@ class Generic_Exporter(Blend_Base):
         self.scripts: typing.List[typing.Union[Function_Script_Dict, Module_Script_Dict]] = []
         self.result = {}
 
-        self._profile = False
-        self._inspect = False
         self._debug = False
-        self._inspect_all = False
-        self._ignore_inspect = False
-        self._skip =  False
-        self._ignore_breakpoint = False
+
+        self._profile = False
+
+        self._inspect_identifiers = set()
+        """ A set of inspect identifiers to pass to Blender. """
 
         self.return_values_file: typing.Optional[str] = None
         """ A file where the scripts return values will be written. """
@@ -277,13 +276,9 @@ class Generic_Exporter(Blend_Base):
                 scripts = self._get_scripts(),
                 builtin_kwargs = builtin_kwargs,
                 return_values_file = self.return_values_file,
-                profile = self._profile,
-                inspect = self._inspect,
+                inspect_identifiers = list(self._inspect_identifiers),
                 debug = self._debug,
-                inspect_all = self._inspect_all,
-                ignore_inspect = self._ignore_inspect,
-                skip = self._skip,
-                ignore_breakpoint = self._ignore_breakpoint
+                profile = self._profile,
             ), default= lambda x: x._to_dict()),
         ]
 

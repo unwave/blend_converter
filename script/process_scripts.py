@@ -166,13 +166,19 @@ else:
 
 
 from blend_converter import utils
-
+from blend_converter import blend_inspector
 
 return_values = {}
 ARGS = get_args()
 
+blend_inspector.add_identifier(*ARGS['inspect_identifiers'])
 
 def process():
+
+
+    if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_BLEND_ORIG):
+        blend_inspector.inspect_blend()
+
 
     for magic_key, magic_value in ARGS['builtin_kwargs'].items():
         setattr(builtins, magic_key, magic_value)
@@ -207,9 +213,8 @@ def process():
             else:
                 raise ValueError(f"Unknown script type: {script}")
 
-            if ARGS['inspect_all']:
-                from blend_converter import bpy_utils
-                bpy_utils.inspect_blend()
+            if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL):
+                blend_inspector.inspect_blend()
 
         except Exception as e:
 
@@ -226,9 +231,8 @@ def process():
             utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), ''.join(traceback.format_exception_only(error_type, error_value)), file=sys.stderr)
             print()
 
-            if ARGS['inspect']:
-                from blend_converter import bpy_utils
-                bpy_utils.inspect_blend()
+            if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL):
+                blend_inspector.inspect_blend()
 
             raise SystemExit(1)
 
@@ -252,21 +256,10 @@ if __name__ == '__main__':
     warnings.simplefilter('error')
 
 
-    from blend_converter import bpy_utils
-
-    setattr(builtins, 'binspect', bpy_utils.inspect_blend)
+    setattr(builtins, 'binspect', blend_inspector.inspect_blend)
 
 
-    if ARGS['ignore_inspect']:
-
-
-        def dummy_inspect(*args, **kwargs):
-            pass
-
-        bpy_utils.inspect_blend = dummy_inspect
-
-
-    if ARGS['ignore_breakpoint']:
+    if blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_BREAKPOINT):
 
         import builtins
 
@@ -274,14 +267,6 @@ if __name__ == '__main__':
             pass
 
         setattr(builtins, 'breakpoint', dummy_breakpoint)
-
-
-    if ARGS['skip']:
-        from blend_converter import tool_settings
-        tool_settings.Bake.fake_bake = True
-        from blend_converter import bpy_uv
-        bpy_uv.SKIP_UNWRAP_AND_PACK = True
-
 
     if ARGS['profile']:
         with Profiled() as prof:
@@ -295,5 +280,6 @@ if __name__ == '__main__':
 
     utils.print_in_color(utils.get_color_code(256,256,256, 34, 139, 34), f"CONVERTED IN {round(time.perf_counter() - start_time, 2)} SECONDS.", flush=True)
 
-    if ARGS['inspect']:
-        bpy_utils.inspect_blend()
+
+    if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_BLEND_FINAL):
+        blend_inspector.inspect_blend()

@@ -21,10 +21,7 @@ from . import utils
 from . import bpy_context
 from . import bpy_utils
 from . import tool_settings
-
-
-SKIP_UNWRAP_AND_PACK = False
-""" For debugging. """
+from . import blend_inspector
 
 
 def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, *, init_from: str = '', init_from_does_not_exist_ok = False):
@@ -325,8 +322,9 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
     if object.type != 'MESH':
         raise Exception(f"Object is not of MESH type: {object.name_full}")
 
-    if SKIP_UNWRAP_AND_PACK:
-        raise utils.Fallback('SKIP_UNWRAP_AND_PACK')
+
+    if blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_UNWRAP):
+        raise utils.Fallback('UV unwrapping is skipped!')
 
 
     def print_output(capture_stdout, capture_stderr, stderr_color = utils.get_color_code(255, 94, 14, 0,0,0)):
@@ -765,7 +763,7 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
 
         print('Pre-packing UV islands...')
 
-        if SKIP_UNWRAP_AND_PACK:
+        if blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_PACK):
             pass
         elif settings.use_uv_packer_addon and settings.use_uv_packer_for_pre_packing and enable_uv_packer_addon():
             uv_packer_pack(settings._actual_width, settings._actual_height, settings.padding, settings.uvp_prerotate, settings.uvp_rescale)
@@ -775,7 +773,7 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
 
         print('Packing UV islands...')
 
-        if SKIP_UNWRAP_AND_PACK:
+        if blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_PACK):
             aabb_pack(merge_overlap=settings.merge_overlap)
 
         elif settings.use_uv_packer_addon and enable_uv_packer_addon():
@@ -1096,6 +1094,9 @@ def get_stdev_mean(values: typing.Union[typing.Sized, typing.Iterable]):
 def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False, divide_by_mean = True):
     print(f"{reunwrap_bad_uvs.__name__}...")
 
+    if blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_UNWRAP):
+        print('Skipping...')
+        return
 
     from mathutils.geometry import area_tri
 

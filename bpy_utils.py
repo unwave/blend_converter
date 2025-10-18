@@ -392,36 +392,6 @@ def get_block_abspath(block: typing.Union[bpy.types.Library, bpy.types.Image]):
     return abspath(block.filepath, block.library)  # type: ignore
 
 
-def inspect_blend(blender_executable: typing.Optional[str] = None, exit_after = False, detached = False):
-    """ Blocking blend file inspection. """
-
-    if blender_executable is None:
-        blender_executable = bpy.app.binary_path
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-
-        if detached:
-            filepath = os.path.join(bpy.app.tempdir, f'DEBUG_{utils.ensure_valid_basename(bpy.context.scene.name)}.blend')
-        else:
-            filepath = os.path.join(temp_dir, f'DEBUG_{utils.ensure_valid_basename(bpy.context.scene.name)}.blend')
-
-        for image in bpy.data.images:
-            if image.source == 'GENERATED' and image.is_dirty:
-                image.pack()
-
-        try:
-            bpy.ops.wm.save_as_mainfile(filepath = filepath, copy = True)
-        except RuntimeError as e:
-            print(e, file=sys.stderr)
-
-        if detached:
-            utils.open_blender_detached(blender_executable, filepath)
-        else:
-            subprocess.run([blender_executable, filepath])
-
-    if exit_after:
-        raise SystemExit('DEBUG EXIT')
-
 
 def group_objects_by_material(objects: typing.List[bpy.types.Object]):
 

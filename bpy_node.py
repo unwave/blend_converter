@@ -1427,7 +1427,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
                 node.copy().outputs[0].join(socket)
 
 
-        # pre-multiply emissions
+        # pre-multiply emissions, solves an issues when mixing them
         for node in surface_input.descendants:
 
             if not node.be('ShaderNodeBsdfPrincipled'):
@@ -1436,15 +1436,30 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
             if not 'Emission Strength' in node.inputs.identifiers:
                 continue
 
-            if (not node.inputs['Emission Strength'].connections and node.inputs['Emission Strength'].is_close(0)) or (not node.inputs[Socket_Identifier.EMISSION].connections and node.inputs[Socket_Identifier.EMISSION].is_close((0, 0, 0))):
+            if (
+                    (
+                        not node.inputs['Emission Strength'].connections
+                        and
+                        node.inputs['Emission Strength'].is_close(0)
+                    )
+                    or
+                    (
+                        not node.inputs[Socket_Identifier.EMISSION].connections
+                        and
+                        node.inputs[Socket_Identifier.EMISSION].is_close((0, 0, 0))
+                    )
+                ):
+
                 node.inputs[Socket_Identifier.EMISSION].disconnect()
                 node.inputs[Socket_Identifier.EMISSION].set_default_value((1, 1, 1, 1))
                 node.inputs['Emission Strength'].disconnect()
                 node.inputs['Emission Strength'].set_default_value(0)
             else:
                 emission_socket = node.inputs[Socket_Identifier.EMISSION]
+                emission_source_socket = emission_socket.connections[0]
 
                 mix_node = emission_socket.new('ShaderNodeVectorMath', operation = 'MULTIPLY')
+                mix_node[0] = emission_source_socket
                 mix_node[1] = node.inputs['Emission Strength'].as_output()
 
                 node.inputs['Emission Strength'].disconnect()

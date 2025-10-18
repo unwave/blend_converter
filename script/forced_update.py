@@ -4,11 +4,12 @@ import os
 module_path = sys.argv[1]
 object_name = sys.argv[2]
 
-other_args = sys.argv[3:]
+ARGS = sys.argv[3:]
 
 import sys
 import importlib.util
 import os
+import typing
 
 module_dir = os.path.dirname(module_path)
 if not module_dir in sys.path:
@@ -30,68 +31,114 @@ from blend_converter.format import common
 
 from blend_converter import utils
 
+from blend_converter import blend_inspector
 
 model: common.Generic_Exporter = getattr(module, '__blends__')[object_name]
 
-model._inspect = 'inspect' in other_args
-model._profile = 'profile' in other_args
-model._debug = 'debug' in other_args
-model._inspect_all = 'inspect_all' in other_args
-model._ignore_inspect = 'ignore_inspect' in other_args
-model._skip = 'skip' in other_args
-model._ignore_breakpoint = 'ignore_breakpoint' in other_args
+
+inspect_options: typing.List[str] = []
+skip_options: typing.List[str] = []
+
+for key, value in blend_inspector.COMMON.__dict__.items():
+    if key.startswith('_'):
+        continue
+    elif value.startswith('inspect'):
+        inspect_options.append(value)
+    elif value.startswith('skip'):
+        skip_options.append(value)
+
+_new_line = '\n\t'
+
+inspect_options.append('inspect:bake:map=<REGEX>')
+skip_options.append('skip:bake:map=<REGEX>')
+
+regex_options = tuple([option.replace('<REGEX>', '') for option in inspect_options + skip_options if option.endswith('<REGEX>')])
+
+OPTIONS = {
+    'help': "print this help and do not convert",
+    'from': "show the source file in the explorer and do not convert",
+    'to': "show the result file in the explorer and do not convert",
+
+    'show': "show the result in the explorer after the execution",
+    'open': "open the result after the execution",
+    'check': "do not perform a forced update",
+
+    'profile': "profile the execution and open snakeviz",
+    'debug': "connect to the process with debugpy",
+
+    'inspect:<OPTIONS>': f"open a copy the blend file being processed at a stage{_new_line}{_new_line.join(inspect_options)}",
+    'skip:<OPTIONS>': f"skip things{_new_line}{_new_line.join(skip_options)}",
+}
 
 
-OPTIONS = dict(
-    where = "show the source file in the explorer and do nothing else",
-    result = "shows the result file in the explorer and do nothing else",
-    show = "show the result in the explorer after the execution",
-    open = "open the result after the execution",
-    inspect = "save and open the final blend file",
-    profile = "profile the execution and open snakeviz",
-    debug = "connect to the process with debugpy",
-    skip = "skip some time consuming operations, the result will be broken but the code will run",
-    inspect_all = "inspect_blend after each script",
-    ignore_inspect = "ignore inspect_blend calls",
-    ignore_breakpoint = "ignore breakpoint calls",
-    check = "do not perform a forced update",
-    help = "print this help and do nothing else",
-)
-
-invalid_arg = next((arg for arg in other_args if arg not in OPTIONS), False)
-
-if invalid_arg or 'help' in other_args:
-
-    print()
-
+def print_help():
     for key, value in OPTIONS.items():
-        print(f"{key}\n\t{value}")
-
-    if invalid_arg:
-        print()
-        utils.print_in_color(utils.get_foreground_color_code(255,0,0), f"Invalid argument: {invalid_arg}", file=sys.stderr)
-        raise SystemExit(1)
+        print(f"{key}{_new_line}{value}")
 
 
-elif 'where' in other_args:
-    utils.print_in_color(utils.get_foreground_color_code(0,191,255), model.blend_path)
-    utils.os_show(model.blend_path)
+def error(reason: str):
+    print()
+    print_help()
+    print()
+    utils.print_in_color(utils.get_foreground_color_code(255,0,0), reason, file=sys.stderr)
+    raise SystemExit(1)
 
-elif 'result' in other_args:
-    if os.path.exists(model.result_path):
-        utils.print_in_color(utils.get_foreground_color_code(0,191,255), model.result_path)
-        utils.os_show(model.result_path)
-    elif os.path.exists(model.result_dir):
-        utils.print_in_color(utils.get_foreground_color_code(0,191,255), model.result_dir)
-        utils.os_show(model.result_dir)
-    else:
-        utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), 'The result folder does not exist yet.')
 
-else:
-    model.update(forced='check' not in other_args)
+for arg in ARGS:
 
-    if 'show' in other_args:
-        utils.os_show(model.result_path)
+    if arg in ('help', 'from', 'to', 'show', 'open', 'check'):
+        continue
 
-    if 'open' in other_args:
-        utils.open_blender_detached(model.blender_executable, model.result_path)
+    if arg == 'profile':
+        model._profile = True
+        continue
+
+    if arg == 'debug':
+        model._debug = True
+        continue
+
+    if arg in inspect_options:
+        model._inspect_identifiers.add(arg)
+        continue
+
+    if arg in skip_options:
+        model._inspect_identifiers.add(arg)
+        continue
+
+    if arg.startswith(regex_options):
+        model._inspect_identifiers.add(arg)
+        continue
+
+    error(f"Invalid argument: {arg}")
+
+
+
+if not {'help', 'from', 'to'}.isdisjoint(ARGS):
+
+    if 'help' in ARGS:
+        print_help()
+
+    if 'from' in ARGS:
+        utils.print_in_color(utils.get_foreground_color_code(0,191,255), model.blend_path)
+        utils.os_show(model.blend_path)
+
+    if 'to' in ARGS:
+        if os.path.exists(model.result_path):
+            utils.print_in_color(utils.get_foreground_color_code(0,191,255), model.result_path)
+            utils.os_show(model.result_path)
+        elif os.path.exists(model.result_dir):
+            utils.print_in_color(utils.get_foreground_color_code(0,191,255), model.result_dir)
+            utils.os_show(model.result_dir)
+        else:
+            utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), 'The result folder does not exist yet.')
+
+    raise SystemExit(0)
+
+
+model.update(forced='check' not in ARGS)
+
+if 'show' in ARGS:
+    utils.os_show(model.result_path)
+
+if 'open' in ARGS:
+    utils.open_blender_detached(model.blender_executable, model.result_path)
