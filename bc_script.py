@@ -34,6 +34,7 @@ if 'bpy' in sys.modules:
     from blend_converter import bpy_utils
     from blend_converter import tool_settings
     from blend_converter import bpy_uv
+    from blend_converter import blend_inspector
 
 
 
@@ -285,7 +286,7 @@ def merge_objects(objects: Objects_Like = None, object_name: str = None):
 
 def inspect_blend(exit_after = False, executable: typing.Optional[str] = None):
     """ Blocking blend file inspection. """
-    bpy_utils.inspect_blend(exit_after=exit_after, blender_executable=executable)
+    blend_inspector.inspect_blend(exit_after=exit_after, blender_executable=executable)
 
 
 def bake_materials(objects: Objects_Like, image_dir: str, resolution: int, **bake_kwargs):

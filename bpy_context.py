@@ -888,7 +888,7 @@ class Output_Socket_Diffuse_AO:
             diffuse_node.inputs['Normal'].join(node_group_input.outputs[1], move = False)
 
         if self.faster and not (self.environment_has_alpha or has_alpha):
-            diffuse_node.outputs[0].join(mix_shader.inputs[1])
+            mix_shader.inputs[1].new('ShaderNodeBsdfDiffuse').inputs['Color'].set_default_value(0)
 
         if self.ignore_backface:
             mix_shader_2 = mix_shader.inputs[1].insert_new('ShaderNodeMixShader', new_node_identifier = 1)

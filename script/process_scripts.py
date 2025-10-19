@@ -188,6 +188,9 @@ def process():
 
         try:
 
+            if blend_inspector.has_identifier(f"inspect:script:pre={script['name']}"):
+                blend_inspector.inspect_blend()
+
             if script['type'] == 'function':
 
                 append_sys_path(os.path.dirname(script['filepath']))
@@ -213,7 +216,7 @@ def process():
             else:
                 raise ValueError(f"Unknown script type: {script}")
 
-            if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL):
+            if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL, f"inspect:script:post={script['name']}"):
                 blend_inspector.inspect_blend()
 
         except Exception as e:

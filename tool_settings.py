@@ -1097,13 +1097,6 @@ class UVs(Settings):
     #### Default: `False`
     """
 
-    inspect_post_unwrap: bool = False
-    """
-    Open .blend after every UV unwrap.
-
-    #### Default: `False`
-    """
-
     average_uv_scale: bool = True
     """
     Scale uv islands according to their mesh surface area.

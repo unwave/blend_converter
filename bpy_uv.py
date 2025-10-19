@@ -300,6 +300,8 @@ def get_object_copy_for_uv_unwrap(object: bpy.types.Object):
         object_copy.delta_location = (0,0,0)
         object_copy.delta_rotation_euler = (0,0,0)
 
+        bpy_utils.apply_modifiers([object_copy], include_name='Smooth by Angle', ignore_type=bpy_context.TOPOLOGY_CHANGING_MODIFIER_TYPES)
+
         object_copy.modifiers.clear()
 
         object_copy.vertex_groups.clear()
@@ -313,7 +315,7 @@ def get_object_copy_for_uv_unwrap(object: bpy.types.Object):
     return object_copy
 
 
-
+@blend_inspector.inspectable
 def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, settings: tool_settings.Ministry_Of_Flat, uv_layer_name: typing.Optional[str] = None):
     """ Currently operates on per mesh basis, so it is not possible to unwrap only a part of `bpy.types.Mesh`. """
     print(unwrap_ministry_of_flat.__name__, object.name_full)
@@ -345,11 +347,6 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         object_copy.name = "EXPORT_" + object_copy.name
 
         with bpy_context.Focus_Objects(object_copy):
-
-            edge_split_modifier: bpy.types.EdgeSplitModifier = object_copy.modifiers.new(name='__bc_edge_split', type='EDGE_SPLIT')
-            edge_split_modifier.use_edge_angle = False
-
-            bpy.ops.object.modifier_apply(modifier=edge_split_modifier.name)
 
 
             with bpy_context.Focus_Objects(object_copy, 'EDIT'):
@@ -801,10 +798,8 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
                 margin = get_island_margin(bpy_utils.get_unique_meshes(objects), settings)
                 bpy.ops.uv.pack_islands(margin = margin)
 
-
-        if settings.inspect_post_unwrap:
-            bpy_utils.inspect_blend()
-
+        if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_UV_PACK):
+            blend_inspector.inspect_blend()
 
 
 def get_linked_uv_islands(mesh: bmesh.types.BMesh, uv_layer: bmesh.types.BMLayerItem):
@@ -1091,12 +1086,11 @@ def get_stdev_mean(values: typing.Union[typing.Sized, typing.Iterable]):
         return statistics.mean(multiplier for multiplier in values if multiplier <= maximum and multiplier >= minimum)
 
 
+@blend_inspector.inspectable
+@blend_inspector.skipable(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_UNWRAP)
 def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False, divide_by_mean = True):
     print(f"{reunwrap_bad_uvs.__name__}...")
 
-    if blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_UNWRAP):
-        print('Skipping...')
-        return
 
     from mathutils.geometry import area_tri
 

@@ -6,6 +6,7 @@ import typing
 import sys
 import subprocess
 import re
+import functools
 
 from . import utils
 
@@ -54,7 +55,7 @@ class COMMON:
     # INSPECT_UV_UNWRAP = 'inspect:uv:unwrap'
     """ after uv unwrapping """
 
-    # INSPECT_UV_PACK = 'inspect:uv:pack'
+    INSPECT_UV_PACK = 'inspect:uv:pack'
     """ after uv packing """
 
     # INSPECT_UV_ALL = 'inspect:uv:all'
@@ -123,3 +124,42 @@ def inspect_blend(blender_executable: typing.Optional[str] = None, exit_after = 
 
     if exit_after:
         raise SystemExit('DEBUG EXIT')
+
+
+def inspectable(func):
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+
+        if has_identifier(f'inspect:func:pre={func.__name__}'):
+            inspect_blend()
+
+        if has_identifier(f'skip:func={func.__name__}'):
+            print(f"Skipping: {func.__name__}")
+            return
+
+        try:
+            return func(*args, **kwargs)
+        finally:
+            if has_identifier(f'inspect:func:post={func.__name__}'):
+                inspect_blend()
+
+    return wrapper
+
+
+def skipable(*identifier: str):
+
+    def decorator(func):
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+
+            if has_identifier(*identifier):
+                print(f"Skipping: {func.__name__}")
+                return
+
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator

@@ -49,10 +49,23 @@ for key, value in blend_inspector.COMMON.__dict__.items():
 
 _new_line = '\n\t'
 
-inspect_options.append('inspect:bake:map=<REGEX>')
-skip_options.append('skip:bake:map=<REGEX>')
 
-regex_options = tuple([option.replace('<REGEX>', '') for option in inspect_options + skip_options if option.endswith('<REGEX>')])
+inspect_options.extend([
+    'inspect:bake:map=<REGEX>',
+
+    'inspect:func:pre=<NAME>',
+    'inspect:func:post=<NAME>',
+
+    'inspect:script:pre=<NAME>',
+    'inspect:script:post=<NAME>',
+])
+
+skip_options.extend([
+    'skip:bake:map=<REGEX>'
+])
+
+
+regex_options = tuple([option.replace('<REGEX>', '').replace('<NAME>', '') for option in inspect_options + skip_options if option.endswith(('<REGEX>', '<NAME>'))])
 
 OPTIONS = {
     'help': "print this help and do not convert",

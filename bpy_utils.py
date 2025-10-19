@@ -490,13 +490,10 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
             b_mesh = bmesh.from_edit_mesh(object_copy.data)
             b_mesh.edges.ensure_lookup_table()
 
-            for edge in b_mesh.edges:
-                edge.smooth = True
-                edge.select_set(edge.seam)
+            edges = [edge for edge in b_mesh.edges if edge.seam]
+            bmesh.ops.split_edges(b_mesh, edges = edges)
 
             bmesh.update_edit_mesh(object_copy.data, loop_triangles=False, destructive=False)
-
-            bpy.ops.mesh.mark_sharp(use_verts=False)
 
             # unwrapping
             try:
