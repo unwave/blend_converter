@@ -1,0 +1,73 @@
+import os
+import tempfile
+import json
+import subprocess
+import threading
+import itertools
+
+
+from . import utils
+from .format import common
+
+
+def write_file(dir: str, basename: str, text: str):
+
+    filepath = os.path.join(dir, utils.ensure_valid_basename(basename))
+    filepath = utils.ensure_unique_path(filepath)
+
+    with open(filepath, 'w') as f:
+        f.write(text)
+
+    return filepath
+
+
+def show_model_diff_vscode(model: common.Generic_Exporter):
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+
+        a = model.get_json_stats()
+        b = model.get_current_stats()
+
+        old = write_file(temp_dir, 'old.json', json.dumps(a, indent=4, default= lambda x: x._to_dict()))
+        new = write_file(temp_dir, 'new.json', json.dumps(b, indent=4, default= lambda x: x._to_dict()))
+
+        main_cmd = ['code', '--new-window', '--wait', '--diff', old, new]
+
+        commands = []
+
+        a_functions = utils.deduplicate([(script.get('filepath'), script.get('name', ''), script.get('sha256'), script.get('code', '')) for script in a.get('scripts', [])])
+        b_functions = utils.deduplicate([(script.get('filepath'), script.get('name', ''), script.get('sha256'), script.get('code', '')) for script in b.get('scripts', [])])
+
+        for script_a, script_b in itertools.product(a_functions, b_functions):
+
+            show_func_diff = (
+                script_a[0] == script_b[0]
+                and
+                script_a[1] == script_b[1]
+                and
+                script_a[2] != script_b[2]
+            )
+
+            if show_func_diff:
+
+                func1 = script_a[1] + '.py'
+                func2 = script_b[1] + '.py'
+
+                cmd = [
+                    'code',
+                    '--reuse-window',
+                    '--diff',
+                    write_file(temp_dir, func1, script_a[3]),
+                    write_file(temp_dir, func2, script_b[3]),
+                ]
+                commands.append(cmd)
+
+        def open_others():
+            import time
+            time.sleep(1)
+            for cmd in commands:
+                subprocess.Popen(cmd)
+
+        threading.Thread(target=open_others).start()
+
+        subprocess.run(main_cmd)

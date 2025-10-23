@@ -29,6 +29,8 @@ spec.loader.exec_module(module)  # type: ignore[reportOptionalMemberAccess]
 
 from blend_converter.format import common
 
+from blend_converter import diff_utils
+
 from blend_converter import utils
 
 from blend_converter import blend_inspector
@@ -72,6 +74,9 @@ OPTIONS = {
     'from': "show the source file in the explorer and do not convert",
     'to': "show the result file in the explorer and do not convert",
 
+    'diff': "show diff based on a written json and do not convert, uses VSCode",
+    'makeupdated': "set the json info as up to date, so it won't be updated unnecessary and do not convert",
+
     'show': "show the result in the explorer after the execution",
     'open': "open the result after the execution",
     'check': "do not perform a forced update",
@@ -96,10 +101,15 @@ def error(reason: str):
     utils.print_in_color(utils.get_foreground_color_code(255,0,0), reason, file=sys.stderr)
     raise SystemExit(1)
 
+non_convert_options = {'help', 'from', 'to', 'diff', 'makeupdated'}
+
 
 for arg in ARGS:
 
-    if arg in ('help', 'from', 'to', 'show', 'open', 'check'):
+    if arg in non_convert_options:
+        continue
+
+    if arg in ('show', 'open', 'check'):
         continue
 
     if arg == 'profile':
@@ -125,8 +135,15 @@ for arg in ARGS:
     error(f"Invalid argument: {arg}")
 
 
+if not non_convert_options.isdisjoint(ARGS):
 
-if not {'help', 'from', 'to'}.isdisjoint(ARGS):
+    if 'diff' in ARGS:
+        diff_utils.show_model_diff_vscode(model)
+
+    if 'makeupdated' in ARGS:
+        if input("Are you sure you want to set the json as up to date? (y/n)").lower() == 'y':
+            print('model._write_final_json()')
+            model._write_final_json()
 
     if 'help' in ARGS:
         print_help()

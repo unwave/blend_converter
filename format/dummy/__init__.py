@@ -8,21 +8,32 @@ class Dummy(common.Generic_Exporter):
     _file_extension = 'dummy'
 
 
-    @property
-    def needs_update(self):
+    def get_current_stats(self):
 
-        settings = self.get_json()
+        stats = {}
 
-        if settings.get('blend_stat') != common.get_file_stat(self.blend_path):
-            return True
+        stats['blend_stat'] = common.get_file_stat(self.blend_path)
 
-        if settings.get('blender_executable_stat') != common.get_file_stat(self.blender_executable):
-            return True
+        stats['blender_executable_stat'] = common.get_file_stat(self.blender_executable)
 
-        if settings.get('scripts') != self._get_scripts():
-            return True
+        stats['scripts'] = self._get_scripts()
 
-        return False
+        return stats
+
+
+    def get_json_stats(self):
+
+        info = self.get_json()
+
+        stats = {}
+
+        stats['blend_stat'] = info.get('blend_stat')
+
+        stats['blender_executable_stat'] = info.get('blender_executable_stat')
+
+        stats['scripts'] = info.get('scripts')
+
+        return stats
 
 
     def _get_scripts(self):

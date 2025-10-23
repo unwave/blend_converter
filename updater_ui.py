@@ -243,6 +243,11 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         menu.append_separator()
 
+        menu_item = menu.append_item(f"Show Diff VSCode", get_func(self.on_show_diff_vscode, entry))
+        menu_item = menu.append_item(f"Set As Updated", get_func(self.on_set_as_updated, entry))
+
+        menu.append_separator()
+
         menu_item = menu.append_item(f"Mark As Needs Update", get_func(self.on_mark_as_needs_update))
         menu_item = menu.append_item(f"Poke", get_func(self.on_entry_poke, entry))
 
@@ -434,6 +439,23 @@ class Model_List(wxp_utils.Item_Viewer_Native):
                 entry.is_manual_update = True
         self.Refresh()
 
+
+    def on_show_diff_vscode(self, entry: updater.Model_Entry):
+        from . import diff_utils
+        import threading
+        threading.Thread(target=diff_utils.show_model_diff_vscode, args=[entry.model]).start()
+
+
+    def on_set_as_updated(self, entry: updater.Model_Entry):
+
+        with wx.MessageDialog(None, f"Are you sure you want to set the '{entry.blend_path}' as up to date?", f"Set As Updated", wx.YES | wx.NO | wx.NO_DEFAULT | wx.ICON_WARNING) as dialog:
+            result = dialog.ShowModal()
+
+            if result != wx.ID_YES:
+                return
+
+        entry.model._write_final_json()
+        self.main_frame.updater.poke_entry(entry)
 
 
 class Output_Lines(wxp_utils.Item_Viewer_Native):

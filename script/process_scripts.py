@@ -116,16 +116,6 @@ def append_sys_path(path: str):
         sys.path.append(path)
 
 
-def print_script_info(script: dict):
-    utils.print_separator(char='█')
-    if script['type'] == 'function':
-        utils.print_in_color(utils.get_color_code(256,256,256, 0, 150, 255), 'SCRIPT:', script['name'], "...", flush=True)
-    elif script['type'] == 'module':
-        utils.print_in_color(utils.get_color_code(256,256,256, 93, 63, 211), 'SCRIPT:', os.path.basename(script['filepath']), "...", flush=True)
-    else:
-        raise ValueError(f"Unknown script type: {script}")
-
-
 def replace_return_values(args):
     """ Substitute previous function return values. """
 
@@ -191,30 +181,20 @@ def process():
             if blend_inspector.has_identifier(f"inspect:script:pre={script['name']}"):
                 blend_inspector.inspect_blend()
 
-            if script['type'] == 'function':
 
-                append_sys_path(os.path.dirname(script['filepath']))
-                print_script_info(script)
-                script_start_time = time.perf_counter()
+            append_sys_path(os.path.dirname(script['filepath']))
 
-                module = import_module_from_file(script['filepath'])
-                result = getattr(module, script['name'])(*replace_return_values(script['args']), **replace_return_values(script['kwargs']))
-                return_values[index] = result
+            utils.print_separator(char='█')
+            utils.print_in_color(utils.get_color_code(256,256,256, 0, 150, 255), 'SCRIPT:', script['name'], "...", flush=True)
 
-                utils.print_in_color(utils.get_color_code(56, 199, 134, 0, 0, 0), f"Processed in {round(time.perf_counter() - script_start_time, 2)} seconds.", flush=True)
+            script_start_time = time.perf_counter()
 
-            elif script['type'] == 'module':
-                setattr(builtins, '__KWARGS__', replace_return_values(script['kwargs']))
+            module = import_module_from_file(script['filepath'])
+            result = getattr(module, script['name'])(*replace_return_values(script['args']), **replace_return_values(script['kwargs']))
+            return_values[index] = result
 
-                append_sys_path(os.path.dirname(script['filepath']))
-                print_script_info(script)
+            utils.print_in_color(utils.get_color_code(56, 199, 134, 0, 0, 0), f"Processed in {round(time.perf_counter() - script_start_time, 2)} seconds.", flush=True)
 
-                import_module_from_file.__wrapped__(script['filepath'])
-
-                delattr(builtins, '__KWARGS__')
-
-            else:
-                raise ValueError(f"Unknown script type: {script}")
 
             if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL, f"inspect:script:post={script['name']}"):
                 blend_inspector.inspect_blend()
@@ -226,10 +206,7 @@ def process():
             error_type, error_value, error_tb = sys.exc_info()
 
             print()
-            if script['type'] == 'function':
-                utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"Fail at script: {script['name']}", file=sys.stderr)
-            elif script['type'] == 'module':
-                utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"Fail at script: {os.path.basename(script['filepath'])}")
+            utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"Fail at script: {script['name']}", file=sys.stderr)
             utils.print_in_color(utils.get_color_code(180,0,0,0,0,0,), ''.join(traceback.format_tb(error_tb)), file=sys.stderr)
             utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), ''.join(traceback.format_exception_only(error_type, error_value)), file=sys.stderr)
             print()

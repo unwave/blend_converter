@@ -328,27 +328,40 @@ class Bam(common.Generic_Exporter, Panda3D_Path_Mixin):
         return script
 
 
-    @property
-    def needs_update(self):
+    def get_current_stats(self):
 
-        if not os.path.exists(self.result_path):
-            return True
+        stats = {}
+
+        stats['result_file_exists'] = os.path.exists(self.result_path)
+
+        stats['blend_stat'] = common.get_file_stat(self.blend_path)
+
+        stats['blender_executable_stat'] = common.get_file_stat(self.blender_executable)
+
+        stats['scripts'] = self._get_scripts()
+
+        stats['bam_scripts'] = self.bam_scripts
+
+        return stats
+
+
+    def get_json_stats(self):
 
         info = self.get_json()
 
-        if info.get('blend_stat') != common.get_file_stat(self.blend_path):
-            return True
+        stats = {}
 
-        if info.get('blender_executable_stat') != common.get_file_stat(self.blender_executable):
-            return True
+        stats['result_file_exists'] = True
 
-        if info.get('scripts') != self._get_scripts():
-            return True
+        stats['blend_stat'] = info.get('blend_stat')
 
-        if info.get('bam_scripts') != self.bam_scripts:
-            return True
+        stats['blender_executable_stat'] = info.get('blender_executable_stat')
 
-        return False
+        stats['scripts'] = info.get('scripts')
+
+        stats['bam_scripts'] = info.get('bam_scripts')
+
+        return stats
 
 
     def get_export_script(self):
@@ -437,4 +450,8 @@ class Bam(common.Generic_Exporter, Panda3D_Path_Mixin):
 
                     bam_scripts_results[index] = result
 
+        self._write_final_json()
+
+
+    def _write_final_json(self):
         self._write_json(scripts = self._get_scripts(), bam_scripts = self.bam_scripts)

@@ -9,6 +9,9 @@ import tempfile
 from datetime import datetime
 import shutil
 import configparser
+import textwrap
+import inspect
+
 
 from .. import utils
 from .. import tool_settings
@@ -46,15 +49,8 @@ class Function_Script_Dict(typing.TypedDict if typing.TYPE_CHECKING else dict):
     name: str
     args: typing.List[typing.Any]
     kwargs: typing.Dict[str, typing.Any]
-    stat: typing.Any
-
-
-class Module_Script_Dict(typing.TypedDict if typing.TYPE_CHECKING else dict):
-    type: str
-    filepath: str
-    kwargs: typing.Dict[str, typing.Any]
-    stat: Stat_Dict
-
+    sha256: str
+    code: str
 
 
 class Blend_Base:
@@ -230,7 +226,7 @@ class Generic_Exporter(Blend_Base):
     def __init__(self, source_path: str, result_dir: str, **kwargs):
         super().__init__(source_path, result_dir, **kwargs)
 
-        self.scripts: typing.List[typing.Union[Function_Script_Dict, Module_Script_Dict]] = []
+        self.scripts: typing.List[Function_Script_Dict] = []
         self.result = {}
 
         self._debug = False
@@ -246,22 +242,39 @@ class Generic_Exporter(Blend_Base):
 
     @property
     def needs_update(self):
+        return self.get_current_stats() != self.get_json_stats()
 
-        if not os.path.exists(self.result_path):
-            return True
+
+    def get_current_stats(self):
+
+        stats = {}
+
+        stats['result_file_exists'] = os.path.exists(self.result_path)
+
+        stats['blend_stat'] = get_file_stat(self.blend_path)
+
+        stats['blender_executable_stat'] = get_file_stat(self.blender_executable)
+
+        stats['scripts'] = self._get_scripts()
+
+        return stats
+
+
+    def get_json_stats(self):
 
         info = self.get_json()
 
-        if info.get('blend_stat') != get_file_stat(self.blend_path):
-            return True
+        stats = {}
 
-        if info.get('blender_executable_stat') != get_file_stat(self.blender_executable):
-            return True
+        stats['result_file_exists'] = True
 
-        if info.get('scripts') != self._get_scripts():
-            return True
+        stats['blend_stat'] = info.get('blend_stat')
 
-        return False
+        stats['blender_executable_stat'] = info.get('blender_executable_stat')
+
+        stats['scripts'] = info.get('scripts')
+
+        return stats
 
 
     def _get_commands(self, **builtin_kwargs):
@@ -302,6 +315,10 @@ class Generic_Exporter(Blend_Base):
             self.return_values_file = os.path.join(temp_dir, uuid.uuid1().hex)
             self._run_blender()
 
+        self._write_final_json()
+
+
+    def _write_final_json(self):
         self._write_json(scripts = self._get_scripts())
 
 
@@ -309,23 +326,12 @@ class Generic_Exporter(Blend_Base):
     def _get_function_script(func: typing.Callable, *args, **kwargs) -> Function_Script_Dict:
         filepath = os.path.realpath(func.__code__.co_filename)
         return {
-            'type': 'function',
             'filepath': filepath,
             'name': func.__name__,
             'args': list(args),
             'kwargs': kwargs,
-            'stat': dict(sha256=utils.get_function_sha256(func)),
-        }
-
-
-    @staticmethod
-    def _get_module_script(filepath: str, **kwargs) -> Module_Script_Dict:
-        filepath = os.path.realpath(filepath)
-        return {
-            'type': 'module',
-            'filepath': filepath,
-            'kwargs': kwargs,
-            'stat': get_file_stat(filepath),
+            'sha256': utils.get_function_sha256(func),
+            'code': textwrap.dedent(inspect.getsource(func)),
         }
 
 
@@ -337,22 +343,6 @@ class Generic_Exporter(Blend_Base):
         """
 
         script = self._get_function_script(func, *args, **kwargs)
-
-        self.scripts.append(script)
-
-        return script
-
-
-    def run_file(self, filepath: str, **kwargs):
-        """
-        The module will be executed before the file export.
-
-        `kwargs` will be available as `__KWARGS__` built-in variable
-
-        `kwargs` must be JSON serializable.
-        """
-
-        script = self._get_module_script(filepath, **kwargs)
 
         self.scripts.append(script)
 
