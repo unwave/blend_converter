@@ -1320,6 +1320,11 @@ class Focus_Objects:
         view_layer = self.view_layer
         objects = self.affected_objects
 
+        # Is there a multiple objects in EDIT mode bpy.ops.object.mode_set(mode='OBJECT') will set the OBJECT mode for all of them
+        # even if they are not active and not selected
+        # practically means that first you have to set the OBJECT mode and then the EDIT mode
+        self.set_mode(self.affected_objects, 'OBJECT', self.hidden_by_hierarchy_collection, self.view_layer)
+
         for mode, objects_in_mode in utils.list_by_key(objects, operator.itemgetter(self.MODE_KEY)).items():
             self.set_mode(objects_in_mode, mode, self.hidden_by_hierarchy_collection, self.view_layer)
 

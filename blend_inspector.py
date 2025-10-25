@@ -89,7 +89,7 @@ class COMMON:
 
 
 
-def inspect_blend(blender_executable: typing.Optional[str] = None, exit_after = False, detached = False):
+def inspect_blend(name = 'DEBUG', blender_executable: typing.Optional[str] = None, exit_after = False, detached = False):
     """ Blocking blend file inspection. """
 
     if has_identifier(COMMON.SKIP_INSPECT):
@@ -101,12 +101,19 @@ def inspect_blend(blender_executable: typing.Optional[str] = None, exit_after = 
     if blender_executable is None:
         blender_executable = bpy.app.binary_path
 
+    if bpy.data.filepath:
+        filepath_stem = ' ' + os.path.splitext(os.path.basename(bpy.data.filepath))[0]
+    else:
+        filepath_stem = ''
+
     with tempfile.TemporaryDirectory() as temp_dir:
 
+        filename = utils.ensure_valid_basename(f'[{name}]{filepath_stem}.blend')
+
         if detached:
-            filepath = os.path.join(bpy.app.tempdir, f'DEBUG_{utils.ensure_valid_basename(bpy.context.scene.name)}.blend')
+            filepath = os.path.join(bpy.app.tempdir, filename)
         else:
-            filepath = os.path.join(temp_dir, f'DEBUG_{utils.ensure_valid_basename(bpy.context.scene.name)}.blend')
+            filepath = os.path.join(temp_dir, filename)
 
         for image in bpy.data.images:
             if image.source == 'GENERATED' and image.is_dirty:
