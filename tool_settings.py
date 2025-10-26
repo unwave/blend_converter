@@ -969,9 +969,9 @@ class Bake(Settings):
     #### Default: `1.0`
     """
 
-    material_name: str = ''
+    texture_name_prefix: str = ''
     """
-    A name to use for newly created combined materials and textures.
+    A name prefix to use for created textures and materials.
 
     If an empty string, then a common part of the materials names or the objects names will be used.
 

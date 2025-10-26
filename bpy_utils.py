@@ -1883,16 +1883,16 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
             _bake_settings.material_key = material_key
             _bake_settings.bake_types = bake_types
 
-            if _bake_settings.material_name:
+            if _bake_settings.texture_name_prefix:
                 if material_key == alpha_material_key:
-                    _bake_settings.material_name = _bake_settings.material_name + '_alpha'
+                    _bake_settings.texture_name_prefix = _bake_settings.texture_name_prefix + '_alpha'
                 else:
-                    _bake_settings.material_name = _bake_settings.material_name
+                    _bake_settings.texture_name_prefix = _bake_settings.texture_name_prefix
             else:
                 if material_key == alpha_material_key:
-                    _bake_settings.material_name = merged_object.name + '_alpha'
+                    _bake_settings.texture_name_prefix = merged_object.name + '_alpha'
                 else:
-                    _bake_settings.material_name = merged_object.name
+                    _bake_settings.texture_name_prefix = merged_object.name
 
             bpy_bake.bake([merged_object], _bake_settings)
 

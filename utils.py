@@ -578,7 +578,7 @@ WINDOWS_RESERVED_NAMES = {
 def is_windows_reserved(name: str):
     return name.upper().split('.', 1)[0] in WINDOWS_RESERVED_NAMES
 
-def ensure_valid_basename(string: str, limit = 64):
+def ensure_valid_basename(string: str, limit = 63):
     """ Returns a valid file basename. """
 
     # no special or non-printable characters

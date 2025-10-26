@@ -570,12 +570,12 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
     materials_to_bake: typing.List[bpy.types.Material] = []
     objects_by_material = bpy_utils.group_objects_by_material(objects)
 
-    if settings.material_name:
-        material_name = settings.material_name
+    if settings.texture_name_prefix:
+        texture_name_prefix = settings.texture_name_prefix
     else:
-        material_name = ensure_unique_name(get_common_name(filter(None, objects_by_material.keys()), objects[0].name))
+        texture_name_prefix = ensure_unique_name(get_common_name(filter(None, objects_by_material.keys()), objects[0].name))
 
-    baking_images = [Baked_Image(map, material_name, settings) for map in settings.bake_types]
+    baking_images = [Baked_Image(map, texture_name_prefix, settings) for map in settings.bake_types]
 
 
     print()
@@ -886,7 +886,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
         if settings.create_materials:
             bpy_uv.clear_uv_layers_from_objects(objects, uv_layer_name, 'UVMap')
 
-            material_name = settings.material_name
+            material_name = settings.texture_name_prefix
             if not material_name:
                 material_name = get_common_name(objects)
 
@@ -919,7 +919,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         if settings.create_materials:
 
-            material_name = settings.material_name
+            material_name = settings.texture_name_prefix
             if not material_name:
                 material_name = get_common_name(materials_to_bake)
 
