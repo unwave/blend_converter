@@ -49,7 +49,9 @@ for key, value in blend_inspector.COMMON.__dict__.items():
     elif value.startswith('skip'):
         skip_options.append(value)
 
-_new_line = '\n\t'
+
+_indented_new_line = '\n\t'
+_double_indented_new_line = '\n\t\t'
 
 
 inspect_options.extend([
@@ -70,28 +72,29 @@ skip_options.extend([
 regex_options = tuple([option.replace('<REGEX>', '').replace('<NAME>', '') for option in inspect_options + skip_options if option.endswith(('<REGEX>', '<NAME>'))])
 
 OPTIONS = {
-    'help': "print this help and do not convert",
-    'from': "show the source file in the explorer and do not convert",
-    'to': "show the result file in the explorer and do not convert",
+    'help': "print this help [does not convert]",
+    'from': "show the source file in the explorer [does not convert]",
+    'to': "show the result file in the explorer [does not convert]",
 
-    'diff': "show diff based on a written json and do not convert, uses VSCode",
-    'makeupdated': "set the json info as up to date, so it won't be updated unnecessary and do not convert",
+    'diff': "show diff based on the written json file, uses VSCode [does not convert] ['code' must be in the PATH environment variable]",
+    'makeupdated': "rewrite the json file as up to date, so it won't trigger the update [does not convert] [requires confirmation]",
 
-    'show': "show the result in the explorer after the execution",
-    'open': "open the result after the execution",
+    'show': "show the result in the explorer [after the execution]",
+    'open': "open the result [after the execution]",
     'check': "do not perform a forced update",
 
-    'profile': "profile the execution and open snakeviz",
-    'debug': "connect to the process with debugpy",
+    'profile': "profile the execution and open with snakeviz [snakeviz must be installed]",
+    'debug': "connect to the process with debugpy [debugpy must be installed]",
 
-    'inspect:<OPTIONS>': f"open a copy the blend file being processed at a stage{_new_line}{_new_line.join(inspect_options)}",
-    'skip:<OPTIONS>': f"skip things{_new_line}{_new_line.join(skip_options)}",
+    'inspect:<OPTIONS> OR i:<OPTIONS>': f"open a copy of the blend file being processed at a stage{_double_indented_new_line}{_double_indented_new_line.join(inspect_options)}",
+    'skip:<OPTIONS> OR s:<OPTIONS>': f"skip a stage, for some — unless specified by inspect:<OPTIONS>`{_double_indented_new_line}{_double_indented_new_line.join(skip_options)}",
 }
 
 
 def print_help():
     for key, value in OPTIONS.items():
-        print(f"{key}{_new_line}{value}")
+        print()
+        print(f"{key}{_indented_new_line}{value}")
 
 
 def error(reason: str):
@@ -104,7 +107,14 @@ def error(reason: str):
 non_convert_options = {'help', 'from', 'to', 'diff', 'makeupdated'}
 
 
-for arg in ARGS:
+for index, arg in enumerate(ARGS):
+
+    # make the shortcut not short
+    if arg.startswith('i:'):
+        arg = 'inspect:' + arg[2:]
+
+    if arg.startswith('s:'):
+        arg = 'skip:' + arg[2:]
 
     if arg in non_convert_options:
         continue
@@ -132,7 +142,7 @@ for arg in ARGS:
         model._inspect_identifiers.add(arg)
         continue
 
-    error(f"Invalid argument: {arg}")
+    error(f"Invalid argument: {ARGS[index]}")  # Using index to print the original, possible shortened version of the command
 
 
 if not non_convert_options.isdisjoint(ARGS):
@@ -146,6 +156,7 @@ if not non_convert_options.isdisjoint(ARGS):
             model._write_final_json()
 
     if 'help' in ARGS:
+        print()
         print_help()
 
     if 'from' in ARGS:

@@ -910,6 +910,8 @@ class Bake(Settings):
 
     raise_warnings: bool = False
     """
+    #### DEBUGGING
+
     If a warning is encountered it will be raised.
 
     #### Default: `False`
@@ -917,16 +919,20 @@ class Bake(Settings):
 
     fake_bake: bool = False
     """
+    #### DEBUGGING
+
     All the usual processing accept for actually baking and saving the baked image.
 
     #### Default: `False`
     """
 
-    save_images: bool = True
+    compose_and_save: bool = True
     """
+    #### DEBUGGING
+
     Compose and save the images to disk.
 
-    If `False` then consequently disables the compositor: denoising, inpaint and channel merging. Use `_raw_images` to access the images.
+    If `False` - disables the compositor: denoising, inpaint and channel merging. Use `_raw_images` to access the images.
 
     #### Default: `True`
     """

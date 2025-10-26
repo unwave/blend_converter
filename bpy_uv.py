@@ -798,8 +798,7 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
                 margin = get_island_margin(bpy_utils.get_unique_meshes(objects), settings)
                 bpy.ops.uv.pack_islands(margin = margin)
 
-        if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_UV_PACK):
-            blend_inspector.inspect_blend()
+        blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_UV_PACK)
 
 
 def get_linked_uv_islands(mesh: bmesh.types.BMesh, uv_layer: bmesh.types.BMLayerItem):

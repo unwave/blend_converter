@@ -284,11 +284,6 @@ def merge_objects(objects: Objects_Like = None, object_name: str = None):
     return bpy_utils.merge_objects(objects=get_objects_fallback(objects), name=object_name)
 
 
-def inspect_blend(exit_after = False, executable: typing.Optional[str] = None):
-    """ Blocking blend file inspection. """
-    blend_inspector.inspect_blend(exit_after=exit_after, blender_executable=executable)
-
-
 def bake_materials(objects: Objects_Like, image_dir: str, resolution: int, **bake_kwargs):
     bpy_utils.bake_materials(get_objects(objects), image_dir, resolution, **bake_kwargs)
 

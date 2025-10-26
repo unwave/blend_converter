@@ -166,8 +166,7 @@ blend_inspector.add_identifier(*ARGS['inspect_identifiers'])
 def process():
 
 
-    if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_BLEND_ORIG):
-        blend_inspector.inspect_blend()
+    blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BLEND_ORIG)
 
 
     for magic_key, magic_value in ARGS['builtin_kwargs'].items():
@@ -178,8 +177,7 @@ def process():
 
         try:
 
-            if blend_inspector.has_identifier(f"inspect:script:pre={script['name']}"):
-                blend_inspector.inspect_blend()
+            blend_inspector.inspect_if_has_identifier(f"inspect:script:pre={script['name']}")
 
 
             append_sys_path(os.path.dirname(script['filepath']))
@@ -196,8 +194,7 @@ def process():
             utils.print_in_color(utils.get_color_code(56, 199, 134, 0, 0, 0), f"Processed in {round(time.perf_counter() - script_start_time, 2)} seconds.", flush=True)
 
 
-            if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL, f"inspect:script:post={script['name']}"):
-                blend_inspector.inspect_blend()
+            blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL, f"inspect:script:post={script['name']}")
 
         except Exception as e:
 
@@ -211,8 +208,7 @@ def process():
             utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), ''.join(traceback.format_exception_only(error_type, error_value)), file=sys.stderr)
             print()
 
-            if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL):
-                blend_inspector.inspect_blend()
+            blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL)
 
             raise SystemExit(1)
 
@@ -261,5 +257,4 @@ if __name__ == '__main__':
     utils.print_in_color(utils.get_color_code(256,256,256, 34, 139, 34), f"CONVERTED IN {round(time.perf_counter() - start_time, 2)} SECONDS.", flush=True)
 
 
-    if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_BLEND_FINAL):
-        blend_inspector.inspect_blend()
+    blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BLEND_FINAL)

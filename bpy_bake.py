@@ -270,7 +270,7 @@ class Baked_Image:
             return self.default_map_settings
 
 
-    def save(self):
+    def compose_and_save(self):
         print()
         print('Composing and saving...')
 
@@ -468,8 +468,7 @@ class Baked_Image:
                 bpy_state.set(bpy.context.scene.render, 'resolution_percentage', 100)
 
 
-                if blend_inspector.has_identifier('bake:comp'):
-                    blend_inspector.inspect_blend()
+                blend_inspector.inspect_if_has_identifier('bake:comp')
 
                 if not self.settings.fake_bake:
                     with utils.Capture_Stdout() as capture:
@@ -594,28 +593,6 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
 
     for baking_image in baking_images:
 
-        do_inspect = False
-
-        def search_identifier(regex: str):
-            for match in blend_inspector.search_identifier(regex):
-                for bake_type in baking_image.bake_types:
-                    if re.search(match.group(1), bake_type._identifier, flags=re.IGNORECASE):
-                        return True
-            return False
-
-
-        if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_BAKE_PRE):
-            do_inspect = True
-
-        elif search_identifier(r'inspect:bake:map=(.+)'):
-            do_inspect = True
-
-        elif search_identifier(r'skip:bake:map=(.+)'):
-            continue
-
-        elif blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_BAKE_ALL):
-            continue
-
 
         for bake_task in baking_image.bakeable_tasks:
 
@@ -682,8 +659,24 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                                 disable_material_state.set(slot, 'material', None)
 
 
-                if do_inspect:
-                    blend_inspector.inspect_blend()
+                def get_bake_type_match(regex: str):
+                    for match in blend_inspector.search_identifier(regex):
+                        for bake_type in bake_task:
+                            if re.search(match.group(1), bake_type._identifier, flags=re.IGNORECASE):
+                                return match.group(0)
+                    return None
+
+
+                if blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BAKE_PRE):
+                    pass
+                elif get_bake_type_match(r'inspect:bake:map=(.+)'):
+                    blend_inspector.inspect_blend(get_bake_type_match(r'inspect:bake:map=(.+)'))
+                elif get_bake_type_match(r'skip:bake:map=(.+)'):
+                    print(f"Skipped: {get_bake_type_match(r'skip:bake:map=(.+)')}")
+                    continue
+                elif blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_BAKE_ALL):
+                    print(f"Skipped: {blend_inspector.COMMON.SKIP_BAKE_ALL}")
+                    continue
 
 
                 def capturing():
@@ -727,14 +720,22 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                         capture.lines.put_nowait(None)
 
 
-            if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_BAKE_AFTER):
-                blend_inspector.inspect_blend()
-
-        if settings.save_images:
-            baking_image.save()
+                blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BAKE_AFTER)
 
 
-    return [image.final_image for image in baking_images]
+        do_compose_and_save = (
+            settings.compose_and_save
+            and
+            not blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_BAKE_ALL)
+            and
+            not blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_BAKE_SAVE)
+        )
+
+        if do_compose_and_save:
+            baking_image.compose_and_save()
+
+    # TODO: checking for None only applicable when skipping stages, otherwise may be ambiguous
+    return [image.final_image for image in baking_images if image.final_image]
 
 
 def get_gltf_settings_node_tree():

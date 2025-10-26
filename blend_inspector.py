@@ -77,6 +77,10 @@ class COMMON:
     """ skip baking all maps, except for maps specified using the inspect command """
 
 
+    SKIP_BAKE_SAVE = 'skip:bake:save'
+    """ skip composing and saving all maps"""
+
+
     SKIP_UV_PACK = 'skip:uv:pack'
     """ skip pack """
 
@@ -138,8 +142,7 @@ def inspectable(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
 
-        if has_identifier(f'inspect:func:pre={func.__name__}'):
-            inspect_blend()
+        inspect_if_has_identifier(f'inspect:func:pre={func.__name__}')
 
         if has_identifier(f'skip:func={func.__name__}'):
             print(f"Skipping: {func.__name__}")
@@ -148,8 +151,7 @@ def inspectable(func):
         try:
             return func(*args, **kwargs)
         finally:
-            if has_identifier(f'inspect:func:post={func.__name__}'):
-                inspect_blend()
+            inspect_if_has_identifier(f'inspect:func:post={func.__name__}')
 
     return wrapper
 
@@ -170,3 +172,11 @@ def skipable(*identifier: str):
         return wrapper
 
     return decorator
+
+
+def inspect_if_has_identifier(*identifier: str):
+    if has_identifier(*identifier):
+        inspect_blend(' | '.join(_identifiers & set(identifier)))
+        return True
+    else:
+        return False
