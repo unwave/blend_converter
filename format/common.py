@@ -335,7 +335,7 @@ class Generic_Exporter(Blend_Base):
         }
 
 
-    def run(self, func: typing.Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+    def run(self, func: 'typing.Callable[P, T]', *args: P.args, **kwargs: P.kwargs) -> T:
         """
         The function will be executed before the file export.
 

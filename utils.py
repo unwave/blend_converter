@@ -506,7 +506,7 @@ def get_color_code(r, g, b, _r, _g, _b):
     return f'\033[38;2;{r};{g};{b};48;2;{_r};{_g};{_b}m'
 
 
-if sys.stdout.isatty():
+if hasattr(sys.stdout, 'isatty') and sys.stdout.isatty():
 
     if sys.platform == 'win32':
         os.system('')
