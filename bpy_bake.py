@@ -620,10 +620,18 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                 bpy_state = context_stack.enter_context(bpy_context.Bpy_State())
 
                 for object in objects:
-                    bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer])
+
+                    try:
+                        uv_map = object.data.uv_layers[uv_layer]
+                    except KeyError as e:
+                        raise Exception(f"UV map '{uv_layer}' for baking is missing in object: {object.name_full}") from e
+
+                    bpy_state.set(object.data.uv_layers, 'active', uv_map)
+
 
                 if settings.use_smart_texture_interpolation:
-                    set_all_image_nodes_interpolation_to_smart(material.node_tree, bpy_state)
+                    for material in materials_to_bake:
+                            set_all_image_nodes_interpolation_to_smart(material.node_tree, bpy_state)
 
 
                 for sub_task in bake_task:

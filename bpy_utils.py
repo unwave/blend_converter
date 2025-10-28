@@ -1957,7 +1957,9 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
 
-def move_modifier_to_first(object: bpy.types.Object, modifier: bpy.types.Modifier):
+def move_modifier_to_first(modifier: bpy.types.Modifier):
+
+    object: bpy.types.Object = modifier.id_data
 
     index = list(object.modifiers).index(modifier)
     if index == 0:
