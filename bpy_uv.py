@@ -12,6 +12,7 @@ import threading
 import queue
 import sys
 import array
+import traceback
 
 import bpy
 import mathutils
@@ -373,9 +374,8 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
                         bpy.ops.export_scene.obj(filepath=filepath_input, use_selection=True, use_materials=False, use_uvs=False, use_mesh_modifiers=False)
                 except Exception as e:
                     print_output(capture_stdout, capture_stderr)
+                    bpy.data.objects.remove(object_copy)
                     raise utils.Fallback('Fail to export obj.') from e
-
-        bpy.data.objects.remove(object_copy)
 
 
         cmd = settings._get_cmd(filepath_input, filepath_output)
@@ -384,6 +384,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         try:
             process = subprocess.run(cmd, timeout=settings.timeout, text = True, capture_output=True, encoding='utf-8')
         except subprocess.TimeoutExpired as e:
+            bpy.data.objects.remove(object_copy)
             raise utils.Fallback(f"Timeout: {object.name_full}") from e
 
         returncode = process.returncode
@@ -391,17 +392,21 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         if returncode == 1:
             pass
         elif returncode == 3221225786:
+            bpy.data.objects.remove(object_copy)
             raise KeyboardInterrupt(f"STATUS_CONTROL_C_EXIT: {object.name_full}")
         elif returncode == 3221225477:
+            bpy.data.objects.remove(object_copy)
             raise utils.Fallback(f"0xc0000005 Access Violation Error: {object.name_full}")
         else:
             print()
             utils.print_in_color(utils.get_color_code(0,0,0, 256,256,256), 'CMD:', utils.get_command_from_list(cmd))
             utils.print_in_color(yellow_color, process.stdout)
             utils.print_in_color(magenta_color, process.stderr)
+            bpy.data.objects.remove(object_copy)
             raise utils.Fallback(f"Bad return code {returncode}: {object.name_full}")
 
         if not os.path.exists(filepath_output):
+            bpy.data.objects.remove(object_copy)
             raise utils.Fallback(f"Output .obj file does not exist: {filepath_output}")
 
         bpy.ops.object.select_all(action='DESELECT')
@@ -415,7 +420,9 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
                     bpy.ops.import_scene.obj(filepath=filepath_output)
             except Exception as e:
                 print_output(capture_stdout, capture_stderr)
+                bpy.data.objects.remove(object_copy)
                 raise utils.Fallback('Fail to import obj.') from e
+
 
         imported_object = bpy.context.selected_objects[0]
         imported_object.name = "IMPORT_" + imported_object.name
@@ -427,6 +434,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         validation_lines: typing.List[str] = list(capture_stdout.lines.queue)
 
         if is_invalid_geometry:
+            bpy.data.objects.remove(object_copy)
             bpy.data.objects.remove(imported_object)
             raise utils.Fallback('\n'.join(validation_lines))
 
@@ -476,11 +484,61 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         imported_object.data.uv_layers[0].name = uv_layer_name
 
 
+        def apply_modifier(modifier: bpy.types.Modifier):
+            object = modifier.id_data
+            print(modifier.name + "...")
+            bpy_context.call_for_object(object, bpy.ops.object.modifier_apply, modifier = modifier.name, single_user = True)
+
+
+        def apply_uv_data_transfer_modifier(from_object: bpy.types.Object, to_object: bpy.types.Object, uv_layer_name: str):
+
+            modifier: bpy.types.DataTransferModifier = to_object.modifiers.new('_', type='DATA_TRANSFER')
+
+            modifier.object = from_object
+            modifier.use_loop_data = True
+            modifier.data_types_loops = {'UV'}
+            modifier.loop_mapping = 'NEAREST_POLYNOR'
+            modifier.layers_uv_select_src = uv_layer_name
+            modifier.show_expanded = False
+
+            modifier.name = 'UV' + modifier.type
+
+            apply_modifier(modifier)
+
         try:
             copy_uv(imported_object, object, uv_layer_name)
-        except ValueError as e:
-            raise utils.Fallback(f"Fail to copy UVs: {filepath_output}") from e
+        except ValueError:
+            traceback.print_exc(file = sys.stderr)
+
+            with bpy_context.Focus_Objects([imported_object, object_copy, object]):
+                apply_uv_data_transfer_modifier(imported_object, object_copy, uv_layer_name)
+
+                # loops that are failed to be transferred create overlaps
+                with bpy_context.Focus_Objects(object_copy, mode='EDIT'):
+                    object_copy.data.uv_layers.active = object_copy.data.uv_layers[uv_layer_name]
+
+                    bpy.ops.mesh.reveal()
+                    bpy.ops.uv.reveal()
+                    bpy_context.call_in_uv_editor(bpy.ops.uv.select_mode, type='VERTEX', can_be_canceled=True)
+                    bpy.ops.mesh.select_all(action='SELECT')
+
+                    bpy.ops.uv.select_all(action='SELECT')
+                    aabb_pack(margin=0.05, merge_overlap=False)
+                    bpy.ops.uv.select_all(action='DESELECT')
+
+                    bpy.ops.uv.select_overlap()
+                    bpy.ops.uv.select_all(action='INVERT')
+                    bpy.ops.uv.pin(clear=False)
+                    bpy.ops.uv.select_all(action='INVERT')
+                    bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, method='MINIMUM_STRETCH', fill_holes=True, no_flip=True, can_be_canceled=True, iterations=30)
+
+                    bpy.ops.uv.select_all(action='SELECT')
+                    bpy.ops.uv.pin(clear=False)
+
+
+                copy_uv(object_copy, object, uv_layer_name)
         finally:
+            bpy.data.objects.remove(object_copy)
             bpy.data.objects.remove(imported_object)
 
 
@@ -1108,6 +1166,11 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
     with bpy_context.Focus_Objects(objects, mode='EDIT'):
 
         for object in objects:
+
+            bpy.ops.mesh.reveal()
+            bpy.ops.uv.reveal()
+            bpy.ops.uv.select_all(action='SELECT')
+            bpy.ops.uv.align_rotation()
 
             bm = bmesh.from_edit_mesh(object.data)
 
