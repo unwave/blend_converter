@@ -565,6 +565,16 @@ def ensure_unique_name(name, taken_names = set()):
     return name
 
 
+def the_bake(active_object: bpy.types.Object, selected_objects: typing.List[bpy.types.Object], kwargs):
+    """ Wrapped into a function to be shown separately when profiling and for monkey patching. """
+    bpy_context.call_for_objects(
+        active_object,
+        selected_objects,
+        bpy.ops.object.bake,
+        **kwargs,
+    )
+
+
 def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings: tool_settings.Bake):
 
     materials_to_bake: typing.List[bpy.types.Material] = []
@@ -641,7 +651,8 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                 def enter_output_context(material: bpy.types.Material, bake_task: typing.List[bake_settings._Bake_Type]):
                     if len(bake_task) == 1:
                         output_socket = context_stack.enter_context(bake_task[0]._get_material_context(material))
-                        context_stack.enter_context(bpy_context.Output_Override(material, output_socket))
+                        if output_socket:
+                            context_stack.enter_context(bpy_context.Output_Override(material, output_socket))
                     else:
                         r_g_b = [context_stack.enter_context(bake_task[i]._get_material_context(material)) for i in range(3)]
                         context_stack.enter_context(bpy_context.Output_Override_Combine_RGB(material, *r_g_b))
@@ -703,6 +714,8 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                         type = bpy.context.scene.cycles.bake_type,
                         pass_filter = get_conformed_pass_filter(),
                     )
+                elif bpy.context.scene.cycles.bake_type == 'NORMAL':
+                    kwargs = dict(type='NORMAL')
                 else:
                     kwargs = dict()
 
@@ -712,19 +725,9 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                     print()
                     print('Baking...')
 
-                    def the_bake():
-                        """ wrapped into a function to be shown separately in a profile"""
-                        bpy_context.call_with_object_override(
-                            objects[0],
-                            objects,
-                            bpy.ops.object.bake,
-                            **kwargs,
-                        )
-
-
                     with utils.Capture_Stdout() as capture:
                         threading.Thread(target=capturing, daemon=True).start()
-                        the_bake()
+                        the_bake(object, [object], kwargs)
                         capture.lines.put_nowait(None)
 
 

@@ -867,7 +867,7 @@ def unify_color_attributes_format(objects: typing.List[bpy.types.Object]):
         for object in objects:
             if color_attribute_name in object.data.color_attributes.keys():
                 object.data.color_attributes.active_color = object.data.color_attributes[color_attribute_name]
-                bpy_context.call_with_object_override(object, [object], bpy.ops.geometry.color_attribute_convert, domain='POINT', data_type='FLOAT_COLOR')
+                bpy_context.call_for_object(object, bpy.ops.geometry.color_attribute_convert, domain='POINT', data_type='FLOAT_COLOR')
 
 
 def make_material_independent_from_object(objects: typing.List[bpy.types.Object]):
@@ -1935,8 +1935,8 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         ## copy materials
         for orig, copy in map_original_to_copy.items():
             with bpy_context.Focus_Objects(copy):
-                bpy.ops.object.material_slot_remove_unused()  # when called with call_with_object_override gives CANCELLED
-            bpy_context.call_with_object_override(copy, [orig, copy], bpy.ops.object.material_slot_copy)
+                bpy.ops.object.material_slot_remove_unused()  # when called with call_for_objects returns CANCELLED
+            bpy_context.call_for_objects(copy, [orig, copy], bpy.ops.object.material_slot_copy)
 
         merge_material_slots_with_the_same_materials(objects)
         merge_material_slots_with_the_same_materials(splitted_objects_copy)
@@ -1967,9 +1967,9 @@ def move_modifier_to_first(modifier: bpy.types.Modifier):
 
     if bpy.app.version < (2,90,0):
         for _ in range(index):
-            bpy_context.call_with_object_override(object, [object], bpy.ops.object.modifier_move_up, modifier = modifier.name)
+            bpy_context.call_for_object(object, bpy.ops.object.modifier_move_up, modifier = modifier.name)
     else:
-        bpy_context.call_with_object_override(object, [object], bpy.ops.object.modifier_move_to_index, modifier = modifier.name, index=0)
+        bpy_context.call_for_object(object, bpy.ops.object.modifier_move_to_index, modifier = modifier.name, index=0)
 
 
 def is_smooth_modifier(modifier: bpy.types.Modifier):

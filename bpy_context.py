@@ -90,7 +90,22 @@ def call_in_view3d(func: typing.Callable, *args, **kwargs):
     return call(get_view3d(), func, *args, **kwargs)
 
 
-def call_with_object_override(active_object: 'bpy.types.Object', objects: typing.List['bpy.types.Object'], func: typing.Callable, *args, can_be_canceled = False, **kwargs):
+def call_for_object(object: 'bpy.types.Object', func: typing.Callable, *args, can_be_canceled = False, **kwargs):
+
+    override = dict(
+        selectable_objects = [object],
+        selected_objects = [object],
+        selected_editable_objects = [object],
+        editable_objects = [object],
+        visible_objects = [object],
+        active_object = object,
+        object = object
+    )
+
+    return call(override, func, *args, can_be_canceled = can_be_canceled, **kwargs)
+
+
+def call_for_objects(active_object: 'bpy.types.Object', objects: typing.List['bpy.types.Object'], func: typing.Callable, *args, can_be_canceled = False, **kwargs):
 
     if not active_object in objects:
         objects.append(active_object)

@@ -310,7 +310,7 @@ def get_object_copy_for_uv_unwrap(object: bpy.types.Object):
             for key_block in reversed(object_copy.data.shape_keys.key_blocks):
                 object_copy.shape_key_remove(key_block)
 
-        bpy_context.call_with_object_override(object_copy, [object_copy], bpy.ops.object.transform_apply, location=False, rotation=False, scale=True)
+        bpy_context.call_for_object(object_copy, bpy.ops.object.transform_apply, location=False, rotation=False, scale=True)
 
     return object_copy
 
@@ -475,9 +475,13 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
         imported_object.data.uv_layers[0].name = uv_layer_name
 
-        copy_uv(imported_object, object, uv_layer_name)
 
-        bpy.data.objects.remove(imported_object)
+        try:
+            copy_uv(imported_object, object, uv_layer_name)
+        except ValueError as e:
+            raise utils.Fallback(f"Fail to copy UVs: {filepath_output}") from e
+        finally:
+            bpy.data.objects.remove(imported_object)
 
 
 def get_uv_triangles(b_mesh: bmesh.types.BMesh, uv_layer):
@@ -721,7 +725,7 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
                     if not object.active_material.get(settings.material_key):
                         continue
 
-                    result = bpy_context.call_with_object_override(object, [object], bpy.ops.object.material_slot_select, can_be_canceled = True)
+                    result = bpy_context.call_for_object(object, bpy.ops.object.material_slot_select, can_be_canceled = True)
                     any_material_selected = 'CANCELLED' not in result  # can be canceled if the material slot is not assigned to any polygon
 
 

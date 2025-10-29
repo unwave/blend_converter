@@ -95,6 +95,8 @@ def print_help():
     for key, value in OPTIONS.items():
         print()
         print(f"{key}{_indented_new_line}{value}")
+    print()
+    print("Putting # as the first character of a command will skip it.")
 
 
 def error(reason: str):
@@ -108,6 +110,10 @@ non_convert_options = {'help', 'from', 'to', 'diff', 'makeupdated'}
 
 
 for index, arg in enumerate(ARGS):
+
+    if arg.startswith('#'):
+        print(f"Option skipped: {arg}")
+        continue
 
     # make the shortcut not short
     if arg.startswith('i:'):
