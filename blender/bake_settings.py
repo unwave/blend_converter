@@ -5,7 +5,7 @@ import sys
 
 if __package__:
     from . import bpy_node
-    from . import tool_settings
+    from .. import tool_settings
     from . import bpy_context
 else:
     from blend_converter import tool_settings

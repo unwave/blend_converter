@@ -5,10 +5,6 @@ import sys
 import json
 
 
-DIR = os.path.dirname(os.path.realpath(__file__))
-BLEND_CONVERTER_INIT_PY = os.path.join(os.path.dirname(DIR), '__init__.py')
-
-
 def import_module_from_file(file_path: str, module_name: typing.Optional[str] = None):
 
     if not os.path.isabs(file_path):
@@ -32,7 +28,8 @@ def import_module_from_file(file_path: str, module_name: typing.Optional[str] = 
 if typing.TYPE_CHECKING:
     import blend_converter
 else:
-    blend_converter = import_module_from_file(BLEND_CONVERTER_INIT_PY, 'blend_converter')
+    blend_converter_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '__init__.py')
+    blend_converter = import_module_from_file(blend_converter_path, 'blend_converter')
 
 
 from blend_converter import bpy_utils

@@ -11,7 +11,6 @@ if typing.TYPE_CHECKING:
 
 
 from . import bpy_context
-from . import bpy_utils
 
 
 VALIDATE_NEW_LINKS = True

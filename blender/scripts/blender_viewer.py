@@ -15,7 +15,6 @@ import bpy
 
 CAMERA_ROTATION = mathutils.Matrix.Rotation(math.radians(90), 4, 'X')
 
-DIR = os.path.dirname(__file__)
 
 
 def get_args() -> dict:

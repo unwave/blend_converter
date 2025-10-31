@@ -14,11 +14,10 @@ from bpy import utils as b_utils
 import mathutils
 
 from . import bpy_node
-from . import utils
 from . import bpy_utils
 
-if typing.TYPE_CHECKING:
-    from . import tool_settings
+from .. import utils
+from .. import tool_settings
 
 
 TOPOLOGY_CHANGING_MODIFIER_TYPES = {

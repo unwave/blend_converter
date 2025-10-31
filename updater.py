@@ -16,7 +16,7 @@ from watchdog import events as watchdog_events
 from watchdog import observers as watchdog_observers
 import psutil
 
-from .format import common
+from . import common
 from . import utils
 
 UPDATE_DELAY = 2
@@ -46,18 +46,19 @@ def kill_process(process: multiprocessing.Process):
     parent_process.kill()
 
 
-class Model_Entry:
+class Program_Entry:
 
 
-    def __init__(self, model: common.Blend_Base, module = None):
-        self.model = model
+    def __init__(self, program: common.Program, module = None):
+
+        self.program = program
 
         self.poke_time = 0
 
-        self.stem = os.path.splitext(os.path.basename(model.blend_path))[0]
+        report_stem = os.path.splitext(os.path.basename(program.report_path))[0]
 
-        self.stdout_file = os.path.join(LOG_DIR, f"{self.stem}_stdout_{uuid.uuid1().hex}.txt")
-        self.stderr_file = os.path.join(LOG_DIR, f"{self.stem}_stderr_{uuid.uuid1().hex}.txt")
+        self.stdout_file = os.path.join(LOG_DIR, f"{report_stem}_stdout_{uuid.uuid1().hex}.txt")
+        self.stderr_file = os.path.join(LOG_DIR, f"{report_stem}_stderr_{uuid.uuid1().hex}.txt")
 
         self.status: typing.Literal['ok', 'needs_update', 'updating', 'error', 'does_not_exist', 'waiting_for_dependency', 'unknown'] = 'unknown'
 
@@ -68,12 +69,10 @@ class Model_Entry:
         self.is_manual_update = False
 
         self.module = module
-        """ A module where the model was collected from. """
+        """ A module where the common.Program was collected from. """
 
-        self.result_path = model.result_path
-        self.blend_path = model.blend_path
 
-        self.path_list = os.path.realpath(model.blend_path).split(os.path.sep)
+        # self.path_list = os.path.realpath(program.blend_path).split(os.path.sep)
 
         self.lock = multiprocessing.Lock()
 
@@ -90,8 +89,8 @@ class Model_Entry:
 
         if has_non_updated_dependency:
             self.status = 'waiting_for_dependency'
-        elif os.path.exists(self.blend_path):
-            if self.model.needs_update:
+        elif os.path.exists(self.program.blend_path):
+            if self.program.are_instructions_changed:
                 self.status = 'needs_update'
             else:
                 self.status = 'ok'
@@ -129,9 +128,9 @@ class Model_Entry:
             stderr_capture_thread.start()
             stdout_capture_thread.start()
             try:
-                self.model.update(True)
+                self.program.execute(True)
             except Exception as e:
-                raise Exception(f"Failed to convert the blend: {self.model.blend_path}") from e
+                raise Exception(f"Fail to convert: {self.program}") from e
             finally:
                 stdout_capture.lines.put_nowait(None)
                 stdout_capture_thread.join()
@@ -189,13 +188,13 @@ class Model_Entry:
 
         if process.exitcode == 0:
             self.status = 'ok'
-            print(f"Done [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.blend_path)
+            print(f"Done [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
         elif process.exitcode == None:
             self.status = 'error'
-            print(f"Timeout [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.blend_path)
+            print(f"Timeout [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
         else:
             self.status = 'error'
-            print(f"Error [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.blend_path)
+            print(f"Error [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
 
 
         if callback:
@@ -208,7 +207,7 @@ class Model_Entry:
 
         with self.lock:
 
-            print(f"Processing [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.blend_path)
+            print(f"Processing [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
 
             self.status = 'updating'
 
@@ -257,7 +256,7 @@ class Updater:
 
         self.is_paused = True
 
-        self.entries: list[Model_Entry] = []
+        self.entries: list[Program_Entry] = []
 
         self.modules: list[types.ModuleType] = []
 
@@ -286,7 +285,7 @@ class Updater:
 
         self.observer.unschedule_all()
 
-        dirs = set(os.path.dirname(entry.blend_path) for entry in self.entries)
+        dirs = set(os.path.dirname(entry.program.blend_path) for entry in self.entries)
         for dir in dirs:
             os.makedirs(dir, exist_ok=True)
             self.observer.schedule(self.event_handler, dir, recursive=True)
@@ -346,22 +345,22 @@ class Updater:
         self.entries.clear()
 
         for module in self.modules:
-            for key, value in getattr(module, '__blends__').items():
-                if isinstance(value, common.Blend_Base):
-                    self.entries.append(Model_Entry(value))
+            for key, value in getattr(module, '__programs__').items():
+                if isinstance(value, common.Program):
+                    self.entries.append(Program_Entry(value))
                 else:
-                    utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"`{key}` is not a model: {repr(value)}", file=sys.stderr)
+                    utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"`{key}` is not a common.Program: {repr(value)}", file=sys.stderr)
 
 
 
-    def has_non_updated_dependency(self, entry: Model_Entry):
+    def has_non_updated_dependency(self, entry: Program_Entry):
         return any(
-            _entry.result_path == entry.blend_path
+            _entry.program.result_path == entry.program.blend_path
             for _entry in self.entries
             if not _entry is entry and _entry.status != 'ok'
         )
 
-    def poke_entry(self, entry: Model_Entry):
+    def poke_entry(self, entry: Program_Entry):
         entry.poke(self.has_non_updated_dependency(entry))
 
     def poke_waiting_for_dependency(self):
@@ -404,7 +403,7 @@ class Updater:
     def poking(self):
         for path in iter(self.queue.get, None):
             for entry in self.entries:
-                if entry.blend_path == path:
+                if entry.program.blend_path == path:
                     self.poke_entry(entry)
 
     def max_updating_entries_exceeded(self):

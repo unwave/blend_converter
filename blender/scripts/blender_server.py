@@ -11,7 +11,7 @@ import traceback
 
 import bpy
 
-DIR = os.path.dirname(__file__)
+
 SENTINEL = object()
 
 

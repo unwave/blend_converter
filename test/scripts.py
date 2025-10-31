@@ -1,7 +1,7 @@
 
 def test_bake_code(result_dir: str, resolution = 128):
 
-    from blend_converter import bpy_utils
+    from blend_converter.blender import bpy_utils
 
     objects = bpy_utils.get_view_layer_objects()
 

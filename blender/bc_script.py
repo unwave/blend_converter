@@ -2,8 +2,8 @@
 The content of this module is meant to be directly used to build a conversion pipeline.
 
 ```python
-from blend_converter import bc_script
-model.run(bc_script.some_script)
+from blend_converter.blender import bc_script
+program.run(bc_script.some_script)
 ```
 
 Module Rules:
@@ -30,11 +30,12 @@ if 'bpy' in sys.modules:
     import bpy
     import mathutils
 
-    from blend_converter import bpy_context
-    from blend_converter import bpy_utils
     from blend_converter import tool_settings
-    from blend_converter import bpy_uv
-    from blend_converter import blend_inspector
+
+    from blend_converter.blender import bpy_context
+    from blend_converter.blender import bpy_utils
+    from blend_converter.blender import bpy_uv
+    from blend_converter.blender import blend_inspector
 
 
 
@@ -159,7 +160,7 @@ def add_actions_to_nla(regex: typing.Optional[str] = None):
         if armature.animation_data.nla_tracks:
             return
 
-        armature_bones_names = bpy_utils.get_visible_armature_bones(armature.data)
+        armature_bones_names = set(bpy_utils.get_visible_armature_bones(armature.data))
         if not armature_bones_names:
             return
 

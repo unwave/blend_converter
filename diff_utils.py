@@ -7,7 +7,7 @@ import itertools
 
 
 from . import utils
-from .format import common
+from . import common
 
 
 def write_file(dir: str, basename: str, text: str):
@@ -21,12 +21,12 @@ def write_file(dir: str, basename: str, text: str):
     return filepath
 
 
-def show_model_diff_vscode(model: common.Generic_Exporter):
+def show_program_diff_vscode(program: common.Program):
 
     with tempfile.TemporaryDirectory() as temp_dir:
 
-        a = model.get_json_stats()
-        b = model.get_current_stats()
+        a = program.get_prev_diff_report()
+        b = program.get_next_diff_report()
 
         old = write_file(temp_dir, 'old.json', json.dumps(a, indent=4, default= lambda x: x._to_dict()))
         new = write_file(temp_dir, 'new.json', json.dumps(b, indent=4, default= lambda x: x._to_dict()))
@@ -35,10 +35,10 @@ def show_model_diff_vscode(model: common.Generic_Exporter):
 
         commands = []
 
-        a_functions = utils.deduplicate([(script.get('filepath'), script.get('name', ''), script.get('sha256'), script.get('code', '')) for script in a.get('scripts', [])])
-        b_functions = utils.deduplicate([(script.get('filepath'), script.get('name', ''), script.get('sha256'), script.get('code', '')) for script in b.get('scripts', [])])
+        instructions_a = utils.deduplicate([(script.get('filepath'), script.get('name', ''), script.get('sha256'), script.get('code', '')) for script in a.get('instructions', [])])
+        instructions_b = utils.deduplicate([(script.get('filepath'), script.get('name', ''), script.get('sha256'), script.get('code', '')) for script in b.get('instructions', [])])
 
-        for script_a, script_b in itertools.product(a_functions, b_functions):
+        for script_a, script_b in itertools.product(instructions_a, instructions_b):
 
             show_func_diff = (
                 script_a[0] == script_b[0]

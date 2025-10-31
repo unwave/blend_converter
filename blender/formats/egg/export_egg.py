@@ -61,8 +61,9 @@ def export_egg(settings: dict):
 
     bpy.context.preferences.use_preferences_save = False
 
-    url = r'https://github.com/kergalym/PRPEE/archive/7a11e066e99735229284beca830c95f33385e5ce.zip'
-    ensure_addon('prpee', url)
+    # Not found
+    # url = r'https://github.com/kergalym/PRPEE/archive/7a11e066e99735229284beca830c95f33385e5ce.zip'
+    # ensure_addon('prpee', url)
 
     def handle_error(exc):
         raise exc

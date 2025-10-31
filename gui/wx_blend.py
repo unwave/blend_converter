@@ -20,17 +20,17 @@ import wx.adv
 import wx.lib.scrolledpanel as scrolled
 
 
-from . import utils
-from . import updater
+from .. import utils
+from .. import updater
+
+from ..blender import blender_server
+
 from . import wxp_utils
-from . import blender_server
 
 
-
-DIR = os.path.dirname(os.path.realpath(__file__))
 
 def get_root_path(*name: str):
-    return os.path.join(DIR, *name)
+    return os.path.join(utils.ROOT_DIR, *name)
 
 
 SENTINEL = object()
@@ -86,7 +86,7 @@ class Item(typing.Dict[str, typing.Any], dict):
 
 
     is_dir: bool
-    entries: typing.List[updater.Model_Entry]
+    entries: typing.List[updater.Program_Entry]
     source_path: str
 
 
@@ -588,7 +588,7 @@ class Items(typing.Dict[str, typing.Any], dict):
         return result
 
 
-    def load(self, data: typing.Dict[str, typing.List[updater.Model_Entry]]):
+    def load(self, data: typing.Dict[str, typing.List[updater.Program_Entry]]):
 
         for source_file, entires in data.items():
 
@@ -1810,7 +1810,7 @@ class Blend_Panel(wx.Panel):
         splitter.SetMinimumPaneSize(5)
 
 
-    def load_data(self, data: typing.Dict[str, typing.List[updater.Model_Entry]]):
+    def load_data(self, data: typing.Dict[str, typing.List[updater.Program_Entry]]):
 
         items = Items()
         items.load(data)

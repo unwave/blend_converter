@@ -29,10 +29,10 @@ import collections
 import ctypes
 
 
-DIR = os.path.dirname(__file__)
+ROOT_DIR = os.path.dirname(__file__)
 
 def get_script_path(name: str):
-    return os.path.join(DIR, 'script', f'{name}.py')
+    return os.path.join(ROOT_DIR, 'script', f'{name}.py')
 
 
 T = typing.TypeVar('T')
@@ -450,26 +450,6 @@ def iter_blend_file(dir: str):
 
         yield file.path
 
-
-def add_to_globals(model: os.PathLike, globals: dict):
-    """ Add a model to the globals to be discoverable by the updater. """
-
-    stem = os.path.splitext(os.path.basename(os.fspath(model)))[0]
-
-    slug = re.sub(r'[^a-z0-9_]', '_', stem, flags=re.IGNORECASE)
-    slug = slug.lstrip('0123456789')
-    name = 'blend_' + slug
-
-    # ensure unique
-    init_name = name
-    index = 2
-    while name in globals:
-        name = init_name + f'_{index}'
-        index += 1
-
-    globals[name] = model
-
-    return name
 
 
 class CONSOLE_COLOR:

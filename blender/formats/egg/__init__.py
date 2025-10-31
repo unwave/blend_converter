@@ -1,9 +1,13 @@
 import typing
 
-from .. import common
-from . import export_egg
-from .. import bam
-from ... import tool_settings
+
+if __spec__.name == __name__:
+    from blend_converter.blender.formats.egg.export_egg import export_egg
+    from blend_converter import tool_settings
+else:
+    from .export_egg import export_egg
+    from .... import tool_settings
+
 
 
 if typing.TYPE_CHECKING:
@@ -154,21 +158,3 @@ class Settings_YABEE(tool_settings.Settings):
 
     #### Default: `False`
     """
-
-
-class Egg(common.Generic_Exporter, bam.Panda3D_Path_Mixin):
-    """ `.blend` to `.egg` handler """
-
-    _file_extension = 'egg'
-    settings: Settings_YABEE
-
-
-    def __init__(self, blend_path: str, result_dir: str, **kwargs):
-        super().__init__(blend_path, result_dir, **kwargs)
-
-        self.settings = Settings_YABEE()
-        """ `yabee_libs.egg_writer.write_out`'s settings """
-
-
-    def get_export_script(self):
-        return self._get_function_script(export_egg.export_egg, dict(fname = self.result_path, **self.settings._to_dict()))

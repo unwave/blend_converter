@@ -11,7 +11,12 @@ INDENT = ' ' * 4
 IMPORTS = """
 import typing
 
-from ... import tool_settings
+
+if __spec__.name == __name__:
+    from blend_converter import tool_settings
+else:
+    from .... import tool_settings
+
 
 if typing.TYPE_CHECKING:
     import dataclasses

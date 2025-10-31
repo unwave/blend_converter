@@ -37,7 +37,6 @@ def get_args() -> dict:
 
 ARGS = get_args()
 
-DIR = os.path.dirname(os.path.realpath(__file__))
 
 SENTINEL = object()
 
@@ -71,8 +70,10 @@ class Viewer(ShowBase):
 
         self.pipeline = simplepbr.init(use_330=True)
 
-        if os.path.exists(os.path.join(DIR, 'cubemap', 'map0.png')):
-            self.pipeline.env_map = os.path.join(DIR, 'cubemap', 'map#.png')
+        cube_map = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'cubemap')
+
+        if os.path.exists(os.path.join(cube_map, 'map0.png')):
+            self.pipeline.env_map = os.path.join(cube_map, 'map#.png')
         else:
             self.ambient_light = self.render.attach_new_node(core.AmbientLight('ambient_light'))
             self.ambient_light.node().set_color((.2, .2, .2, 1))

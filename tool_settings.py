@@ -199,13 +199,13 @@ class Settings():
 
     ignore_default_settings: bool = False
     """
-    If `True` setting a default value to a default value will be ignored.
+    If `True` replacing a default value with a default value will be ignored.
 
     Can be useful when trying to avoid unnecessary updates while setting the settings programmatically.
 
     #### Beware of the `_update` usage and cases where settings are required to be explicitly set to defaults.
 
-    It is safer to conditionally replace the whole setting rather than set its members.
+    It is more relable to conditionally replace the whole Settings object rather than set its members.
 
     #### Default: `False`
     """
@@ -425,6 +425,34 @@ class Settings():
             setattr(self, key, getattr(other, key))
 
         return self
+
+
+    def __iter__(self):
+
+        for key in self.__dict__:
+
+            if key.startswith('_'):
+                continue
+
+            if not key in self._has_been_set:
+                continue
+
+            yield key
+
+
+    def __getitem__(self, key: str):
+
+        if key.startswith('_') or not key in self._has_been_set:
+            raise KeyError(f"Unexpected key: {key}")
+
+        value = getattr(self, key)
+
+        if isinstance(value, Settings):
+            return value._to_dict()
+        elif isinstance(value, set):
+            return list(value)
+        else:
+            return value
 
 
 FILE_EXTENSION = dict(

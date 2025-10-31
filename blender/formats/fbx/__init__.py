@@ -1,8 +1,12 @@
 import typing
 
-from .. import common
-from . import export_fbx
-from ... import tool_settings
+
+if __spec__.name == __name__:
+    from blend_converter.blender.formats.fbx.export_fbx import export_fbx
+    from blend_converter import tool_settings
+else:
+    from .export_fbx import export_fbx
+    from .... import tool_settings
 
 
 if typing.TYPE_CHECKING:
@@ -422,18 +426,3 @@ class Settings_Fbx(tool_settings.Settings):
 
     #### Default: `'Y'`
     """
-
-
-class Fbx(common.Generic_Exporter):
-
-    _file_extension = 'fbx'
-    settings: Settings_Fbx
-
-    def __init__(self, source_path: str, result_dir: str, **kwargs):
-        super().__init__(source_path, result_dir, **kwargs)
-
-        self.settings = Settings_Fbx()
-        """ Official Blender FBX Exporter `4.29.1` Settings """
-
-    def get_export_script(self):
-        return self._get_function_script(export_fbx.export_fbx, dict(filepath = self.result_path, **self.settings._to_dict()))

@@ -3,18 +3,16 @@ from __future__ import annotations
 import json
 import os
 import typing
-import itertools
 import uuid
 import tempfile
 from datetime import datetime
-import shutil
 import configparser
 import textwrap
 import inspect
 
 
-from .. import utils
-from .. import tool_settings
+from . import utils
+
 
 T = typing.TypeVar('T')
 
@@ -26,8 +24,6 @@ else:
         args: None
         kwargs: None
     P = Fake_ParamSpec()
-
-PROCESS_SCRIPTS_PY = utils.get_script_path('process_scripts')
 
 
 class Stat_Dict(typing.TypedDict if typing.TYPE_CHECKING else dict):
@@ -43,141 +39,141 @@ def get_file_stat(path: str) -> Stat_Dict:
     }
 
 
-class Function_Script_Dict(typing.TypedDict if typing.TYPE_CHECKING else dict):
-    type: str
-    filepath: str
-    name: str
-    args: typing.List[typing.Any]
-    kwargs: typing.Dict[str, typing.Any]
-    sha256: str
-    code: str
+class File:
+
+    def __init__(self, *path: str):
+        self.path = os.path.join(*path)
 
 
-class Blend_Base:
-    """ Base `.blend` handler """
+    def __fspath__(self):
+        return self.path
 
 
-    _file_extension = 'none'
+    def _to_dict(self):
+        stat = os.stat(self.path)
 
-    blender_executable = shutil.which(utils.get_blender_executable())
-    """ Blender's binary path to run commands with."""
-
-    blender_stdout = None
-    """ Blender's console output. """
-
-
-    def __init__(self, source_path: str, result_dir: str, is_dir = False, is_import = False):
-        """
-        Parameters
-        ----------
-        source_path: A file path or a directory of the source file. By default the `.blend` file path is expected.
-
-        result_dir: directory where the result files will be placed.
-        """
-
-        self._source_path = os.path.abspath(source_path)
-        """ A file path or a directory of the source file. """
-
-        self.result_dir = os.path.abspath(result_dir)
-        """ Directory where files will be placed."""
-
-        self._is_dir = is_dir
-        """ If `True` the actual blend file is the last modified one. """
-
-        self._is_import = is_import
-        """ `True` if the blend file is generated from importing other formats. """
-
-        self._stem = None
-        """
-        A name for the generate files.
-
-        By default the same as the `.blend`'s base name without the file extension.
-        """
-
-        self.config: typing.Optional[Config_Base] = None
-        """
-        Pre model configuration.
-        """
-
-
-    @classmethod
-    def from_dir(cls, source_path: str, result_dir: str):
-        """
-        Use the last modified `.blend` file from the directory as the source file.
-
-        The result file name is the name for the directory.
-        """
-        return cls(source_path, result_dir, is_dir = True, is_import = False)
-
-
-    @classmethod
-    def from_import(cls, source_path: str, result_dir: str):
-        raise NotImplementedError('Not yet implemented.')
-        return cls(source_path, result_dir, is_dir = False, is_import = True)
-
-
-    @classmethod
-    def from_dir_import(cls, source_path: str, result_dir: str):
-        raise NotImplementedError('Not yet implemented.')
-        return cls(source_path, result_dir, is_dir = True, is_import = True)
+        return dict(
+            _type = type(self).__name__,
+            path = self.path,
+            mtime = stat.st_mtime,
+            size = stat.st_size,
+        )
 
 
     @property
-    def blend_path(self):
-        if self._is_dir:
-            try:
-                return utils.get_last_blend(self._source_path)
-            except (FileNotFoundError, ValueError):
-                return os.path.join(self._source_path, 'DOES_NOT_EXISTS.blend')
-        else:
-            return self._source_path
+    def name(self):
+        return os.path.basename(self.path)
 
 
     @property
     def stem(self):
-        if self._stem is None:
-            if self._is_dir:
-                return os.path.basename(self._source_path)
-            else:
-                return os.path.splitext(os.path.basename(self._source_path))[0]
-        else:
-            return self._stem
-
-
-    @stem.setter
-    def stem(self, value: str):
-        self._stem = value
+        return os.path.splitext(os.path.basename(self.path))[0]
 
 
     @property
-    def json_path(self):
-        return os.path.join(self.result_dir, self.stem + f".{self._file_extension}" + '.json')
+    def ext(self):
+        return os.path.splitext(self.path)[1]
 
 
-    def get_json(self):
+    @property
+    def dirname(self):
+        return os.path.dirname(self.path)
+
+
+    @property
+    def dir_basename(self):
+        return os.path.basename(os.path.dirname(self.path))
+
+
+    @property
+    def dir_based_name(self):
+        return self.dir_basename + self.ext
+
+
+
+class Instruction:
+
+
+    def __init__(self, executor, func: typing.Callable, *args, **kwargs):
+
+        self.func = func
+
+        self.executor = executor
+        self.filepath: str = os.path.realpath(func.__code__.co_filename)
+        self.name: str = func.__name__
+        self.args: typing.List[typing.Any] = list(args)
+        self.kwargs: typing.Dict[str, typing.Any] = kwargs
+        self.sha256: str = utils.get_function_sha256(func)
+        self.code: str = textwrap.dedent(inspect.getsource(func))
+
+
+    def _to_dict(self):
+        return dict(
+            _type = type(self).__name__,
+            executor = self.executor,
+            filepath = self.filepath,
+            name = self.name,
+            args = self.args,
+            kwargs = self.kwargs,
+            sha256 = self.sha256,
+            code = self.code,
+        )
+
+
+class Program:
+
+
+    def __init__(self, *, blend_path: str, result_path: str, blender_executable: str, report_path: typing.Optional[str] = None):
+
+
+        # this is for the GUI
+        self.blend_path = os.fspath(blend_path)
+        self.result_path = os.fspath(result_path)
+        self.blender_executable = os.fspath(blender_executable)
+
+        if report_path is None:
+            self.report_path = self.result_path + '.json'
+        else:
+            self.report_path = os.fspath(report_path)
+
+
+        self.instructions: typing.List[Instruction] = []
+
+        self._debug = False
+
+        self._profile = False
+
+        self._inspect_identifiers = set()
+        """ A set of inspect identifiers to pass to tools. """
+
+        self.return_values = {}
+
+        self.return_values_file: typing.Optional[str] = None
+        """ A file where the return values will be written. """
+
+        self.config: typing.Optional[Config_Base] = None
+        """ Pre execution configuration. """
+
+
+
+    def read_raw_report(self):
         """ Read the json file with the information about how the converted file was created. """
 
-        if not os.path.exists(self.json_path):
+        if not os.path.exists(self.report_path):
             return {}
 
-        with open(self.json_path, encoding='utf-8') as json_file:
+        with open(self.report_path, encoding='utf-8') as json_file:
             try:
                 return json.load(json_file)
             except json.decoder.JSONDecodeError:
                 return {}
 
 
-    def _write_json(self, **kwargs):
+    def write_raw_report(self):
 
-        info = self.get_json()
+        info = self.read_raw_report()
 
-        info.update(kwargs)
-
-        info['blender_executable'] = self.blender_executable
-        info['blender_executable_stat'] = get_file_stat(self.blender_executable)
-
-        info['blend_path'] = os.path.realpath(self.blend_path)
-        info['blend_stat'] = get_file_stat(self.blend_path)
+        info['instructions'] = self.instructions
 
         now = datetime.now()
 
@@ -190,183 +186,73 @@ class Blend_Base:
 
         info['write_count'] = info.get('write_count', 0) + 1
         info['write_times'] = info.get('write_times', []) + [now.timestamp()]
+        info['write_times_str'] = info.get('write_times_str', []) + [now.astimezone().isoformat(' ', 'seconds')]
 
-        temp_json_name = self.json_path + uuid.uuid1().hex
+        os.makedirs(os.path.dirname(self.report_path), exist_ok = True)
 
-        with open(temp_json_name, 'w', encoding='utf-8') as json_file:
-            json.dump(info, json_file, indent=4, ensure_ascii=False, default=lambda x: x._to_dict())
+        temp_report_name = self.report_path + uuid.uuid1().hex
 
-        os.replace(temp_json_name, self.json_path)
+        with open(temp_report_name, 'w', encoding='utf-8') as f:
+            json.dump(info, f, indent=4, ensure_ascii=False, default=lambda x: x._to_dict())
 
-
-    @property
-    def result_path(self):
-        return os.path.realpath(os.path.join(self.result_dir, self.stem + '.' + self._file_extension))
-
-
-    def update(self, forced = False):
-        raise NotImplementedError('This function updates the target file.')
-
-
-    @property
-    def needs_update(self):
-        raise NotImplementedError('This function returns True is the target file should be updated.')
+        os.replace(temp_report_name, self.report_path)
 
 
     def __fspath__(self):
-        return self.result_path
+        return self.blend_path
 
 
-class Generic_Exporter(Blend_Base):
-
-
-    settings: tool_settings.Settings
-
-
-    def __init__(self, source_path: str, result_dir: str, **kwargs):
-        super().__init__(source_path, result_dir, **kwargs)
-
-        self.scripts: typing.List[Function_Script_Dict] = []
-        self.result = {}
-
-        self._debug = False
-
-        self._profile = False
-
-        self._inspect_identifiers = set()
-        """ A set of inspect identifiers to pass to Blender. """
-
-        self.return_values_file: typing.Optional[str] = None
-        """ A file where the scripts return values will be written. """
+    def __str__(self):
+        return self.blend_path
 
 
     @property
-    def needs_update(self):
-        return self.get_current_stats() != self.get_json_stats()
+    def are_instructions_changed(self):
+        return self.get_next_diff_report() != self.get_prev_diff_report()
 
 
-    def get_current_stats(self):
-
-        stats = {}
-
-        stats['result_file_exists'] = os.path.exists(self.result_path)
-
-        stats['blend_stat'] = get_file_stat(self.blend_path)
-
-        stats['blender_executable_stat'] = get_file_stat(self.blender_executable)
-
-        stats['scripts'] = self._get_scripts()
-
-        return stats
+    def get_next_diff_report(self):
+        return dict(
+            instructions = self.instructions,
+        )
 
 
-    def get_json_stats(self):
-
-        info = self.get_json()
-
-        stats = {}
-
-        stats['result_file_exists'] = True
-
-        stats['blend_stat'] = info.get('blend_stat')
-
-        stats['blender_executable_stat'] = info.get('blender_executable_stat')
-
-        stats['scripts'] = info.get('scripts')
-
-        return stats
+    def get_prev_diff_report(self):
+        return dict(
+            instructions = self.read_raw_report().get('instructions'),
+        )
 
 
-    def _get_commands(self, **builtin_kwargs):
 
-        return [
-            self.blend_path,
-            '--python',
-            PROCESS_SCRIPTS_PY,
-            '--',
-            '-json_args',
-            json.dumps(dict(
-                scripts = self._get_scripts(),
-                builtin_kwargs = builtin_kwargs,
-                return_values_file = self.return_values_file,
-                inspect_identifiers = list(self._inspect_identifiers),
-                debug = self._debug,
-                profile = self._profile,
-            ), default= lambda x: x._to_dict()),
-        ]
+    def execute(self, forced = False):
 
-
-    def update(self, forced = False):
-
-        if not (forced or self.needs_update):
+        if not (forced or self.are_instructions_changed):
             return
-
-        if self.blender_executable is None:
-            raise Exception('Blender executable is not specified.')
-
-        if self._file_extension == 'blend' and os.path.exists(self.result_path) and os.path.samefile(self.blend_path, self.result_path):
-            raise Exception(f"Should not save the blend file in the same location: {self.blend_path}")
-
-
-        os.makedirs(os.path.dirname(self.result_path), exist_ok = True)
 
         with tempfile.TemporaryDirectory() as temp_dir:
 
             self.return_values_file = os.path.join(temp_dir, uuid.uuid1().hex)
-            self._run_blender()
 
-        self._write_final_json()
+            instructions_sorted = utils.list_by_key(self.instructions, lambda instruction: instruction.executor)
 
+            for executor, instructions in instructions_sorted.items():
 
-    def _write_final_json(self):
-        self._write_json(scripts = self._get_scripts())
+                executor.run(instructions, self.return_values_file, self._inspect_identifiers)
 
-
-    @staticmethod
-    def _get_function_script(func: typing.Callable, *args, **kwargs) -> Function_Script_Dict:
-        filepath = os.path.realpath(func.__code__.co_filename)
-        return {
-            'filepath': filepath,
-            'name': func.__name__,
-            'args': list(args),
-            'kwargs': kwargs,
-            'sha256': utils.get_function_sha256(func),
-            'code': textwrap.dedent(inspect.getsource(func)),
-        }
+                with open(self.return_values_file, encoding='utf-8') as f:
+                        self.return_values = {int(key): value for key, value in json.load(f).items()}
 
 
-    def run(self, func: 'typing.Callable[P, T]', *args: P.args, **kwargs: P.kwargs) -> T:
-        """
-        The function will be executed before the file export.
-
-        `args` and `kwargs` must be JSON serializable.
-        """
-
-        script = self._get_function_script(func, *args, **kwargs)
-
-        self.scripts.append(script)
-
-        return script
+        self.write_raw_report()
 
 
-    def get_export_script(self):
-        raise NotImplementedError('This function should return an export script.')
+    def run(self, executor, func: 'typing.Callable[P, T]', *args: P.args, **kwargs: P.kwargs) -> T:
+        """ `args` and `kwargs` must be JSON serializable. """
 
+        instruction = Instruction(executor, func, *args, **kwargs)
+        self.instructions.append(instruction)
 
-    def _get_scripts(self):
-        """ Get a list of all the scripts that will be executed. """
-        return self.scripts + [self.get_export_script()]
-
-
-    def _run_blender(self, **builtin_kwargs):
-
-        __tracebackhide__ = True
-
-        utils.run_blender(self.blender_executable, self._get_commands(**builtin_kwargs), stdout = self.blender_stdout)
-
-        if self.return_values_file is not None:
-            with open(self.return_values_file, encoding='utf-8') as f:
-                    self.result = {int(key): value for key, value in json.load(f).items()}
+        return instruction
 
 
 class Config_Base:

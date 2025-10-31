@@ -18,12 +18,13 @@ import mathutils
 import bmesh
 
 from . import bpy_bake
-from . import tool_settings
 from . import bpy_context
 from . import bake_settings as tool_settings_bake
 from . import bpy_node
 from . import bpy_uv
-from . import utils
+
+from .. import tool_settings
+from .. import utils
 
 
 T_Objects = typing.TypeVar('T_Objects', bpy.types.Object, typing.List[bpy.types.Object], typing.Iterable[bpy.types.Object])
@@ -693,12 +694,12 @@ def bake_materials(objects: typing.List[bpy.types.Object], image_dir: str, resol
         merge_material_slots_with_the_same_materials(objects)
 
 
-def open_homefile(blend_file):
+def read_homefile(blend_file, load_ui = True):
 
     blend_dir = os.path.dirname(blend_file)
 
     try:
-        bpy.ops.wm.read_homefile(filepath=blend_file, load_ui=False)
+        bpy.ops.wm.read_homefile(filepath=blend_file, load_ui = load_ui)
     except RuntimeError:
         traceback.print_exc(file=sys.stderr)
 

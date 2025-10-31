@@ -8,11 +8,11 @@ import inspect
 
 from .. import common
 from . import remote_execution_handler
-from ... import utils
+from .. import utils
 from .. import fbx
 
 
-SCRIPT_RUNNER_PATH = os.path.join(utils.DIR, 'format', 'unreal', 'script_runner.py')
+SCRIPT_RUNNER_PATH = os.path.join(utils.ROOT_DIR, 'format', 'unreal', 'script_runner.py')
 
 
 def runner_bootstrap(script_runner_path: str, data: dict):

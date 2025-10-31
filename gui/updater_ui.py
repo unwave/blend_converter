@@ -8,17 +8,20 @@ import json
 import subprocess
 import collections
 import base64
+import shutil
 
 import pyperclip
 import wx
 import wx.lib.newevent
 
-from . import utils
-from . import updater
+
+from .. import utils
+from .. import updater
+
+from ..blender import blender_server
+
 from . import wx_blend
 from . import wxp_utils
-from . import blender_server
-
 
 class Model_List(wxp_utils.Item_Viewer_Native):
 
@@ -37,10 +40,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.main_frame: Main_Frame = self.GetTopLevelParent()
 
         self.columns = [
-            # ('path', 800, self.get_column_path),
             ('live', 40, self.get_column_live_update),
             ('ℹ️', 40, self.get_column_icon_status),
-            ('path_parts', 600, self.get_column_path_parts),
+            ('path', 800, self.get_column_path),
+            # ('path_parts', 600, self.get_column_path_parts),
             ('ext', 100, self.get_column_result_type),
             # ('poke_time', 200, self.get_column_poke_time),
             ('status', 200, self.get_column_status),
@@ -53,7 +56,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         self.Bind(wx.EVT_KEY_DOWN, self.on_key)
 
-        self.double_click_function: typing.Optional[typing.Callable[[updater.Model_Entry]]] = self.on_empty_double_click_function
+        self.double_click_function: typing.Optional[typing.Callable[[updater.Program_Entry]]] = self.on_empty_double_click_function
 
 
     def set_columns(self, columns):
@@ -85,7 +88,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def set_data(self, data):
 
-        self.data: list[updater.Model_Entry] = data
+        self.data: list[updater.Program_Entry] = data
         self.SetItemCount(len(data))
         self.Refresh()
 
@@ -100,7 +103,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         return self.columns[col][2](self.data[row])
 
 
-    def get_column_icon_status(self, item: updater.Model_Entry):
+    def get_column_icon_status(self, item: updater.Program_Entry):
         if item.status == 'ok':
             return '✔️'
         elif item.status == 'updating':
@@ -109,7 +112,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             return ''
 
 
-    def get_column_live_update(self, item: updater.Model_Entry):
+    def get_column_live_update(self, item: updater.Program_Entry):
         if item.is_manual_update:
             return '🚀'
         elif item.is_live_update:
@@ -118,23 +121,20 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             return ''
 
 
-    def get_column_path_parts(self, item: updater.Model_Entry):
-        if item.model._is_dir:
-            return " • ".join(item.path_list[-3:-1])
-        else:
-            return " • ".join(item.path_list[-3:])
+    # def get_column_path_parts(self, item: updater.Program_Entry):
+    #     return " • ".join(item.program.path_list[-3:])
 
 
-    def get_column_path(self, item: updater.Model_Entry):
-        return item.blend_path
+    def get_column_path(self, item: updater.Program_Entry):
+        return item.program.blend_path
 
-    def get_column_result_type(self, item: updater.Model_Entry):
-        return item.model._file_extension
+    def get_column_result_type(self, item: updater.Program_Entry):
+        return os.path.splitext(item.program.result_path)[1]
 
-    def get_column_poke_time(self, item: updater.Model_Entry):
+    def get_column_poke_time(self, item: updater.Program_Entry):
         return utils.get_time_str_from(item.poke_time)
 
-    def get_column_status(self, item: updater.Model_Entry):
+    def get_column_status(self, item: updater.Program_Entry):
         return item.status
 
 
@@ -173,18 +173,18 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         elif mask == (False, True, True):
             self.on_open_result(entry)
         elif mask == (False, True, False):
-            if os.path.exists(entry.model.result_path):
+            if os.path.exists(entry.program.result_path):
                 self.on_show_result_in_explorer(entry)
-            elif os.path.exists(entry.model.result_dir):
-                utils.os_open(entry.model.result_dir)
+            elif os.path.exists(os.path.dirname(entry.program.result_path)):
+                utils.os_open(os.path.dirname(entry.program.result_path))
             else:
-                wx.MessageBox(f"The result path does not exist yet:\n{entry.model.result_path}", 'File does not exist', style= wx.OK | wx.ICON_ERROR)
+                wx.MessageBox(f"The result path does not exist yet:\n{entry.program.result_path}", 'File does not exist', style= wx.OK | wx.ICON_ERROR)
 
         elif mask == (True, True, True):
             self.on_compare_model(entry)
 
         elif mask == (True, True, False):
-            utils.os_show([entry.model.blend_path, entry.model.result_path if os.path.exists(entry.model.result_path) else entry.model.result_dir])
+            utils.os_show([entry.program.blend_path, entry.program.result_path if os.path.exists(entry.program.result_path) else entry.program.report_path])
 
         else:
             if self.double_click_function:
@@ -204,7 +204,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         entry = self.data[index]
 
-        blend_path = entry.model.blend_path
+        blend_path = entry.program.blend_path
         menu_item = menu.append_item(f"Show Blend", get_func(utils.os_show, blend_path))
         menu_item.Enable(os.path.exists(blend_path))
 
@@ -213,14 +213,14 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         menu.append_separator()
 
-        menu_item = menu.append_item(f"Show Result", get_func(utils.os_show, entry.model.result_path))
-        menu_item.Enable(os.path.exists(entry.model.result_path))
+        menu_item = menu.append_item(f"Show Result", get_func(utils.os_show, entry.program.result_path))
+        menu_item.Enable(os.path.exists(entry.program.result_path))
 
         menu_item = menu.append_item(f"Open Result", get_func(self.on_open_result, entry))
-        menu_item.Enable(os.path.exists(entry.model.result_path))
+        menu_item.Enable(os.path.exists(entry.program.result_path))
 
-        menu_item = menu.append_item(f"Show Result Dir", get_func(utils.os_open, entry.model.result_dir))
-        menu_item.Enable(os.path.exists(entry.model.result_dir))
+        menu_item = menu.append_item(f"Show Result Dir", get_func(utils.os_open, os.path.dirname(entry.program.result_path)))
+        menu_item.Enable(os.path.exists( os.path.dirname(entry.program.result_path)))
 
         menu.append_separator()
 
@@ -233,7 +233,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         menu_item.Enable(os.path.exists(output_file))
 
         menu_item = menu.append_item(f"Compare", get_func(self.on_compare_model, entry))
-        menu_item.Enable(os.path.exists(blend_path) and os.path.exists(entry.model.result_path))
+        menu_item.Enable(os.path.exists(blend_path) and os.path.exists(entry.program.result_path))
 
         menu.append_separator()
 
@@ -260,7 +260,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         menu.append_separator()
 
         menu_item = menu.append_item(f"Set Config", get_func(self.on_set_config, entry))
-        menu_item.Enable(bool(entry.model.config))
+        menu_item.Enable(bool(entry.program.config))
 
         menu.append_separator()
         menu_item = menu.append_item(f"Enable Live Update", get_func(self.on_enable_live_update, True))
@@ -292,16 +292,16 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.parent.main_frame.Refresh()
 
 
-    def on_entry_poke(self, entry: updater.Model_Entry):
+    def on_entry_poke(self, entry: updater.Program_Entry):
         self.main_frame.updater.poke_entry(entry)
 
 
-    def on_copy_conversion_command(self, entry: updater.Model_Entry):
+    def on_copy_conversion_command(self, entry: updater.Program_Entry):
 
         def get_module_and_name():
             for module in self.main_frame.updater.modules:
-                for key, value in getattr(module, '__blends__').items():
-                    if value is entry.model:
+                for key, value in getattr(module, '__programs__').items():
+                    if value is entry.program:
                         return module.__file__, key
 
         command = utils.get_command_from_list([
@@ -313,18 +313,18 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         wxp_utils.set_clipboard_text(command)
 
 
-    def on_show_source_in_explorer(self, entry: updater.Model_Entry):
-        utils.os_show(entry.model.blend_path)
+    def on_show_source_in_explorer(self, entry: updater.Program_Entry):
+        utils.os_show(entry.program.blend_path)
 
-    def on_open_source(self, entry: updater.Model_Entry):
+    def on_open_source(self, entry: updater.Program_Entry):
         self.GetTopLevelParent().blender_server.ensure()
-        self.GetTopLevelParent().blender_server.open_mainfile(entry.model.blend_path)
+        self.GetTopLevelParent().blender_server.open_mainfile(entry.program.blend_path)
 
-    def on_show_result_in_explorer(self, entry: updater.Model_Entry):
-        utils.os_show(entry.model.result_path)
+    def on_show_result_in_explorer(self, entry: updater.Program_Entry):
+        utils.os_show(entry.program.result_path)
 
-    def on_open_result(self, entry: updater.Model_Entry):
-        path = entry.model.result_path
+    def on_open_result(self, entry: updater.Program_Entry):
+        path = entry.program.result_path
 
         if not os.path.exists(path):
             with wx.MessageDialog(None, f"{path}", 'File does not exist.', wx.OK | wx.ICON_ERROR) as dialog:
@@ -335,7 +335,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             panda_viewer_path = utils.get_script_path('panda3d_viewer')
             subprocess.Popen([sys.executable, panda_viewer_path, path])
         elif path.endswith('.blend'):
-            cmd = [entry.model.blender_executable, path]
+            cmd = [entry.program.blender_executable, path]
             utils.open_blender_detached(*cmd)
         else:
             utils.os_open(path)
@@ -357,7 +357,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         key_code = event.GetKeyCode()
 
         if key_code == ord('C'):
-            pyperclip.copy('\n'.join((entry.blend_path for entry in self.get_selected_items())))
+            pyperclip.copy('\n'.join((entry.program.blend_path for entry in self.get_selected_items())))
         elif key_code == ord('A'):
             prev_func = self.on_item_selected
             self.on_item_selected = lambda a, b: None
@@ -366,31 +366,31 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             self.on_item_selected = prev_func
 
 
-    def on_compare_model(self, entry: updater.Model_Entry):
+    def on_compare_model(self, entry: updater.Program_Entry):
 
         args = {
-            'blend_path': entry.model.blend_path,
-            'result_path': entry.model.result_path
+            'blend_path': entry.program.blend_path,
+            'result_path': entry.program.result_path
         }
 
-        cmd = [entry.model.blender_executable, '--python', utils.get_script_path('start_compare'), '--', '-json_args', json.dumps(args)]
+        cmd = [entry.program.blender_executable, '--python', utils.get_script_path('start_compare'), '--', '-json_args', json.dumps(args)]
 
         utils.open_blender_detached(*cmd)
 
 
-    def on_open_source(self, entry: updater.Model_Entry):
+    def on_open_source(self, entry: updater.Program_Entry):
 
-        cmd = [entry.model.blender_executable, entry.model.blend_path]
+        cmd = [entry.program.blender_executable, entry.program.blend_path]
 
         utils.open_blender_detached(*cmd)
 
 
-    def on_copy_folder_basename(self, entry: updater.Model_Entry):
-        wxp_utils.set_clipboard_text("\n".join((os.path.basename(os.path.dirname(entry.blend_path)) for entry in self.get_selected_items())))
+    def on_copy_folder_basename(self, entry: updater.Program_Entry):
+        wxp_utils.set_clipboard_text("\n".join((os.path.basename(os.path.dirname(entry.program.blend_path)) for entry in self.get_selected_items())))
 
 
-    def on_copy_blend_path(self, entry: updater.Model_Entry):
-        wxp_utils.set_clipboard_text("\n".join((entry.blend_path for entry in self.get_selected_items())))
+    def on_copy_blend_path(self, entry: updater.Program_Entry):
+        wxp_utils.set_clipboard_text("\n".join((entry.program.blend_path for entry in self.get_selected_items())))
 
 
     def on_mark_as_needs_update(self):
@@ -398,7 +398,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             entry.status = 'needs_update'
 
 
-    def on_entry_force_update(self, entry: updater.Model_Entry):
+    def on_entry_force_update(self, entry: updater.Program_Entry):
 
         main_frame: Main_Frame = self.GetTopLevelParent()
 
@@ -410,13 +410,13 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         entry.update(main_frame.updater.poke_waiting_for_dependency)
 
 
-    def on_set_config(self, entry: updater.Model_Entry):
+    def on_set_config(self, entry: updater.Program_Entry):
 
-        config = entry.model.config
+        config = entry.program.config
         if not config:
             return
 
-        with wxp_utils.Generic_Selector_Dialog(self, config.to_ui_data(), title = f"Config: {os.path.basename(entry.blend_path)}") as dialog:
+        with wxp_utils.Generic_Selector_Dialog(self, config.to_ui_data(), title = f"Config: {os.path.basename(entry.program.blend_path)}") as dialog:
 
             dialog.ok_button.SetLabel("Restart")
 
@@ -440,21 +440,21 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.Refresh()
 
 
-    def on_show_diff_vscode(self, entry: updater.Model_Entry):
-        from . import diff_utils
+    def on_show_diff_vscode(self, entry: updater.Program_Entry):
+        from .. import diff_utils
         import threading
-        threading.Thread(target=diff_utils.show_model_diff_vscode, args=[entry.model]).start()
+        threading.Thread(target=diff_utils.show_program_diff_vscode, args=[entry.program]).start()
 
 
-    def on_set_as_updated(self, entry: updater.Model_Entry):
+    def on_set_as_updated(self, entry: updater.Program_Entry):
 
-        with wx.MessageDialog(None, f"Are you sure you want to set the '{entry.blend_path}' as up to date?", f"Set As Updated", wx.YES | wx.NO | wx.NO_DEFAULT | wx.ICON_WARNING) as dialog:
+        with wx.MessageDialog(None, f"Are you sure you want to set the '{entry.program.blend_path}' as up to date?", f"Set As Updated", wx.YES | wx.NO | wx.NO_DEFAULT | wx.ICON_WARNING) as dialog:
             result = dialog.ShowModal()
 
             if result != wx.ID_YES:
                 return
 
-        entry.model._write_final_json()
+        entry.program.write_raw_report()
         self.main_frame.updater.poke_entry(entry)
 
 
@@ -646,10 +646,10 @@ class Result_Panel(wx.Panel):
             # simple search
             elif fragment.startswith('-'):
                 fragment = fragment[1:]
-                result = [entry for entry in result if not fragment.lower() in entry.blend_path.lower()]
+                result = [entry for entry in result if not fragment.lower() in entry.program.blend_path.lower()]
 
             else:
-                result = [entry for entry in result if fragment.lower() in entry.blend_path.lower()]
+                result = [entry for entry in result if fragment.lower() in entry.program.blend_path.lower()]
 
         return result
 
@@ -689,9 +689,9 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.updater = updater.Updater.from_files(files)
 
         if not self.updater.entries:
-            raise Exception("Nothing to do. No models provided in __blends__.")
+            raise Exception("Nothing to do. No models provided in __programs__.")
 
-        blender_executable = collections.Counter([entry.model.blender_executable for entry in self.updater.entries]).most_common(1)[0][0]
+        blender_executable = collections.Counter([entry.program.blender_executable for entry in self.updater.entries]).most_common(1)[0][0]
 
         self.blender_server = blender_server.Blender_Server(blender_executable)
 
@@ -727,12 +727,12 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         self.pause(self.updater.is_paused)
 
-        self.set_blends()
+        # self.set_blends()
 
 
-    def set_blends(self):
-        blend_paths = utils.list_by_key(self.updater.entries, lambda entry: os.path.realpath(entry.model._source_path))
-        self.blend_panel.load_data(blend_paths)
+    # def set_blends(self):
+    #     blend_paths = utils.list_by_key(self.updater.entries, lambda entry: os.path.realpath(entry.program.blend_path))
+    #     self.blend_panel.load_data(blend_paths)
 
 
     @classmethod
@@ -767,8 +767,8 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.result_panel = Result_Panel(self.notebook)
         self.notebook.AddPage(self.result_panel, "Result")
 
-        self.blend_panel = wx_blend.Blend_Panel(self.notebook)
-        self.notebook.AddPage(self.blend_panel, "Blend")
+        # self.blend_panel = wx_blend.Blend_Panel(self.notebook)
+        # self.notebook.AddPage(self.blend_panel, "Blend")
 
 
     def set_menu_bar(self):

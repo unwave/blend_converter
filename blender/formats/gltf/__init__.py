@@ -1,8 +1,12 @@
 import typing
 
-from .. import common
-from . import export_gltf
-from ... import tool_settings
+
+if __spec__.name == __name__:
+    from blend_converter.blender.formats.gltf.export_gltf import export_gltf
+    from blend_converter import tool_settings
+else:
+    from .export_gltf import export_gltf
+    from .... import tool_settings
 
 
 if typing.TYPE_CHECKING:
@@ -366,29 +370,3 @@ class Settings_GLTF(tool_settings.Settings):
 
     #### Default: `"*.glb;*.gltf"`
     """
-
-
-
-class Gltf(common.Generic_Exporter):
-    """ `.blend` to `.gltf` handler """
-
-    settings: Settings_GLTF
-
-    @property
-    def _file_extension(self):
-        if getattr(self.settings, 'export_format', 'GLB') == 'GLB':
-            return 'glb'
-        else:
-            return 'gltf'
-
-    def __init__(self, source_path: str, result_dir: str, **kwargs):
-        super().__init__(source_path, result_dir, **kwargs)
-
-        self.settings = Settings_GLTF()
-        """
-        The arguments for `bpy.ops.export_scene.gltf()`
-        Version: `1.8.19`
-        """
-
-    def get_export_script(self):
-        return self._get_function_script(export_gltf.export_gltf, dict(filepath = self.result_path, **self.settings._to_dict()))

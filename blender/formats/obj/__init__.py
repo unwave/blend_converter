@@ -1,8 +1,12 @@
 import typing
 
-from ... import tool_settings
-from . import export_obj
-from .. import common
+
+if __spec__.name == __name__:
+    from blend_converter.blender.formats.obj.export_obj import export_obj
+    from blend_converter import tool_settings
+else:
+    from .export_obj import export_obj
+    from .... import tool_settings
 
 
 if typing.TYPE_CHECKING:
@@ -221,20 +225,3 @@ class Settings_Obj(tool_settings.Settings):
 
     #### Default: `False`
     """
-
-
-class Obj(common.Generic_Exporter):
-
-    _file_extension = 'obj'
-    settings: Settings_Obj
-
-
-    def __init__(self, source_path: str, result_dir: str, **kwargs):
-        super().__init__(source_path, result_dir, **kwargs)
-
-        self.settings = Settings_Obj()
-        """ Official Blender Built-In OBJ Exporter"""
-
-
-    def get_export_script(self):
-        return self._get_function_script(export_obj.export_obj, dict(filepath = self.result_path, **self.settings._to_dict()))

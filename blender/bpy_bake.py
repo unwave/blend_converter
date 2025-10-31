@@ -11,11 +11,13 @@ import re
 
 import bpy
 
-from . import utils
+
+from .. import tool_settings
+from .. import utils
+
 from . import bpy_node
 from . import bpy_context
 from . import bpy_utils
-from . import tool_settings
 from . import bpy_uv
 from . import bake_settings
 from . import blend_inspector
@@ -149,7 +151,7 @@ class Baked_Image:
 
     def __init__(self, bake_types: typing.Union[bake_settings._Bake_Type, typing.List[bake_settings._Bake_Type]], name_prefix: str, settings: tool_settings.Bake):
 
-        if not isinstance(bake_types, typing.Iterable):
+        if isinstance(bake_types, bake_settings._Bake_Type):
             bake_types = [bake_types]
 
         self.bake_types = bake_types

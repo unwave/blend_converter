@@ -16,14 +16,13 @@ import warnings
 import builtins
 
 
-DIR = os.path.dirname(os.path.realpath(__file__))
-BLEND_CONVERTER_INIT_PY = os.path.join(os.path.dirname(DIR), '__init__.py')
+BLEND_CONVERTER_INIT_PY = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))), '__init__.py')
 
 SENTINEL = object()
 
 
 if 'bpy' in sys.modules:
-    # TODO: open the blend as a home file and remap paths to prevent overwriting it somewhere in the scripts by mistake
+    # TODO: open the blend as a home file and remap paths to prevent overwriting it by mistake
     import bpy
     bpy.context.preferences.filepaths.save_version = 32
 
@@ -124,8 +123,8 @@ def replace_return_values(args):
         _args = []
 
         for arg in args:
-            if arg in ARGS['scripts']:
-                _args.append(return_values[ARGS['scripts'].index(arg)])
+            if arg in ARGS['instructions']:
+                _args.append(return_values[ARGS['instructions'].index(arg)])
             else:
                 _args.append(arg)
 
@@ -136,8 +135,8 @@ def replace_return_values(args):
         _kwargs = {}
 
         for key, arg in args.items():
-            if arg in ARGS['scripts']:
-                _kwargs[key] = return_values[ARGS['scripts'].index(arg)]
+            if arg in ARGS['instructions']:
+                _kwargs[key] = return_values[ARGS['instructions'].index(arg)]
             else:
                 _kwargs[key] = arg
 
@@ -146,6 +145,29 @@ def replace_return_values(args):
     else:
         raise Exception(f"Unexpected args type: {args}")
 
+
+def substitute_filepaths(value: typing.Union[list, dict]):
+
+    if isinstance(value, list):
+        for index, sub_value in enumerate(value):
+            if type(sub_value) is dict:
+                if sub_value.get('_type') == 'File':
+                    value[index] = sub_value['path']
+                else:
+                    substitute_filepaths(sub_value)
+            elif type(sub_value) is list:
+                substitute_filepaths(sub_value)
+    elif isinstance(value, dict):
+        for key, sub_value in value.items():
+            if type(sub_value) is dict:
+                if sub_value.get('_type') == 'File':
+                    value[key] = sub_value['path']
+                else:
+                    substitute_filepaths(sub_value)
+            elif type(sub_value) is list:
+                substitute_filepaths(sub_value)
+    else:
+        raise Exception(f"Unexpected value {repr(value)} or type {type(value)}")
 
 
 
@@ -156,7 +178,7 @@ else:
 
 
 from blend_converter import utils
-from blend_converter import blend_inspector
+from blend_converter.blender import blend_inspector
 
 return_values = {}
 ARGS = get_args()
@@ -169,32 +191,33 @@ def process():
     blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BLEND_ORIG)
 
 
-    for magic_key, magic_value in ARGS['builtin_kwargs'].items():
-        setattr(builtins, magic_key, magic_value)
+    for instruction in ARGS['instructions']:
+        substitute_filepaths(instruction['args'])
+        substitute_filepaths(instruction['kwargs'])
 
 
-    for index, script in enumerate(ARGS['scripts']):
+    for index, instruction in enumerate(ARGS['instructions']):
 
         try:
 
-            blend_inspector.inspect_if_has_identifier(f"inspect:script:pre={script['name']}")
+            blend_inspector.inspect_if_has_identifier(f"inspect:script:pre={instruction['name']}")
 
 
-            append_sys_path(os.path.dirname(script['filepath']))
+            append_sys_path(os.path.dirname(instruction['filepath']))
 
             utils.print_separator(char='█')
-            utils.print_in_color(utils.get_color_code(256,256,256, 0, 150, 255), 'SCRIPT:', script['name'], "...", flush=True)
+            utils.print_in_color(utils.get_color_code(256,256,256, 0, 150, 255), 'SCRIPT:', instruction['name'], "...", flush=True)
 
             script_start_time = time.perf_counter()
 
-            module = import_module_from_file(script['filepath'])
-            result = getattr(module, script['name'])(*replace_return_values(script['args']), **replace_return_values(script['kwargs']))
+            module = import_module_from_file(instruction['filepath'])
+            result = getattr(module, instruction['name'])(*replace_return_values(instruction['args']), **replace_return_values(instruction['kwargs']))
             return_values[index] = result
 
             utils.print_in_color(utils.get_color_code(56, 199, 134, 0, 0, 0), f"Processed in {round(time.perf_counter() - script_start_time, 2)} seconds.", flush=True)
 
 
-            blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL, f"inspect:script:post={script['name']}")
+            blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL, f"inspect:script:post={instruction['name']}")
 
         except Exception as e:
 
@@ -203,7 +226,7 @@ def process():
             error_type, error_value, error_tb = sys.exc_info()
 
             print()
-            utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"Fail at script: {script['name']}", file=sys.stderr)
+            utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"Fail at script: {instruction['name']}", file=sys.stderr)
             utils.print_in_color(utils.get_color_code(180,0,0,0,0,0,), ''.join(traceback.format_tb(error_tb)), file=sys.stderr)
             utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), ''.join(traceback.format_exception_only(error_type, error_value)), file=sys.stderr)
             print()

@@ -1,5 +1,5 @@
 
-def export_gltf(settings: dict):
+def export_gltf(filepath: str, settings: dict):
 
     import bpy
 
@@ -11,4 +11,6 @@ def export_gltf(settings: dict):
     with warnings.catch_warnings():
         warnings.simplefilter('default')
 
-        bpy.ops.export_scene.gltf(**settings)
+        bpy.ops.export_scene.gltf(filepath=filepath, **settings)
+
+    print(f"glTF is exported in path: {filepath}")

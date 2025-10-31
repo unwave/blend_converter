@@ -18,11 +18,12 @@ import bpy
 import mathutils
 import bmesh
 
-from . import utils
 from . import bpy_context
 from . import bpy_utils
-from . import tool_settings
 from . import blend_inspector
+
+from .. import utils
+from .. import tool_settings
 
 
 def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, *, init_from: str = '', init_from_does_not_exist_ok = False):
