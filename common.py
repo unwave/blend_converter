@@ -15,10 +15,6 @@ from . import utils
 from . import tool_settings
 
 
-PROGRAMS_BEACON = '_get_bc_programs'
-""" Name of a function that will return a dictionary with programs """
-
-
 ROOT_DIR = os.path.dirname(__file__)
 
 def get_script_path(name: str):

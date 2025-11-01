@@ -2,9 +2,10 @@ import sys
 import os
 
 module_path = sys.argv[1]
-object_name = sys.argv[2]
+programs_getter_name = sys.argv[2]
+object_name = sys.argv[3]
 
-ARGS = sys.argv[3:]
+ARGS = sys.argv[4:]
 
 import sys
 import importlib.util
@@ -35,7 +36,7 @@ from blend_converter import utils
 
 from blend_converter.blender import blend_inspector
 
-program: common.Program = getattr(module, common.PROGRAMS_BEACON)()[object_name]
+program: common.Program = getattr(module, programs_getter_name)()[object_name]
 
 
 inspect_options: typing.List[str] = []

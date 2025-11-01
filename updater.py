@@ -49,7 +49,7 @@ def kill_process(process: multiprocessing.Process):
 class Program_Entry:
 
 
-    def __init__(self, program: common.Program, from_module: types.ModuleType, dictionary_key: str):
+    def __init__(self, program: common.Program, from_module: types.ModuleType, programs_getter_name: str, dictionary_key: str):
 
         self.program = program
 
@@ -74,6 +74,9 @@ class Program_Entry:
 
         self.from_module = from_module
         """ A module where the common.Program was collected from. """
+
+        self.programs_getter_name = programs_getter_name
+        """ Name of a function that will return a dictionary with programs """
 
 
         # self.path_list = os.path.realpath(program.blend_path).split(os.path.sep)
@@ -327,12 +330,12 @@ class Updater:
 
 
     @classmethod
-    def from_files(cls, files: list[str]):
+    def from_files(cls, files: list[str], programs_getter_name: str):
 
         updater = cls()
 
         updater.reload_files(files)
-        updater.set_entires_from_modules()
+        updater.set_entires_from_modules(programs_getter_name)
         updater.poke_all()
         updater.init_observer()
         updater.schedule_observer()
@@ -341,7 +344,7 @@ class Updater:
 
         return updater
 
-    def set_entires_from_modules(self):
+    def set_entires_from_modules(self, programs_getter_name: str):
 
         for entry in self.entries:
             entry.terminate()
@@ -349,9 +352,9 @@ class Updater:
         self.entries.clear()
 
         for module in self.modules:
-            for key, program in getattr(module, common.PROGRAMS_BEACON)().items():
+            for key, program in getattr(module, programs_getter_name)().items():
                 if isinstance(program, common.Program):
-                    self.entries.append(Program_Entry(program, module, key))
+                    self.entries.append(Program_Entry(program, module, programs_getter_name, key))
                 else:
                     utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"`{key}` is not a common.Program: {repr(program)}", file=sys.stderr)
 

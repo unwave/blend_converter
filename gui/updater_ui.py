@@ -297,16 +297,21 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.main_frame.updater.poke_entry(entry)
 
 
-    def on_copy_conversion_command(self, entry: updater.Program_Entry):
+    def get_conversion_command(self, entry: updater.Program_Entry):
 
         command = utils.get_command_from_list([
             sys.executable,
             common.get_script_path('forced_update'),
             entry.from_module.__file__,
+            entry.programs_getter_name,
             entry.dictionary_key,
         ])
 
-        wxp_utils.set_clipboard_text(command)
+        return command
+
+
+    def on_copy_conversion_command(self, entry: updater.Program_Entry):
+        wxp_utils.set_clipboard_text(self.get_conversion_command(entry))
 
 
     def on_show_source_in_explorer(self, entry: updater.Program_Entry):
@@ -353,7 +358,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         key_code = event.GetKeyCode()
 
         if key_code == ord('C'):
-            pyperclip.copy('\n'.join((self.on_copy_conversion_command(entry) for entry in self.get_selected_items())))
+            pyperclip.copy('\n'.join((self.get_conversion_command(entry) for entry in self.get_selected_items())))
         elif key_code == ord('A'):
             prev_func = self.on_item_selected
             self.on_item_selected = lambda a, b: None
@@ -680,12 +685,12 @@ Event_Stderr_Line_Printed, EVT_STDERR_LINE_PRINTED = wx.lib.newevent.NewEvent()
 class Main_Frame(wxp_utils.Generic_Frame):
 
 
-    def __init__(self, files: list[str], columns: typing.Optional[typing.Iterable[typing.Tuple[str, int, typing.Callable[[int], str]]]] = None):
+    def __init__(self, files: list[str], programs_getter_name: str, columns: typing.Optional[typing.Iterable[typing.Tuple[str, int, typing.Callable[[int], str]]]] = None):
 
-        self.updater = updater.Updater.from_files(files)
+        self.updater = updater.Updater.from_files(files, programs_getter_name)
 
         if not self.updater.entries:
-            raise Exception(f"No programs provided in files: {files}")
+            raise Exception(f"No programs with getter '{programs_getter_name}' provided in files: {files}")
 
         blender_executable = collections.Counter([entry.program.blender_executable for entry in self.updater.entries]).most_common(1)[0][0]
 
@@ -732,12 +737,12 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     @classmethod
-    def get_app(cls, files, columns = None):
+    def get_app(cls, files, programs_getter_name: str, columns = None):
 
         print(sys.argv)
 
         app = wxp_utils.App()
-        frame = cls(files=files, columns = columns)
+        frame = cls(files=files, programs_getter_name = programs_getter_name, columns = columns)
 
         if '__restart__' in sys.argv:
 
