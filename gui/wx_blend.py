@@ -21,16 +21,16 @@ import wx.lib.scrolledpanel as scrolled
 
 
 from .. import utils
+from .. import common
 from .. import updater
 
-from ..blender import blender_server
 
 from . import wxp_utils
 
 
 
 def get_root_path(*name: str):
-    return os.path.join(utils.ROOT_DIR, *name)
+    return os.path.join(common.ROOT_DIR, *name)
 
 
 SENTINEL = object()

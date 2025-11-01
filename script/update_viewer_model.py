@@ -113,7 +113,7 @@ if __name__ == '__main__':
         raise Exception(f"Unknown file type: {model_type}")
 
 
-    program.execute(True)
+    program.execute()
 
 
     with open(update_model_json_info, 'w', encoding='utf-8') as file:

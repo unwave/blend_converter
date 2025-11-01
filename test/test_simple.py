@@ -53,7 +53,7 @@ def test_merge_and_bake_gltf(blend_dir, blender_executable):
 
     program.run(blender, export_gltf, program.result_path, Settings_GLTF(export_apply=True))
 
-    program.execute(True)
+    program.execute()
 
 
 @pytest.mark.parametrize('blend_dir', BLEND_DIRS)
@@ -106,4 +106,4 @@ def test_copy_and_bake_gltf(blend_dir, blender_executable):
 
     program.run(blender, export_gltf, program.result_path, Settings_GLTF(export_apply=True))
 
-    program.execute(True)
+    program.execute()

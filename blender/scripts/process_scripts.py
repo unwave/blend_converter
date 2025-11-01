@@ -146,30 +146,6 @@ def replace_return_values(args):
         raise Exception(f"Unexpected args type: {args}")
 
 
-def substitute_filepaths(value: typing.Union[list, dict]):
-
-    if isinstance(value, list):
-        for index, sub_value in enumerate(value):
-            if type(sub_value) is dict:
-                if sub_value.get('_type') == 'File':
-                    value[index] = sub_value['path']
-                else:
-                    substitute_filepaths(sub_value)
-            elif type(sub_value) is list:
-                substitute_filepaths(sub_value)
-    elif isinstance(value, dict):
-        for key, sub_value in value.items():
-            if type(sub_value) is dict:
-                if sub_value.get('_type') == 'File':
-                    value[key] = sub_value['path']
-                else:
-                    substitute_filepaths(sub_value)
-            elif type(sub_value) is list:
-                substitute_filepaths(sub_value)
-    else:
-        raise Exception(f"Unexpected value {repr(value)} or type {type(value)}")
-
-
 
 if typing.TYPE_CHECKING:
     import blend_converter
@@ -189,11 +165,6 @@ def process():
 
 
     blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BLEND_ORIG)
-
-
-    for instruction in ARGS['instructions']:
-        substitute_filepaths(instruction['args'])
-        substitute_filepaths(instruction['kwargs'])
 
 
     for index, instruction in enumerate(ARGS['instructions']):

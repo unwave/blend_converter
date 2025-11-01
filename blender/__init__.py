@@ -6,7 +6,7 @@ from .. import utils
 from .. import common
 
 
-BLENDER_SCRIPT_RUNNER = os.path.join(utils.ROOT_DIR, 'blender', 'scripts', 'process_scripts.py')
+BLENDER_SCRIPT_RUNNER = os.path.join(common.ROOT_DIR, 'blender', 'scripts', 'process_scripts.py')
 
 
 class Blender:

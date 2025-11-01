@@ -25,8 +25,8 @@ def show_program_diff_vscode(program: common.Program):
 
     with tempfile.TemporaryDirectory() as temp_dir:
 
-        a = program.get_prev_diff_report()
-        b = program.get_next_diff_report()
+        a = program.get_prev_report_diff()
+        b = program.get_next_report_diff()
 
         old = write_file(temp_dir, 'old.json', json.dumps(a, indent=4, default= lambda x: x._to_dict()))
         new = write_file(temp_dir, 'new.json', json.dumps(b, indent=4, default= lambda x: x._to_dict()))

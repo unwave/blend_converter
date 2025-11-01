@@ -22,11 +22,14 @@ def apply_settings(settings_image: dict, settings_render: dict, settings_cycles:
         setattr(bpy.context.scene.view_settings, key, value)
 
 
-def export_image(filepath, **kwargs):
+def export_image(filepath: str, settings =  dict()):
 
-    apply_settings(**kwargs)
+    apply_settings(**settings)
 
     bpy.ops.render.render()
+
+    import os
+    os.makedirs(os.path.dirname(filepath), exist_ok = True)
 
     bpy.data.images['Render Result'].save_render(filepath=filepath)
     print("Image saved:", filepath)

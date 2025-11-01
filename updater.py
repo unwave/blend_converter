@@ -49,7 +49,7 @@ def kill_process(process: multiprocessing.Process):
 class Program_Entry:
 
 
-    def __init__(self, program: common.Program, module = None):
+    def __init__(self, program: common.Program, from_module: types.ModuleType, dictionary_key: str):
 
         self.program = program
 
@@ -68,7 +68,11 @@ class Program_Entry:
 
         self.is_manual_update = False
 
-        self.module = module
+
+        self.dictionary_key = dictionary_key
+        """ Key of the program in the programs dictionary. """
+
+        self.from_module = from_module
         """ A module where the common.Program was collected from. """
 
 
@@ -128,7 +132,7 @@ class Program_Entry:
             stderr_capture_thread.start()
             stdout_capture_thread.start()
             try:
-                self.program.execute(True)
+                self.program.execute()
             except Exception as e:
                 raise Exception(f"Fail to convert: {self.program}") from e
             finally:
@@ -345,11 +349,11 @@ class Updater:
         self.entries.clear()
 
         for module in self.modules:
-            for key, value in getattr(module, '__programs__').items():
-                if isinstance(value, common.Program):
-                    self.entries.append(Program_Entry(value))
+            for key, program in getattr(module, common.PROGRAMS_BEACON)().items():
+                if isinstance(program, common.Program):
+                    self.entries.append(Program_Entry(program, module, key))
                 else:
-                    utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"`{key}` is not a common.Program: {repr(value)}", file=sys.stderr)
+                    utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"`{key}` is not a common.Program: {repr(program)}", file=sys.stderr)
 
 
 

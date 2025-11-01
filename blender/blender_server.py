@@ -9,11 +9,11 @@ import time
 import traceback
 import typing
 
-from . import utils
+from . import common
 
 SENTINEL = object()
 
-BLENDER_SERVER_SCRIPT_PATH = utils.get_blender_script_path('blender_server')
+BLENDER_SERVER_SCRIPT_PATH = common.get_blender_script_path('blender_server')
 
 
 class Blender_Server:

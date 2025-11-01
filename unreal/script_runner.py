@@ -1,4 +1,4 @@
-""" This script will import and run the Unreal scripts inside an Unreal Engine instance. """
+""" This script will import and run the functions inside an Unreal Engine instance. """
 
 import importlib
 import importlib.util
@@ -50,7 +50,7 @@ def run(data: dict):
         import blend_converter
 
 
-    for index, script in enumerate(data['scripts']):
+    for index, script in enumerate(data['instructions']):
 
         try:
 

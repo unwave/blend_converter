@@ -35,7 +35,7 @@ from blend_converter import utils
 
 from blend_converter.blender import blend_inspector
 
-program: common.Program = getattr(module, '__programs__')[object_name]
+program: common.Program = getattr(module, common.PROGRAMS_BEACON)()[object_name]
 
 
 inspect_options: typing.List[str] = []
@@ -81,7 +81,7 @@ OPTIONS = {
 
     'show': "show the result in the explorer [after the execution]",
     'open': "open the result [after the execution]",
-    'check': "do not perform a forced update",
+    'check': "do not execute if up to date",
 
     'profile': "profile the execution and open with snakeviz [snakeviz must be installed]",
     'debug': "connect to the process with debugpy [debugpy must be installed]",
@@ -158,7 +158,7 @@ if not non_convert_options.isdisjoint(ARGS):
 
     if 'makeupdated' in ARGS:
         if input("Are you sure you want to set the json as up to date? (y/n)").lower() == 'y':
-            program.write_raw_report()
+            program.write_report()
 
     if 'help' in ARGS:
         print()
@@ -181,7 +181,12 @@ if not non_convert_options.isdisjoint(ARGS):
     raise SystemExit(0)
 
 
-program.execute(forced='check' not in ARGS)
+if 'check' in ARGS:
+    if program.are_instructions_changed:
+        program.execute()
+else:
+    program.execute()
+
 
 if 'show' in ARGS:
     utils.os_show(program.result_path)

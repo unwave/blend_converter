@@ -12,6 +12,20 @@ import inspect
 
 
 from . import utils
+from . import tool_settings
+
+
+PROGRAMS_BEACON = '_get_bc_programs'
+""" Name of a function that will return a dictionary with programs """
+
+
+ROOT_DIR = os.path.dirname(__file__)
+
+def get_script_path(name: str):
+    return os.path.join(ROOT_DIR, 'script', f'{name}.py')
+
+def get_blender_script_path(name: str):
+    return os.path.join(ROOT_DIR, 'blender', 'scripts', f'{name}.py')
 
 
 T = typing.TypeVar('T')
@@ -119,6 +133,9 @@ class Instruction:
             code = self.code,
         )
 
+    def __repr__(self):
+        return json.dumps(self._to_dict(), indent = 4, ensure_ascii = False, default = lambda x: x._to_dict())
+
 
 class Program:
 
@@ -156,8 +173,8 @@ class Program:
 
 
 
-    def read_raw_report(self):
-        """ Read the json file with the information about how the converted file was created. """
+    def read_report(self):
+        """ Read the report json file with the instructions of a previous execution. """
 
         if not os.path.exists(self.report_path):
             return {}
@@ -169,31 +186,32 @@ class Program:
                 return {}
 
 
-    def write_raw_report(self):
+    def write_report(self):
+        """ Write the current instructions with additional information. """
 
-        info = self.read_raw_report()
+        report = self.read_report()
 
-        info['instructions'] = self.instructions
+        report['instructions'] = self.instructions
 
         now = datetime.now()
 
-        if not info.get('ctime'):
-            info['ctime'] = info['mtime'] = now.timestamp()
-            info['ctime_str'] = info['mtime_str'] = now.astimezone().isoformat(' ', 'seconds')
+        if not report.get('ctime'):
+            report['ctime'] = report['mtime'] = now.timestamp()
+            report['ctime_str'] = report['mtime_str'] = now.astimezone().isoformat(' ', 'seconds')
         else:
-            info['mtime'] = now.timestamp()
-            info['mtime_str'] = now.astimezone().isoformat(' ', 'seconds')
+            report['mtime'] = now.timestamp()
+            report['mtime_str'] = now.astimezone().isoformat(' ', 'seconds')
 
-        info['write_count'] = info.get('write_count', 0) + 1
-        info['write_times'] = info.get('write_times', []) + [now.timestamp()]
-        info['write_times_str'] = info.get('write_times_str', []) + [now.astimezone().isoformat(' ', 'seconds')]
+        report['write_count'] = report.get('write_count', 0) + 1
+        report['write_times'] = report.get('write_times', []) + [now.timestamp()]
+        report['write_times_str'] = report.get('write_times_str', []) + [now.astimezone().isoformat(' ', 'seconds')]
 
         os.makedirs(os.path.dirname(self.report_path), exist_ok = True)
 
         temp_report_name = self.report_path + uuid.uuid1().hex
 
         with open(temp_report_name, 'w', encoding='utf-8') as f:
-            json.dump(info, f, indent=4, ensure_ascii=False, default=lambda x: x._to_dict())
+            json.dump(report, f, indent=4, ensure_ascii=False, default=lambda x: x._to_dict())
 
         os.replace(temp_report_name, self.report_path)
 
@@ -208,26 +226,71 @@ class Program:
 
     @property
     def are_instructions_changed(self):
-        return self.get_next_diff_report() != self.get_prev_diff_report()
+        return self.get_next_report_diff() != self.get_prev_report_diff()
 
 
-    def get_next_diff_report(self):
+    def get_next_report_diff(self):
         return dict(
-            instructions = self.instructions,
+            instructions = json.loads(json.dumps(self.instructions, default = lambda x: x._to_dict())),
         )
 
 
-    def get_prev_diff_report(self):
+    def get_prev_report_diff(self):
         return dict(
-            instructions = self.read_raw_report().get('instructions'),
+            instructions = self.read_report().get('instructions', []),
         )
 
 
+    def replace_return_values(self, value: typing.Union[list, dict]):
+        """ Provide result of one executor to the next. """
 
-    def execute(self, forced = False):
+        value = value.copy()
 
-        if not (forced or self.are_instructions_changed):
-            return
+        if isinstance(value, list):
+            for index, sub_value in enumerate(value):
+                if sub_value in self.instructions:
+                    return_value = self.return_values.get(self.instructions.index(sub_value))
+                    if return_value:
+                        value[index] = return_value
+                elif type(sub_value) in (list, dict):
+                    value[index] = self.replace_return_values(value)
+                elif isinstance(sub_value, tool_settings.Settings):
+                    value[index] = self.replace_return_values(sub_value._to_dict())
+        elif isinstance(value, dict):
+            for key, sub_value in value.items():
+                if sub_value in self.instructions:
+                    return_value = self.return_values.get(self.instructions.index(sub_value))
+                    if return_value:
+                        value[key] = return_value
+                elif type(sub_value) is (list, dict):
+                    value[key] = self.replace_return_values(value)
+                elif isinstance(sub_value, tool_settings.Settings):
+                    value[key] = self.replace_return_values(sub_value._to_dict())
+        else:
+            raise Exception(f"Unexpected args type: {value}")
+
+        return value
+
+
+    def substitute_filepaths(self, value: typing.Union[list, dict]):
+
+        if isinstance(value, list):
+            for index, sub_value in enumerate(value):
+                if type(sub_value) is File:
+                    value[index] = sub_value.path
+                elif type(sub_value) in (list, dict):
+                    self.substitute_filepaths(sub_value)
+        elif isinstance(value, dict):
+            for key, sub_value in value.items():
+                if type(sub_value) is File:
+                    value[key] = sub_value.path
+                elif type(sub_value) in (list, dict):
+                    self.substitute_filepaths(sub_value)
+        else:
+            raise Exception(f"Unexpected value {repr(value)} or type {type(value)}")
+
+
+    def execute(self):
 
         with tempfile.TemporaryDirectory() as temp_dir:
 
@@ -237,13 +300,24 @@ class Program:
 
             for executor, instructions in instructions_sorted.items():
 
-                executor.run(instructions, self.return_values_file, self._inspect_identifiers)
+                substituted_instructions = []
+                for instruction in instructions:
+
+                    args = self.replace_return_values(instruction.args)
+                    kwargs = self.replace_return_values(instruction.kwargs)
+                    self.substitute_filepaths(args)
+                    self.substitute_filepaths(kwargs)
+
+                    substituted_instructions.append(Instruction(instruction.executor, instruction.func, *args, **kwargs))
+
+                executor.run(substituted_instructions, self.return_values_file, self._inspect_identifiers)
 
                 with open(self.return_values_file, encoding='utf-8') as f:
-                        self.return_values = {int(key): value for key, value in json.load(f).items()}
+                    self.return_values = {int(key): value for key, value in json.load(f).items()}
 
 
-        self.write_raw_report()
+
+        self.write_report()
 
 
     def run(self, executor, func: 'typing.Callable[P, T]', *args: P.args, **kwargs: P.kwargs) -> T:

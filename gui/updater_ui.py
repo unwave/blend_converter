@@ -16,6 +16,7 @@ import wx.lib.newevent
 
 
 from .. import utils
+from .. import common
 from .. import updater
 
 from ..blender import blender_server
@@ -298,16 +299,11 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def on_copy_conversion_command(self, entry: updater.Program_Entry):
 
-        def get_module_and_name():
-            for module in self.main_frame.updater.modules:
-                for key, value in getattr(module, '__programs__').items():
-                    if value is entry.program:
-                        return module.__file__, key
-
         command = utils.get_command_from_list([
             sys.executable,
-            utils.get_script_path('forced_update'),
-            *get_module_and_name(),
+            common.get_script_path('forced_update'),
+            entry.from_module.__file__,
+            entry.dictionary_key,
         ])
 
         wxp_utils.set_clipboard_text(command)
@@ -332,7 +328,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             return
 
         if path.endswith('.bam'):
-            panda_viewer_path = utils.get_script_path('panda3d_viewer')
+            panda_viewer_path = common.get_script_path('panda3d_viewer')
             subprocess.Popen([sys.executable, panda_viewer_path, path])
         elif path.endswith('.blend'):
             cmd = [entry.program.blender_executable, path]
@@ -357,7 +353,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         key_code = event.GetKeyCode()
 
         if key_code == ord('C'):
-            pyperclip.copy('\n'.join((entry.program.blend_path for entry in self.get_selected_items())))
+            pyperclip.copy('\n'.join((self.on_copy_conversion_command(entry) for entry in self.get_selected_items())))
         elif key_code == ord('A'):
             prev_func = self.on_item_selected
             self.on_item_selected = lambda a, b: None
@@ -373,7 +369,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             'result_path': entry.program.result_path
         }
 
-        cmd = [entry.program.blender_executable, '--python', utils.get_script_path('start_compare'), '--', '-json_args', json.dumps(args)]
+        cmd = [entry.program.blender_executable, '--python', common.get_script_path('start_compare'), '--', '-json_args', json.dumps(args)]
 
         utils.open_blender_detached(*cmd)
 
@@ -454,7 +450,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             if result != wx.ID_YES:
                 return
 
-        entry.program.write_raw_report()
+        entry.program.write_report()
         self.main_frame.updater.poke_entry(entry)
 
 
@@ -689,7 +685,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.updater = updater.Updater.from_files(files)
 
         if not self.updater.entries:
-            raise Exception("Nothing to do. No models provided in __programs__.")
+            raise Exception(f"No programs provided in files: {files}")
 
         blender_executable = collections.Counter([entry.program.blender_executable for entry in self.updater.entries]).most_common(1)[0][0]
 

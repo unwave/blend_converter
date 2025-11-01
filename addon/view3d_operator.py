@@ -16,6 +16,7 @@ from . import reg
 
 
 from .. import utils
+from .. import common
 from ..blender import bpy_utils
 from .. import tool_settings
 
@@ -206,9 +207,9 @@ reg.property(
 )
 
 
-PANDA_VIEWER_COMMAND = ['python', utils.get_script_path('panda3d_viewer')]
-BLENDER_VIEWER_COMMAND = [bpy.app.binary_path, '--python', utils.get_blender_script_path('blender_viewer')]
-UPDATE_VIEWER_MODEL_PY = utils.get_script_path('update_viewer_model')
+PANDA_VIEWER_COMMAND = ['python', common.get_script_path('panda3d_viewer')]
+BLENDER_VIEWER_COMMAND = [bpy.app.binary_path, '--python', common.get_blender_script_path('blender_viewer')]
+UPDATE_VIEWER_MODEL_PY = common.get_script_path('update_viewer_model')
 
 
 def update_model(model_type, viewer_starter_command, blend_path, object_names, temp_dir, bake_settings, bullet_physics):
