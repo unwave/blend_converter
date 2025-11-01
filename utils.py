@@ -34,6 +34,9 @@ ROOT_DIR = os.path.dirname(__file__)
 def get_script_path(name: str):
     return os.path.join(ROOT_DIR, 'script', f'{name}.py')
 
+def get_blender_script_path(name: str):
+    return os.path.join(ROOT_DIR, 'blender', 'scripts', f'{name}.py')
+
 
 T = typing.TypeVar('T')
 T2 = typing.TypeVar('T2')

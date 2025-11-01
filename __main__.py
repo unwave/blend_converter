@@ -1,4 +1,5 @@
 import sys
 
-from . import updater_ui
-updater_ui.Main_Frame.start(sys.argv[1:])
+from .gui import updater_ui
+app = updater_ui.Main_Frame.get_app(files = sys.argv[1:])
+app.MainLoop()

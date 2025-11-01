@@ -2,18 +2,22 @@ import typing
 import os
 import tempfile
 import subprocess
+import math
 
 import bmesh
 import bpy
 import bpy_extras
+import mathutils
 
 from . import operator_factory
-from .. import bpy_utils
-from .. import utils
 from .. import tool_settings
-from .. import bpy_node
-from .. import bpy_context
-from .. import bpy_uv
+from ..blender import bpy_utils
+from ..blender import utils
+from ..blender import bpy_node
+from ..blender import bpy_context
+from ..blender import bpy_uv
+
+
 
 
 operator_factory.Operator_Class_Base.bl_options = {'REGISTER', 'UNDO'}
@@ -45,7 +49,6 @@ def convert_to_pbr(self, context):
     invoke = lambda operator, context, event: bpy.data.window_managers[0].invoke_props_dialog(operator, width=400)
 )
 def ensure_pixel_per_island(operator: bpy.types.Operator, context: bpy.types.Context):
-    from .. import bpy_uv
     bpy_uv._ensure_pixel_per_island(context.selected_objects, operator.resolution[0], operator.resolution[1])
 
 
@@ -463,10 +466,6 @@ def scale_uv_to_world_per_uv_layout_median(operator: bpy.types.Operator, context
     bl_options = {'REGISTER', 'UNDO'},
 )
 def align_longest_1(operator: bpy.types.Operator, context: bpy.types.Context):
-
-    from .. import bpy_uv
-    import mathutils
-    import math
 
     object = context.active_object
     mesh = object.data

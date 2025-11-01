@@ -1,8 +1,12 @@
 import os
 import importlib
+import importlib.util
 import typing
 import sys
 import json
+
+
+BLEND_CONVERTER_INIT = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), '__init__.py')
 
 
 def import_module_from_file(file_path: str, module_name: typing.Optional[str] = None):
@@ -28,24 +32,27 @@ def import_module_from_file(file_path: str, module_name: typing.Optional[str] = 
 if typing.TYPE_CHECKING:
     import blend_converter
 else:
-    blend_converter_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '__init__.py')
-    blend_converter = import_module_from_file(blend_converter_path, 'blend_converter')
+    blend_converter = import_module_from_file(BLEND_CONVERTER_INIT, 'blend_converter')
 
-
-from blend_converter import bpy_utils
 
 
 if 'bpy' in sys.modules:
     import bpy
-    from blend_converter import bpy_context
 
 
 def delete_other(object_names):
+
+    from blend_converter.blender import bpy_context
 
     with bpy_context.Focus_Objects([object for object in bpy.data.objects if object.name in object_names]):
         bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
 
     bpy.data.batch_remove(set(object for object in bpy.data.objects if object.name not in object_names))
+
+
+def make_everything_local():
+
+    bpy.ops.object.make_local(type='ALL')
 
 
 if __name__ == '__main__':
@@ -62,40 +69,52 @@ if __name__ == '__main__':
 
     bullet_physics: str = ARGS['bullet_physics']
 
+    from blend_converter import common
+    from blend_converter.blender import Blender
+    from blend_converter.blender import bc_script
+    from blend_converter.blender.formats.blend import open_mainfile
 
-    if model_type == 'Bam':
-        from blend_converter.format.bam import Bam
+    blender = Blender(blender_executable)
 
-        model = Bam(blend_path, temp_dir)
+    program = common.Program(blend_path='', result_path='', blender_executable='', report_path = os.path.join(temp_dir, 'report.json'))
 
-        from blend_converter.format.bam import post_conversion, pre_conversion
+    program.run(blender, open_mainfile, blend_path)
 
-        model.run(pre_conversion.assign_curve_placeholders)
-        model.run(pre_conversion.assign_collision_placeholders)
+    program.run(blender, make_everything_local)
 
-        model.run_bam_function(post_conversion.convert_curve_placeholders)
-        model.run_bam_function(post_conversion.convert_collision_placeholders)
+    if not bullet_physics:
+
+        kwargs = dict(image_dir = temp_dir, resolution = 1024)
+        kwargs.update(bake_settings)
+        program.run(blender, bc_script.merge_objects_and_bake_materials, object_names, **kwargs)
+
+        program.run(blender, delete_other, object_names)
+
+    if False and model_type == 'Bam':
+
+        from blend_converter.blender.formats.bam import Bam
+
+        from blend_converter.blender.formats.bam import post_conversion, pre_conversion
+
+        program.run(pre_conversion.assign_curve_placeholders)
+        program.run(pre_conversion.assign_collision_placeholders)
+
+        program.run_bam_function(post_conversion.convert_curve_placeholders)
+        program.run_bam_function(post_conversion.convert_collision_placeholders)
 
     elif model_type == 'Gltf':
-        from blend_converter.format.gltf import Gltf
+        from blend_converter.blender.formats.gltf import export_gltf, Settings_GLTF
 
-        model = Gltf(blend_path, temp_dir)
-        model.settings.export_format = 'GLTF_SEPARATE'
+        result_path = os.path.join(temp_dir, 'converted.gltf')
+
+        program.run(blender, export_gltf, result_path, Settings_GLTF(export_format = 'GLTF_SEPARATE'))
 
     else:
         raise Exception(f"Unknown file type: {model_type}")
 
-    model.blender_executable = blender_executable
 
-    if not bullet_physics:
-        kwargs = dict(image_dir = temp_dir, resolution = 1024)
-        kwargs.update(bake_settings)
-        model.run(bpy_utils.merge_objects_and_bake_materials, object_names, **kwargs)
-
-        model.run(delete_other, object_names)
-
-    model.update(True)
+    program.execute(True)
 
 
     with open(update_model_json_info, 'w', encoding='utf-8') as file:
-        json.dump({'path': model.result_path}, file)
+        json.dump({'path': result_path}, file)

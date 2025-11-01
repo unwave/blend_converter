@@ -10,7 +10,7 @@ import atexit
 import bpy
 
 from blend_converter.addon import view3d_operator
-from blend_converter import utils, bpy_utils
+from blend_converter.blender import utils, bpy_utils
 
 
 def get_args() -> dict:
@@ -151,7 +151,7 @@ class BLENDCONVVIEWER_OT_reload_blend_file(bpy.types.Operator, OP):
 
     def execute(self, context):
 
-        bpy_utils.open_homefile(BLEND)
+        bpy_utils.read_homefile(BLEND)
 
         return {'FINISHED'}
 

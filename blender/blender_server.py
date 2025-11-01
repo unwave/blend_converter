@@ -13,7 +13,7 @@ from . import utils
 
 SENTINEL = object()
 
-BLENDER_SERVER_SCRIPT_PATH = utils.get_script_path('blender_server')
+BLENDER_SERVER_SCRIPT_PATH = utils.get_blender_script_path('blender_server')
 
 
 class Blender_Server:

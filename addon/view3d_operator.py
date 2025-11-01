@@ -7,6 +7,7 @@ import threading
 import time
 import typing
 import uuid
+import traceback
 
 import bpy
 import mathutils
@@ -15,7 +16,7 @@ from . import reg
 
 
 from .. import utils
-from .. import bpy_utils
+from ..blender import bpy_utils
 from .. import tool_settings
 
 
@@ -84,7 +85,6 @@ class Viewer_Commander:
         try:
             self.blende_socket.sendall(json.dumps(data).encode() + b'\0')
         except Exception:
-            import traceback
             traceback.print_exc()
 
             self.terminate()
@@ -207,7 +207,7 @@ reg.property(
 
 
 PANDA_VIEWER_COMMAND = ['python', utils.get_script_path('panda3d_viewer')]
-BLENDER_VIEWER_COMMAND = [bpy.app.binary_path, '--python', utils.get_script_path('blender_viewer')]
+BLENDER_VIEWER_COMMAND = [bpy.app.binary_path, '--python', utils.get_blender_script_path('blender_viewer')]
 UPDATE_VIEWER_MODEL_PY = utils.get_script_path('update_viewer_model')
 
 
@@ -320,7 +320,8 @@ class BLENDCONVERTER_OT_export_and_inspect(bpy.types.Operator):
 
     def update(self, context: bpy.types.Context, objects: typing.List[bpy.types.Object]):
 
-        temp_dir = os.path.join(bpy.app.tempdir, f'bc_{time.time()}')
+
+        temp_dir = os.path.join(bpy.app.tempdir, f'bc_{utils.get_time_stamp()}')
         os.makedirs(temp_dir)
 
         if bpy.data.filepath:

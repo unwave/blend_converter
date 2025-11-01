@@ -34,7 +34,7 @@ def get_class_signature(name: str):
 
 def get_class_lines(name: str, docs_string: str, properties: object):
 
-    from blend_converter import docs
+    from blend_converter.blender import type_utils
 
     lines = []
 
@@ -43,7 +43,7 @@ def get_class_lines(name: str, docs_string: str, properties: object):
     lines.append(textwrap.indent(f'""" {docs_string} """', INDENT))
     lines.append('')
     lines.append('')
-    lines.append(textwrap.indent(docs.get_docs_from_properties(properties), INDENT))
+    lines.append(textwrap.indent(type_utils.get_docs_from_properties(properties), INDENT))
 
     return lines
 
