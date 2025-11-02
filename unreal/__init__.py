@@ -41,8 +41,8 @@ class Unreal:
     def run(self, instructions: typing.List[common.Instruction], return_values_file: str, inspect_identifiers: set, debug = False, profile = False):
 
         with remote_execution_handler.UE_Remote_Execution_Handler() as handler:
-            utils.print_in_color(utils.get_color_code(96, 154, 247, 0,0,0), "UNREAL ENGINE EXECUTION")
-            utils.print_in_color(utils.get_color_code(255, 139, 51, 0,0,0), "The output is delayed until all instructions are done.")
+            utils.print_in_color(utils.get_color_code(96, 154, 247, 0,0,0), "UNREAL ENGINE EXECUTION", flush = True)
+            utils.print_in_color(utils.get_color_code(255, 139, 51, 0,0,0), "The output is delayed until all instructions are done.", flush = True)
             handler.exec_func(runner_bootstrap, SCRIPT_RUNNER_PATH, dict(instructions = instructions))
 
 

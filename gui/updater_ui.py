@@ -755,7 +755,9 @@ class Main_Frame(wxp_utils.Generic_Frame):
             frame.Raise()
 
         frame.Show()
-        frame.show_console(False)
+
+        if not utils.Console_Shown.get_is_using_terminal():
+            frame.show_console(False)
 
         return app
 

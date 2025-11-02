@@ -480,6 +480,9 @@ def get_color_code(r, g, b, _r, _g, _b):
     return f'\033[38;2;{r};{g};{b};48;2;{_r};{_g};{_b}m'
 
 
+def dummy_print_in_color(color_code, *args, **kwargs):
+    print(*args, **kwargs)
+
 if hasattr(sys.stdout, 'isatty') and sys.stdout.isatty():
 
     if sys.platform == 'win32':
@@ -489,8 +492,7 @@ if hasattr(sys.stdout, 'isatty') and sys.stdout.isatty():
         print(f"{color_code}{' '.join(str(arg) for arg in args)}{CONSOLE_COLOR.RESET}", **kwargs)
 
 else:
-    def print_in_color(color_code, *args, **kwargs):
-        print(*args, **kwargs)
+    print_in_color = dummy_print_in_color
 
 
 def get_terminal_width(fallback = 80):
@@ -614,6 +616,8 @@ class Capture_Output:
 
         os.dup2(self.pipe_write_fileno, self.file_descriptor)
         self.write_pipe_textwrapper = os.fdopen(self.pipe_write_fileno, 'w', encoding='utf-8')
+        self.write_pipe_textwrapper.reconfigure(write_through=True, line_buffering=False)
+
         setattr(sys, self._std_output_name, self.write_pipe_textwrapper)
 
         if self.use_set_other:
@@ -979,6 +983,7 @@ def attempt(func: typing.Callable[[typing.Any], T], *args, **kwargs) -> T:
 class Console_Shown:
     """ Not on Windows does nothing. """
 
+
     def __init__(self, always_on_top = False):
         self.do_always_on_top = always_on_top
         self.was_shown = 0
@@ -989,24 +994,32 @@ class Console_Shown:
             self.enabled = False
             return
 
-        if 'TERM_PROGRAM' in os.environ:
-            self.enabled = False
-            return
-
         import ctypes
 
         self.kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
         self.user32 = ctypes.WinDLL('user32', use_last_error=True)
 
+        if self.get_is_using_terminal():
+            self.enabled = False
+            return
+
+
+    @staticmethod
+    def get_is_using_terminal():
+        return not {'PROMPT', 'TERM_PROGRAM', 'TERM', 'TERMINAL_EMULATOR'}.isdisjoint(os.environ)
+
+
     def get_last_error(self):
         import ctypes
         return ctypes.WinError(ctypes.get_last_error())
 
+
     def show(self, value: bool = True):
 
-        console = self.kernel32.GetConsoleWindow()
+        if os.name != 'nt':
+            return
 
-        using_terminal = 'PROMPT' in os.environ
+        console = self.kernel32.GetConsoleWindow()
 
         SW_HIDE = 0
         SW_SHOWNORMAL = 1
@@ -1021,13 +1034,16 @@ class Console_Shown:
         self.user32.BringWindowToTop(console)
 
         # disable exit button
-        if not was_shown and not using_terminal:
+        if not was_shown and not self.get_is_using_terminal():
             menu = self.user32.GetSystemMenu(console, 0)
             self.user32.DeleteMenu(menu, 0xF060, 0)
 
         return was_shown
 
     def always_on_top(self, value: bool = True):
+
+        if os.name != 'nt':
+            return
 
         HWND_TOPMOST = -1
         HWND_NOTOPMOST = -2

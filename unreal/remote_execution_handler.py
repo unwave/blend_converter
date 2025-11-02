@@ -13,6 +13,10 @@ def get_color_code(r, g, b, _r, _g, _b):
 
 RESET_COLOR = '\033[0m'
 
+
+def dummy_print_in_color(fg_rgb: list, bg_rgb: list, *args, **kwargs):
+    print(*args, **kwargs)
+
 if hasattr(sys.stdout, 'isatty') and sys.stdout.isatty():
 
     if sys.platform == 'win32':
@@ -22,8 +26,7 @@ if hasattr(sys.stdout, 'isatty') and sys.stdout.isatty():
         print(f"{get_color_code(*fg_rgb, *bg_rgb)}{' '.join(str(arg) for arg in args)}{RESET_COLOR}", **kwargs)
 
 else:
-    def print_in_color(fg_rgb: list, bg_rgb: list, *args, **kwargs):
-        print(*args, **kwargs)
+    print_in_color = dummy_print_in_color
 
 
 class UE_Remote_Execution_Handler:

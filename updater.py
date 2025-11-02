@@ -116,6 +116,13 @@ class Program_Entry:
 
     def update_job(self):
 
+        from . import utils
+        from . unreal import remote_execution_handler
+
+        utils.print_in_color = utils.dummy_print_in_color
+        remote_execution_handler.print_in_color = remote_execution_handler.dummy_print_in_color
+
+
         def stdout_capture_job():
             with open(self.stdout_file, 'a+', encoding='utf-8') as f:
                 for line in iter(stdout_capture.lines.get, None):
@@ -131,18 +138,26 @@ class Program_Entry:
         stdout_capture_thread = threading.Thread(target=stdout_capture_job, daemon=True)
         stderr_capture_thread = threading.Thread(target=stderr_capture_job, daemon=True)
 
+        error = None
+
         with utils.Capture_Stdout() as stdout_capture, utils.Capture_Stderr() as stderr_capture:
+
             stderr_capture_thread.start()
             stdout_capture_thread.start()
+
             try:
                 self.program.execute()
             except Exception as e:
-                raise Exception(f"Fail to convert: {self.program}") from e
-            finally:
-                stdout_capture.lines.put_nowait(None)
-                stdout_capture_thread.join()
-                stderr_capture.lines.put_nowait(None)
-                stderr_capture_thread.join()
+                error = e
+                traceback.print_exc(file=sys.stderr)
+
+        stdout_capture.lines.put_nowait(None)
+        stdout_capture_thread.join()
+        stderr_capture.lines.put_nowait(None)
+        stderr_capture_thread.join()
+
+        if error:
+            raise SystemExit(1)
 
 
     def _run(self, callback: typing.Callable, thread_identity: uuid.UUID):
