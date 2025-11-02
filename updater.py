@@ -49,7 +49,7 @@ def kill_process(process: multiprocessing.Process):
 class Program_Entry:
 
 
-    def __init__(self, program: common.Program, from_module: types.ModuleType, programs_getter_name: str, dictionary_key: str):
+    def __init__(self, program: common.Program, from_module_file: str, programs_getter_name: str, dictionary_key: str):
 
         self.program = program
 
@@ -72,8 +72,8 @@ class Program_Entry:
         self.dictionary_key = dictionary_key
         """ Key of the program in the programs dictionary. """
 
-        self.from_module = from_module
-        """ A module where the common.Program was collected from. """
+        self.from_module_file = from_module_file
+        """ A module file which the common.Program was collected from. """
 
         self.programs_getter_name = programs_getter_name
         """ Name of a function that will return a dictionary with programs """
@@ -354,7 +354,7 @@ class Updater:
         for module in self.modules:
             for key, program in getattr(module, programs_getter_name)().items():
                 if isinstance(program, common.Program):
-                    self.entries.append(Program_Entry(program, module, programs_getter_name, key))
+                    self.entries.append(Program_Entry(program, module.__file__, programs_getter_name, key))
                 else:
                     utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"`{key}` is not a common.Program: {repr(program)}", file=sys.stderr)
 

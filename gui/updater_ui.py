@@ -302,7 +302,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         command = utils.get_command_from_list([
             sys.executable,
             common.get_script_path('forced_update'),
-            entry.from_module.__file__,
+            entry.from_module_file,
             entry.programs_getter_name,
             entry.dictionary_key,
         ])
