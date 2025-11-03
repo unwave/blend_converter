@@ -9,6 +9,7 @@ from datetime import datetime
 import configparser
 import textwrap
 import inspect
+import time
 
 
 from . import utils
@@ -291,6 +292,9 @@ class Program:
 
     def execute(self):
 
+        start_time = time.perf_counter()
+        print("EXECUTION START:", time.strftime('%H:%M:%S %Y-%m-%d'), flush=True)
+
         with tempfile.TemporaryDirectory() as temp_dir:
 
             self.return_values_file = os.path.join(temp_dir, uuid.uuid1().hex)
@@ -314,7 +318,8 @@ class Program:
                 with open(self.return_values_file, encoding='utf-8') as f:
                     self.return_values = {int(key): value for key, value in json.load(f).items()}
 
-
+        print("EXECUTION END:", time.strftime('%H:%M:%S %Y-%m-%d'), flush=True)
+        print(f"TIME: {round(time.perf_counter() - start_time, 2)} SECONDS", flush=True)
 
         self.write_report()
 

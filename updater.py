@@ -22,7 +22,7 @@ from . import utils
 UPDATE_DELAY = 2
 
 # MAX_AMOUNT_OF_UPDATING_ENTRIES = multiprocessing.cpu_count() - 1
-MAX_AMOUNT_OF_UPDATING_ENTRIES = 2
+MAX_AMOUNT_OF_PARALLEL_EXECUTIONS = 2
 
 TIMEOUT = None
 
@@ -432,9 +432,9 @@ class Updater:
                     self.poke_entry(entry)
 
 
-    def max_updating_entries_exceeded(self):
+    def max_parallel_executions_exceeded(self):
         updating_entires = len([entry for entry in self.entries if entry.status == 'updating'])
-        return updating_entires >= MAX_AMOUNT_OF_UPDATING_ENTRIES
+        return updating_entires >= MAX_AMOUNT_OF_PARALLEL_EXECUTIONS
 
 
     def despatching(self):
@@ -443,33 +443,48 @@ class Updater:
 
             time.sleep(1)
 
+            if self.max_parallel_executions_exceeded():
+                continue
+
             for entry in self.entries:
 
-                if self.max_updating_entries_exceeded():
-                    break
+                if not entry.is_manual_update:
+                    continue
 
                 if self.max_executions_per_tag_exceeded(entry.program.tags):
                     continue
 
-                if entry.is_manual_update:
-                    entry.is_manual_update = False
-                    entry.update(self.poke_waiting_for_dependency)
+                if self.has_non_updated_dependency(entry):
+                    self.poke_entry(entry)
+                    continue
 
-            if not self.is_paused:
+                entry.is_manual_update = False
+                entry.update(self.poke_waiting_for_dependency)
 
-                for entry in self.entries:
 
-                    if self.max_updating_entries_exceeded():
-                        break
+            if self.is_paused:
+                continue
 
-                    if entry.status != 'needs_update':
-                        continue
 
-                    if self.max_executions_per_tag_exceeded(entry.program.tags):
-                        continue
+            for entry in self.entries:
 
-                    if entry.is_live_update and entry.poke_timeout:
-                        entry.update(self.poke_waiting_for_dependency)
+                if not entry.is_live_update:
+                    continue
+
+                if entry.status != 'needs_update':
+                    continue
+
+                if self.max_executions_per_tag_exceeded(entry.program.tags):
+                    continue
+
+                if self.has_non_updated_dependency(entry):
+                    self.poke_entry(entry)
+                    continue
+
+                if not entry.poke_timeout:
+                    continue
+
+                entry.update(self.poke_waiting_for_dependency)
 
 
     def terminate_observer(self):

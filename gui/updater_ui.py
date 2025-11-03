@@ -260,6 +260,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         menu.append_separator()
 
+        menu_item = menu.append_item(f"Force Execute Selected", get_func(self.on_force_execute_selected))
+
+        menu.append_separator()
+
         menu_item = menu.append_item(f"Set Config", get_func(self.on_set_config, entry))
         menu_item.Enable(bool(entry.program.config))
 
@@ -403,7 +407,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         main_frame: Main_Frame = self.GetTopLevelParent()
 
-        if main_frame.updater.max_updating_entries_exceeded():
+        if main_frame.updater.max_parallel_executions_exceeded():
             wx.MessageBox("Max amount of simultaneous updates exceeded.", "Error", style= wx.OK | wx.ICON_ERROR)
             return
 
@@ -434,10 +438,17 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         self.main_frame.on_restart()
 
+
     def on_update_selected(self):
         for entry in self.get_selected_items():
             if entry.status in ('needs_update', 'error'):
                 entry.is_manual_update = True
+        self.Refresh()
+
+
+    def on_force_execute_selected(self):
+        for entry in self.get_selected_items():
+            entry.is_manual_update = True
         self.Refresh()
 
 

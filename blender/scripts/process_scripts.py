@@ -1,7 +1,7 @@
 import time
 
 start_time = time.perf_counter()
-print("CONVERSION STARTED", time.strftime('%H:%M:%S %Y-%m-%d'))
+print("BLENDER START", time.strftime('%H:%M:%S %Y-%m-%d'))
 
 import argparse
 import functools
@@ -248,7 +248,7 @@ if __name__ == '__main__':
         json.dump(return_values, return_values_file, indent = 4, ensure_ascii = False, default = lambda x: repr(x))
 
 
-    utils.print_in_color(utils.get_color_code(256,256,256, 34, 139, 34), f"CONVERTED IN {round(time.perf_counter() - start_time, 2)} SECONDS.", flush=True)
+    utils.print_in_color(utils.get_color_code(256,256,256, 34, 139, 34), f"BLENDER HAS EXECUTED IN {round(time.perf_counter() - start_time, 2)} SECONDS.", flush=True)
 
 
     blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BLEND_FINAL)
