@@ -309,7 +309,7 @@ class Program:
 
                     substituted_instructions.append(Instruction(instruction.executor, instruction.func, *args, **kwargs))
 
-                executor.run(substituted_instructions, self.return_values_file, self._inspect_identifiers)
+                executor.run(substituted_instructions, self.return_values_file, self._inspect_identifiers, debug = self._debug, profile = self._profile)
 
                 with open(self.return_values_file, encoding='utf-8') as f:
                     self.return_values = {int(key): value for key, value in json.load(f).items()}
