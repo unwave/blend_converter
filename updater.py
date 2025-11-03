@@ -287,6 +287,8 @@ class Updater:
 
         self.init_files = []
 
+        self.max_parallel_execution_per_tag = {}
+
 
     def init_observer(self):
 
@@ -422,15 +424,18 @@ class Updater:
 
         update_ui()
 
+
     def poking(self):
         for path in iter(self.queue.get, None):
             for entry in self.entries:
                 if entry.program.blend_path == path:
                     self.poke_entry(entry)
 
+
     def max_updating_entries_exceeded(self):
         updating_entires = len([entry for entry in self.entries if entry.status == 'updating'])
         return updating_entires >= MAX_AMOUNT_OF_UPDATING_ENTRIES
+
 
     def despatching(self):
 
@@ -442,6 +447,9 @@ class Updater:
 
                 if self.max_updating_entries_exceeded():
                     break
+
+                if self.max_executions_per_tag_exceeded(entry.program.tags):
+                    continue
 
                 if entry.is_manual_update:
                     entry.is_manual_update = False
@@ -457,16 +465,28 @@ class Updater:
                     if entry.status != 'needs_update':
                         continue
 
+                    if self.max_executions_per_tag_exceeded(entry.program.tags):
+                        continue
+
                     if entry.is_live_update and entry.poke_timeout:
                         entry.update(self.poke_waiting_for_dependency)
-
-
 
 
     def terminate_observer(self):
         self.observer.unschedule_all()
         self.observer.stop()
         self.observer.join()
+
+
+    def set_max_parallel_executions_per_program_tag(self, tag: str, count: int):
+        self.max_parallel_execution_per_tag[tag] = count
+
+
+    def max_executions_per_tag_exceeded(self, tags: typing.Iterable[str]):
+        for tag in tags:
+            if self.max_parallel_execution_per_tag[tag] <= len([entry for entry in self.entries if entry.status == 'updating' and tag in entry.program.tags]):
+                return True
+        return False
 
 
 def update_ui():

@@ -167,6 +167,9 @@ class Program:
         self.config: typing.Optional[Config_Base] = None
         """ Pre execution configuration. """
 
+        self.tags: typing.Set[str] = set()
+        """ Use for differentiation. See `set_max_workers_by_program_tag`. """
+
 
 
     def read_report(self):

@@ -682,6 +682,11 @@ Event_Stdout_Line_Printed, EVT_STDOUT_LINE_PRINTED = wx.lib.newevent.NewEvent()
 Event_Stderr_Line_Printed, EVT_STDERR_LINE_PRINTED = wx.lib.newevent.NewEvent()
 
 
+class BC_App(wx.App):
+
+    main_frame: Main_Frame
+
+
 class Main_Frame(wxp_utils.Generic_Frame):
 
 
@@ -737,12 +742,13 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     @classmethod
-    def get_app(cls, files, programs_getter_name: str, columns = None):
+    def get_app(cls, files: typing.List[str], programs_getter_name: str, columns = None):
 
         print(sys.argv)
 
-        app = wxp_utils.App()
+        app = BC_App()
         frame = cls(files=files, programs_getter_name = programs_getter_name, columns = columns)
+        app.main_frame = frame
 
         if '__restart__' in sys.argv:
 
