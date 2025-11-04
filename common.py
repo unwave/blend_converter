@@ -160,6 +160,9 @@ class Program:
         self._inspect_identifiers = set()
         """ A set of inspect identifiers to pass to tools. """
 
+        self._inspect_values = dict()
+        """ Values to set when inspecting and get like `blend_inspector.get_value('my_value', 100)` """
+
         self.return_values = {}
 
         self.return_values_file: typing.Optional[str] = None
@@ -313,7 +316,14 @@ class Program:
 
                     substituted_instructions.append(Instruction(instruction.executor, instruction.func, *args, **kwargs))
 
-                executor.run(substituted_instructions, self.return_values_file, self._inspect_identifiers, debug = self._debug, profile = self._profile)
+                executor.run(
+                    instructions = substituted_instructions,
+                    return_values_file = self.return_values_file,
+                    inspect_identifiers = self._inspect_identifiers,
+                    inspect_values = self._inspect_values,
+                    debug = self._debug,
+                    profile = self._profile,
+                )
 
                 with open(self.return_values_file, encoding='utf-8') as f:
                     self.return_values = {int(key): value for key, value in json.load(f).items()}

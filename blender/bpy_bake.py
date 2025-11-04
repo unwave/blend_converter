@@ -347,12 +347,16 @@ class Baked_Image:
                 blur_node.inputs[1].default_value = self.settings.resolution_multiplier - 1
 
                 if bpy.app.version >= (2, 93):
-                    target_input = blur_node.inputs[0].insert_new('CompositorNodeAntiAliasing').inputs[0]
+                    anti_aliasing = blur_node.inputs[0].insert_new('CompositorNodeAntiAliasing')
+                    anti_aliasing.inputs[1].default_value = 0.5
+                    target_input = anti_aliasing.inputs[0]
                 else:
                     target_input = blur_node.inputs[0]
             else:
                 if bpy.app.version >= (2, 93):
-                    target_input = file_node_input.insert_new('CompositorNodeAntiAliasing').inputs[0]
+                    anti_aliasing = file_node_input.insert_new('CompositorNodeAntiAliasing')
+                    anti_aliasing.inputs[1].default_value = 0.5
+                    target_input = anti_aliasing.inputs[0]
                 else:
                     target_input = file_node_input
 
@@ -470,7 +474,7 @@ class Baked_Image:
                 bpy_state.set(bpy.context.scene.render, 'resolution_percentage', 100)
 
 
-                blend_inspector.inspect_if_has_identifier('bake:comp')
+                blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BAKE_COMPOSER)
 
                 if not self.settings.fake_bake:
                     with utils.Capture_Stdout() as capture:
@@ -592,7 +596,7 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
 
     print()
 
-    for material, _objects in objects_by_material.items():
+    for material, _ in objects_by_material.items():
 
         if not material:
             continue
@@ -632,6 +636,9 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                 bpy_state = context_stack.enter_context(bpy_context.Bpy_State())
 
                 for object in objects:
+
+                    if settings.use_selected_to_active and bpy.context.view_layer.objects.active != object:
+                        continue
 
                     try:
                         uv_map = object.data.uv_layers[uv_layer]
@@ -897,6 +904,10 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
         settings._images.extend(images)
 
         if settings.create_materials:
+
+            if settings.use_selected_to_active:
+                objects = [o for o in objects if bpy.context.view_layer.objects.active == o]
+
             bpy_uv.clear_uv_layers_from_objects(objects, uv_layer_name, 'UVMap')
 
             material_name = settings.texture_name_prefix
@@ -932,6 +943,9 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         if settings.create_materials:
 
+            if settings.use_selected_to_active:
+                objects_in_group = [o for o in objects_in_group if bpy.context.view_layer.objects.active == o]
+
             material_name = settings.texture_name_prefix
             if not material_name:
                 material_name = get_common_name(materials_to_bake)
@@ -960,6 +974,10 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
                 create_material(material.name, uv_layer_name, images, material, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
 
         if settings.create_materials:
+
+            if settings.use_selected_to_active:
+                objects = [o for o in objects if bpy.context.view_layer.objects.active == o]
+
             bpy_uv.clear_uv_layers_from_objects(objects, uv_layer_name, 'UVMap')
 
 
@@ -1022,6 +1040,10 @@ def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings
 
 
 def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -> typing.List[bpy.types.Image]:
+
+
+    if not objects:
+        raise Exception(f"No objects provided for baking: {settings}")
 
 
     bake_start_time = time.perf_counter()
@@ -1101,11 +1123,22 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
     settings._images = []
     settings._raw_images = []
 
+    active_object = bpy.context.view_layer.objects.active
 
-    with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects) as focus_context, bpy_context.Bpy_State() as bpy_state:
+    with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), bpy_context.Isolate_Focus(objects), bpy_context.Bpy_State() as bpy_state:
+
+
+        if settings.use_selected_to_active:
+
+            bpy.context.view_layer.objects.active = active_object
+
+            if settings.cage_object_name:
+                # Cage object "CAGE" not found in evaluated scene, it may be hidden
+                # TODO: check if it can fail in other ways
+                bpy.context.scene.collection.objects.link(bpy.data.objects[settings.cage_object_name])
+
 
         # ensure object render visibility
-        objects_in_temp_collection = set(focus_context.hidden_by_hierarchy_collection.objects)
         for object in objects:
 
             if object.animation_data:
@@ -1115,10 +1148,6 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
 
             bpy_state.set(object, 'hide_render', False)
 
-            if not objects_in_temp_collection:
-                # object might be hidden for render by a hierarchy
-                focus_context.hidden_by_hierarchy_collection.objects.link(object)
-
         # bake objects
         if settings.merge_materials_between_objects:
 
@@ -1127,9 +1156,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
                 # https://developer.blender.org/T83971
                 bpy_state.set(bpy.context.scene.render.bake, 'margin', min(1, settings.margin))
 
-            if objects:
-                with bpy_context.Focus_Objects(objects):
-                    bake_objects(objects, settings)
+            bake_objects(objects, settings)
 
         else:
             for object in objects:

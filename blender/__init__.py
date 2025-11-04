@@ -18,7 +18,14 @@ class Blender:
         self.stdout = None
 
 
-    def run(self, instructions: typing.List[common.Instruction], return_values_file: str, inspect_identifiers: set, debug = False, profile = False):
+    def run(self, *,
+            instructions: typing.List[common.Instruction],
+            return_values_file: str,
+            inspect_identifiers: set,
+            inspect_values: dict,
+            debug: bool,
+            profile: bool,
+        ):
 
         command = [
             '--python',
@@ -29,6 +36,7 @@ class Blender:
                 instructions = instructions,
                 return_values_file = return_values_file,
                 inspect_identifiers = list(inspect_identifiers),
+                inspect_values = dict(inspect_values),
                 debug = debug,
                 profile = profile,
             ), default = lambda x: x._to_dict()),

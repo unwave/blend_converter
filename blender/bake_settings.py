@@ -311,6 +311,10 @@ class _AO(_Bake_Type, tool_settings.Settings):
     _default_color = (1.0, 1.0, 1.0)
     _requires_principled_bsdf = True
 
+    @property
+    def _default_value(self) -> float:
+        return _get_value_from_color(self._default_color)
+
 
 
 @dataclass
@@ -758,3 +762,38 @@ class Buffer_Factor(_Bake_Type, tool_settings.Settings):
                 image = images[0]
 
             return bpy_context.Composer_Input_Factor(input_socket, image, use_denoise=self.use_denoise)
+
+
+class Normal_Native(_Bake_Type):
+    """ The native Normal bake type. Use for baking from selected to active. """
+
+
+    default_color: tuple = (0.5, 0.5, 1.0)
+
+    _socket_type = _Socket_Type.VECTOR
+    _identifier = 'Normal'
+
+    _requires_principled_bsdf = False
+
+
+    @property
+    def _default_color(self) -> float:
+        return self.default_color
+
+
+    def _get_setup_context(self):
+        return bpy_context.Bpy_State([(bpy.context.scene.cycles, 'bake_type', 'NORMAL')])
+
+
+    def _get_material_context(self, material):
+        return contextlib.nullcontext()
+
+
+    def _get_composer_context(self, input_socket, images):
+
+        if isinstance(images, bpy.types.Image):
+            image = images
+        else:
+            image = images[0]
+
+        return bpy_context.Composer_Input_Normal(input_socket, image)

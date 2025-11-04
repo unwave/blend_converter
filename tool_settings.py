@@ -197,6 +197,9 @@ def _get_specs(cls):
 class Settings():
 
 
+    if typing.TYPE_CHECKING:
+        ignore_default_settings: bool = dataclasses.field(init=False)
+
     ignore_default_settings: bool = False
     """
     If `True` replacing a default value with a default value will be ignored.
@@ -210,6 +213,8 @@ class Settings():
     #### Default: `False`
     """
 
+    if typing.TYPE_CHECKING:
+        allow_non_default_settings: bool = dataclasses.field(init=False)
 
     allow_non_default_settings: bool = False
     """
@@ -1006,6 +1011,26 @@ class Bake(Settings):
     #### Default: `''`
     """
 
+    use_selected_to_active: bool = False
+    """
+    Bake from selected to active.
+
+    #### Default: `False`
+    """
+
+    cage_object_name: str = ''
+    """
+    If not an empty string then the object will be used as a bake cage.
+
+    #### Default: `''`
+    """
+
+    max_ray_distance = 0
+    """
+    Used for the selected to active bake.
+
+    #### Default: `0`
+    """
 
 
 @dataclasses.dataclass

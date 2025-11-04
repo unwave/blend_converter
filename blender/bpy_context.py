@@ -15,6 +15,7 @@ import mathutils
 
 from . import bpy_node
 from . import bpy_utils
+from . import bpy_data
 
 from .. import utils
 from .. import tool_settings
@@ -465,7 +466,11 @@ class Bake_Settings(Bpy_State):
         self.set(render, 'use_compositing', True)
         self.set(render, 'use_sequencer', False)
 
-        self.set(render.bake, 'use_selected_to_active', False)
+        self.set(render.bake, 'use_selected_to_active', self.bake_settings.use_selected_to_active)
+        if self.bake_settings.cage_object_name:
+            self.set(render.bake, 'use_cage', True)
+            self.set(render.bake, 'cage_object', bpy.data.objects[self.bake_settings.cage_object_name])
+            self.set(render.bake, 'max_ray_distance', self.bake_settings.max_ray_distance)
 
         self.set(context.view_layer, 'pass_alpha_threshold', 0.5)
 
@@ -1667,6 +1672,80 @@ class Composer_Input_Factor:
 
         else:
             init_alpha_node.outputs[0].insert_new('CompositorNodeInpaint', distance = 16)
+
+
+    def __exit__(self, type, value, traceback):
+        self.tree.delete_new_nodes()
+
+
+class Composer_Input_Normal:
+
+
+    def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, use_denoise = False):
+
+        self.tree = bpy_node.Compositor_Tree_Wrapper(bpy.context.scene.node_tree)
+        self.input_socket = self.tree.get_socket_wrapper(input_socket)
+        self.image = image
+
+        self.use_denoise = use_denoise
+
+
+    def __enter__(self):
+
+        image_node = self.input_socket.new('CompositorNodeImage', image = self.image)
+
+
+        set_alpha_node = image_node.outputs[0].insert_new('CompositorNodeSetAlpha')
+
+        math_node = image_node.outputs[1].new('CompositorNodeMath', operation = 'GREATER_THAN')
+        math_node.inputs[1].default_value = 0.9999
+
+        math_node.outputs[0].join(set_alpha_node.inputs[1])
+
+        distance = max(self.image.generated_height, self.image.generated_width)
+        distance = min(distance, 512)
+
+        if self.use_denoise:
+            denoise_node = set_alpha_node.outputs[0].insert_new('CompositorNodeDenoise')
+            denoise_node.prefilter = 'NONE'
+            denoise_node.use_hdr = False
+            denoise_node.inputs['Albedo'].join(image_node.outputs['Alpha'], move=False)
+
+
+            denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=1)
+            denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=1)
+
+            erode_node = math_node.outputs[0].new('CompositorNodeDilateErode', mode = 'DISTANCE', distance = -1 if bpy.context.scene.render.bake.margin > 1 else 0)
+            set_alpha_node_2 = denoise_node.outputs[0].insert_new('CompositorNodeSetAlpha')
+            erode_node.outputs[0].join(set_alpha_node_2.inputs[1])
+
+            inpaint = set_alpha_node_2.outputs[0].insert_new('CompositorNodeInpaint', distance = distance)
+
+        else:
+            inpaint = set_alpha_node.outputs[0].insert_new('CompositorNodeInpaint', distance = distance)
+
+
+        filter_inward_normals = set_alpha_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Remove_Inward_Normal'))
+
+        def insert_normalize(node: bpy_node._Shader_Node_Wrapper):
+
+            normalize_normal = node.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Normalize_Vector'))
+
+            map_range_1 = normalize_normal.inputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Map_Range_Image'))
+            map_range_1[1] = 0
+            map_range_1[2] = 1
+            map_range_1[3] = -1
+            map_range_1[4] = 1
+
+            map_range_2 = normalize_normal.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Map_Range_Image'))
+            map_range_2[1] = -1
+            map_range_2[2] = 1
+            map_range_2[3] = 0
+            map_range_2[4] = 1
+
+        insert_normalize(filter_inward_normals)
+        insert_normalize(inpaint)
+
 
 
     def __exit__(self, type, value, traceback):

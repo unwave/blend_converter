@@ -51,6 +51,9 @@ class COMMON:
     INSPECT_BAKE_AFTER = 'inspect:bake:after'
     """ inspect after baking a texture """
 
+    INSPECT_BAKE_COMPOSER = 'inspect:bake:comp'
+    """ inspect composer """
+
     # TODO
     # INSPECT_UV_UNWRAP = 'inspect:uv:unwrap'
     """ after uv unwrapping """
@@ -180,3 +183,14 @@ def inspect_if_has_identifier(*identifier: str):
         return True
     else:
         return False
+
+
+T = typing.TypeVar('T')
+
+_values: typing.Dict[str, str] = {}
+
+def get_value(key: str, default: typing.Optional[T]) -> T:
+    return type(default)(_values.get(key, default))
+
+def add_value(**kwargs):
+    _values.update(kwargs)

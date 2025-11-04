@@ -160,6 +160,7 @@ return_values = {}
 ARGS = get_args()
 
 blend_inspector.add_identifier(*ARGS['inspect_identifiers'])
+blend_inspector.add_value(**ARGS['inspect_values'])
 
 def process():
 

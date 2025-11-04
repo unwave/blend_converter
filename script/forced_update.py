@@ -91,8 +91,19 @@ OPTIONS = {
     'profile': "profile the execution and open with snakeviz [snakeviz must be installed]",
     'debug': "connect to the process with debugpy [debugpy must be installed]",
 
-    'inspect:<OPTIONS> OR i:<OPTIONS>': f"open a copy of the blend file being processed at a stage{_double_indented_new_line}{_double_indented_new_line.join(inspect_options + [x + '<REGEX>' for x in inspect_regex_options])}",
-    'skip:<OPTIONS> OR s:<OPTIONS>': f"skip a stage, for some — unless specified by inspect:<OPTIONS>`{_double_indented_new_line}{_double_indented_new_line.join(skip_options + [x + '<REGEX>' for x in skip_regex_options])}",
+    'inspect:<OPTIONS> OR i:<OPTIONS>':
+        "open a copy of the blend file being processed at a stage"
+        "\n\t\t"
+        f"{_double_indented_new_line.join(inspect_options + [x + '<REGEX>' for x in inspect_regex_options])}",
+
+        'skip:<OPTIONS> OR s:<OPTIONS>': f"skip a stage, for some — unless specified by inspect:<OPTIONS>`"
+        "\n\t\t"
+        f"{_double_indented_new_line.join(skip_options + [x + '<REGEX>' for x in skip_regex_options])}",
+
+    'set:<NAME>=<VALUE>':
+        "Set an inspect variable named <NAME> to value <VALUE> in a way so:"
+        "\n\t\t"
+        "blend_inspector.get_value(<NAME>, default = 15000) == <VALUE>",
 }
 
 
@@ -189,6 +200,11 @@ for index, arg in enumerate(ARGS):
         program._inspect_identifiers.add(arg)
         continue
 
+    if arg.startswith('set:'):
+        var_name, var_value = arg[len('set:'):].split('=')
+        color_print([255, 255, 255], [48, 88, 138], f'{var_name} = {var_value}')
+        program._inspect_values[var_name] = var_value
+        continue
 
     error(f"Invalid option: {ARGS[index]}")  # Using index to print the original, possible shortened version of the command
 
