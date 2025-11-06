@@ -530,7 +530,7 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
 
             uv_layer_name = object.data.uv_layers.active.name
 
-            uvs_unwrap_settings = tool_settings.UVs(
+            uvs_unwrap_settings = tool_settings.Unwrap_UVs(
                 uv_layer_name = object.data.uv_layers.active.name,
                 mark_seams_from_islands = operator.mark_seams_from_islands,
                 reunwrap_all_with_minimal_stretch = operator.reunwrap_with_minimal_stretch,
@@ -563,18 +563,15 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
                     bpy.ops.uv.average_islands_scale()
 
 
-            pack_uvs_settings = tool_settings.UVs(
+            pack_uvs_settings = tool_settings.Pack_UVs(
                 resolution = operator.resolution,
                 uv_layer_name = uv_layer_name,
                 average_uv_scale = False,
-                uvp_rescale = False,
-                uvp_prerotate = True,
-                do_unwrap = False,
                 uv_packer_addon_pin_largest_island=operator.uv_packer_addon_pin_largest_island,
                 use_uv_packer_for_pre_packing = operator.use_uv_packer_for_pre_packing,
             )
             pack_uvs_settings._set_suggested_padding()
-            bpy_uv.unwrap_and_pack([object], pack_uvs_settings)
+            bpy_uv.pack([object], pack_uvs_settings)
             bpy_uv.ensure_pixel_per_island([object], pack_uvs_settings)
 
 

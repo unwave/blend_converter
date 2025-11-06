@@ -455,8 +455,13 @@ def get_compatible_armature_actions(objects: typing.List[bpy.types.Object]) -> t
 
 
 
-def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object], settings: tool_settings.UVs, ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None):
+def unwrap_ministry_of_flat_with_fallback(
+            objects: typing.List[bpy.types.Object],
+            settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
+            ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None,
+        ):
 
+    settings = tool_settings.Unwrap_UVs()._update(settings)
     ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(vertex_weld=False, rasterization_resolution=1, packing_iterations=1)._update(ministry_of_flat_settings)
 
     for object in objects:
@@ -510,7 +515,7 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
                 bpy.ops.mesh.select_all(action='SELECT')
                 bpy.ops.uv.select_all(action='SELECT')
                 bpy.ops.uv.pin(clear=True)
-                bpy.ops.uv.smart_project(island_margin = settings._uv_island_margin_fraction / 0.8, angle_limit = math.radians(settings.smart_project_angle_limit))
+                bpy.ops.uv.smart_project(angle_limit = math.radians(settings.smart_project_angle_limit))
 
             do_reunwrap = settings.reunwrap_bad_uvs_with_minimal_stretch or settings.reunwrap_all_with_minimal_stretch
 
@@ -537,7 +542,7 @@ def unwrap_ministry_of_flat_with_fallback(objects: typing.List[bpy.types.Object]
 def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material_keys: typing.Optional[typing.List[str]] = None):
     print(f"{create_uvs.__name__}...")
 
-    settings = tool_settings.UVs(resolution=resolution)
+    settings = tool_settings.Pack_UVs(resolution=resolution)
     settings._set_suggested_padding()
 
     objects = get_unique_mesh_objects(objects)
@@ -555,19 +560,15 @@ def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material
 
         bpy_uv.ensure_uv_layer(objects, settings.uv_layer_name)
 
-        if tool_settings.Ministry_Of_Flat._executable_exists:
-            unwrap_ministry_of_flat_with_fallback(objects, settings)
-            settings.do_unwrap = False
-        else:
-            settings.do_unwrap = True
+        unwrap_ministry_of_flat_with_fallback(objects)
 
         if settings.merge:
             if material_keys:
                 for material_key in material_keys:
                     settings.material_key = material_key
-                    bpy_uv.unwrap_and_pack(objects, settings)
+                    bpy_uv.pack(objects, settings)
             else:
-                bpy_uv.unwrap_and_pack(objects, settings)
+                bpy_uv.pack(objects, settings)
 
         else:
             for material, _objects in group_objects_by_material(objects).items():
@@ -575,7 +576,7 @@ def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material
                 if material_keys and not any(material.get(key) for key in material_keys):
                     continue
 
-                bpy_uv.unwrap_and_pack(_objects, settings)
+                bpy_uv.pack(_objects, settings)
 
         bpy_uv.ensure_pixel_per_island(objects, settings)
 
@@ -1221,9 +1222,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
 
 
         ## unwrap
-        settings = tool_settings.UVs(resolution = 1024 if resolution == 0 else resolution, do_unwrap=False, average_uv_scale=False)
-        settings._set_suggested_padding()
-        settings.uv_layer_name = uv_layer_reuse
+        unwrap_uvs_settings = tool_settings.Unwrap_UVs(uv_layer_name = uv_layer_reuse)
 
         # TODO: check results for non mesh objects, they supposed to have valid auto-generated UVs, like curves do
         objects_to_unwrap = get_unique_mesh_objects([object for object in objects if hasattr(object.data, 'uv_layers') and not uv_layer_reuse in object.data.uv_layers])
@@ -1239,12 +1238,12 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
                 for modifier in object.modifiers:
                     bpy_state.set(modifier, 'show_viewport', False)
 
-            bpy_uv.ensure_uv_layer(objects_to_unwrap, settings.uv_layer_name)
+            bpy_uv.ensure_uv_layer(objects_to_unwrap, unwrap_uvs_settings.uv_layer_name)
 
             for object in objects_to_unwrap:
-                bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
+                bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[unwrap_uvs_settings.uv_layer_name])
 
-            unwrap_ministry_of_flat_with_fallback(objects_to_unwrap, settings)
+            unwrap_ministry_of_flat_with_fallback(objects_to_unwrap, unwrap_uvs_settings)
 
             bpy_uv.scale_uv_to_world_per_uv_layout(objects_to_unwrap)
 
@@ -1255,9 +1254,9 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
 
 
         ## pack
-        merged_uvs_settings = settings._get_copy()
-        merged_uvs_settings.uv_layer_name = uv_layer_bake
-        bpy_uv.ensure_uv_layer([merged_object], merged_uvs_settings.uv_layer_name, init_from=settings.uv_layer_name)
+        pack_uvs_settings = tool_settings.Pack_UVs(resolution = 1024 if resolution == 0 else resolution, uv_layer_name = uv_layer_bake)
+        pack_uvs_settings._set_suggested_padding()
+        bpy_uv.ensure_uv_layer([merged_object], pack_uvs_settings.uv_layer_name, init_from=uv_layer_bake)
 
 
         with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
@@ -1271,13 +1270,12 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
             bpy.ops.uv.average_islands_scale()
 
         for material_key in (alpha_material_key, opaque_material_key):
-            merged_uvs_settings.material_key = material_key
-            merged_uvs_settings.average_uv_scale = False
-            merged_uvs_settings.uvp_rescale = True
-            bpy_uv.unwrap_and_pack([merged_object], merged_uvs_settings)
+            pack_uvs_settings.material_key = material_key
+            pack_uvs_settings.average_uv_scale = False
+            bpy_uv.pack([merged_object], pack_uvs_settings)
 
 
-        bpy_uv.ensure_pixel_per_island([merged_object], settings)
+        bpy_uv.ensure_pixel_per_island([merged_object], pack_uvs_settings)
 
 
         ## bake
@@ -1654,9 +1652,13 @@ def move_objects_to_new_collection(objects: typing.List[bpy.types.Object], colle
     return layer_collection
 
 
-def unwrap_unique_meshes(objects: typing.List[bpy.types.Object], settings: tool_settings.UVs, *,
+def unwrap_unique_meshes(
+            objects: typing.List[bpy.types.Object],
+            settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
             ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None
         ):
+
+    settings = tool_settings.Unwrap_UVs()._update(settings)
 
     objects = get_unique_mesh_objects(objects)
 
@@ -1677,8 +1679,8 @@ def unwrap_unique_meshes(objects: typing.List[bpy.types.Object], settings: tool_
 
 def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake_Materials, *,
             bake_settings: typing.Optional[tool_settings.Bake] = None,
-            unwrap_settings: typing.Optional[tool_settings.UVs] = None,
-            pack_settings: typing.Optional[tool_settings.UVs] = None,
+            unwrap_settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
+            pack_settings: typing.Optional[tool_settings.Pack_UVs] = None,
             ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None,
         ):
 
@@ -1716,7 +1718,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         ## unwrap uvs
-        _unwrap_settings = tool_settings.UVs(uv_layer_name = settings.uv_layer_bake)
+        _unwrap_settings = tool_settings.Unwrap_UVs(uv_layer_name = settings.uv_layer_bake)
         if unwrap_settings:
             _unwrap_settings._update(unwrap_settings)
 
@@ -1732,7 +1734,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         if settings.unwrap_original_topology:
-            unwrap_unique_meshes(filter_objects_to_unwrap(objects), _unwrap_settings, ministry_of_flat_settings = ministry_of_flat_settings)
+            unwrap_unique_meshes(filter_objects_to_unwrap(objects), _unwrap_settings, ministry_of_flat_settings)
 
 
         ## copy identifiers
@@ -1771,7 +1773,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         if not settings.unwrap_original_topology:
-            unwrap_unique_meshes(filter_objects_to_unwrap(objects_copy), _unwrap_settings, ministry_of_flat_settings = ministry_of_flat_settings)
+            unwrap_unique_meshes(filter_objects_to_unwrap(objects_copy), _unwrap_settings, ministry_of_flat_settings)
 
 
         if settings.isolate_object_hierarchies:
@@ -1806,20 +1808,18 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
                 if not any(m for m in materials if m.get(material_key)):
                     continue
 
-                _pack_settings = tool_settings.UVs(
+                _pack_settings = tool_settings.Pack_UVs(
                     resolution = resolution,
                     uv_layer_name = settings.uv_layer_bake,
                     material_key = material_key,
                     average_uv_scale = False,
-                    uvp_rescale = False,
-                    do_unwrap = False,
                 )
 
                 if pack_settings:
                     _pack_settings._update(pack_settings)
 
                 _pack_settings._set_suggested_padding()
-                bpy_uv.unwrap_and_pack([merged_object], _pack_settings)
+                bpy_uv.pack([merged_object], _pack_settings)
                 bpy_uv.ensure_pixel_per_island([merged_object], _pack_settings)
 
 

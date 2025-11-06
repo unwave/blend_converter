@@ -382,8 +382,8 @@ def copy_and_bake_materials(
         get_objects(objects),
         tool_settings.Bake_Materials._from_dict(settings),
         bake_settings = tool_settings.Bake._from_dict(bake_settings) if bake_settings else None,
-        unwrap_settings = tool_settings.UVs._from_dict(unwrap_settings) if unwrap_settings else None,
-        pack_settings = tool_settings.UVs._from_dict(pack_settings) if pack_settings else None,
+        unwrap_settings = tool_settings.Unwrap_UVs._from_dict(unwrap_settings) if unwrap_settings else None,
+        pack_settings = tool_settings.Pack_UVs._from_dict(pack_settings) if pack_settings else None,
         ministry_of_flat_settings = tool_settings.Ministry_Of_Flat._from_dict(ministry_of_flat_settings) if ministry_of_flat_settings else None,
     )
 
@@ -419,7 +419,7 @@ def apply_modifiers(objects: Objects_Like, *args, **kwargs):
 def unwrap(objects: Objects_Like, **kwargs):
 
     if 'settings' in kwargs:
-        kwargs['settings'] = tool_settings.UVs._from_dict(kwargs['settings'])
+        kwargs['settings'] = tool_settings.Unwrap_UVs._from_dict(kwargs['settings'])
 
     if 'ministry_of_flat_settings' in kwargs:
         kwargs['ministry_of_flat_settings'] = tool_settings.Ministry_Of_Flat._from_dict(kwargs['ministry_of_flat_settings'])

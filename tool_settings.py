@@ -1034,7 +1034,46 @@ class Bake(Settings):
 
 
 @dataclasses.dataclass
-class UVs(Settings):
+class Unwrap_UVs(Settings):
+
+
+    uv_layer_name: str = DEFAULT_UV_LAYER_NAME
+    """
+    The UV layer to use for baking.
+    #### Default: `DEFAULT_UV_LAYER_NAME`
+    """
+
+    smart_project_angle_limit: int = 54
+    """
+    `angle_limit` parameter of the `bpy.ops.uv.smart_project` operator.
+
+    #### Default: `54`
+    """
+
+    mark_seams_from_islands: bool = False
+    """
+    After unwrapping mark uv seams according the islands.
+
+    #### Default: `False`
+    """
+
+    reunwrap_bad_uvs_with_minimal_stretch: bool = True
+    """
+    Reunwrap bad uvs using the Blender's MINIMUM_STRETCH method.
+
+    #### Default: `True`
+    """
+
+    reunwrap_all_with_minimal_stretch: bool = False
+    """
+    Reunwrap all uvs using the Blender's MINIMUM_STRETCH method.
+
+    #### Default: `False`
+    """
+
+
+@dataclasses.dataclass
+class Pack_UVs(Settings):
 
 
     @property
@@ -1113,20 +1152,6 @@ class UVs(Settings):
     #### Default: `4`
     """
 
-    smart_project_angle_limit: int = 54
-    """
-    `angle_limit` parameter of the `bpy.ops.uv.smart_project` operator.
-
-    #### Default: `54`
-    """
-
-    do_unwrap: bool = True
-    """
-    Use the smart UV unwrapping before packing.
-
-    #### Default: `True`
-    """
-
     merge_overlap: bool = False
     """
     Blender 3.6+
@@ -1163,11 +1188,11 @@ class UVs(Settings):
     #### Default: `True`
     """
 
-    uvp_rescale: bool = True
+    uvp_rescale: bool = False
     """
     Rescale UVs before packing.
 
-    #### Default: `True`
+    #### Default: `False`
     """
 
     uvp_prerotate: bool = True
@@ -1175,27 +1200,6 @@ class UVs(Settings):
     Pre-rotate UVs before packing. This can make them be no longer axis aligned.
 
     #### Default: `True`
-    """
-
-    mark_seams_from_islands: bool = False
-    """
-    After unwrapping mark uv seams according the islands.
-
-    #### Default: `False`
-    """
-
-    reunwrap_bad_uvs_with_minimal_stretch: bool = True
-    """
-    Reunwrap bad uvs using the Blender's MINIMUM_STRETCH method.
-
-    #### Default: `True`
-    """
-
-    reunwrap_all_with_minimal_stretch: bool = False
-    """
-    Reunwrap all uvs using the Blender's MINIMUM_STRETCH method.
-
-    #### Default: `False`
     """
 
     use_uv_packer_for_pre_packing: bool = False

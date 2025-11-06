@@ -233,7 +233,7 @@ def enable_uv_packer_addon():
         return True
 
 
-def get_island_margin(meshes: typing.Iterable[bpy.types.Mesh], settings: tool_settings.UVs):
+def get_island_margin(meshes: typing.Iterable[bpy.types.Mesh], settings: tool_settings.Pack_UVs):
     """
     For the `ADD` margin method. The UV islands should already exist in the meshes.
 
@@ -745,15 +745,15 @@ def uv_packer_pack(uvp_width: int, uvp_height: int, uvp_padding: int, uvp_prerot
     execute_uv_packer_addon(Dummy(), Dummy_Context())
 
 
-def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_settings.UVs) -> str:
+def pack(objects: typing.List[bpy.types.Object], settings: tool_settings.Pack_UVs) -> str:
     """ Assumes the objects are selected and in the object mode. """
 
-    print('unwrap_and_pack_uvs...')
+    print('pack_uvs...')
 
     objects = bpy_utils.get_unique_mesh_objects(objects)
 
     if not objects:
-        print("No valid objects to unwrap and pack: ", [o.name_full for o in objects])
+        print("No valid objects to pack: ", [o.name_full for o in objects])
         return
 
     with bpy_context.Focus_Objects(objects, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
@@ -812,13 +812,6 @@ def unwrap_and_pack(objects: typing.List[bpy.types.Object], settings: tool_setti
             # can also crate an empty or procedural texture in the material and make active
             for material_slot in object.material_slots:
                 bpy_state.set(material_slot, 'material', None)
-
-        if settings.do_unwrap:
-            print('bpy.ops.uv.smart_project...')
-            bpy.ops.uv.smart_project(
-                island_margin = settings._uv_island_margin_fraction / 0.8,
-                angle_limit = math.radians(settings.smart_project_angle_limit),
-            )
 
 
         print('Pre-packing UV islands...')
@@ -1052,7 +1045,7 @@ def _ensure_pixel_per_island(objects: typing.List[bpy.types.Object], res_x: int,
         bmesh.update_edit_mesh(data, loop_triangles=False, destructive=False)
 
 
-def ensure_pixel_per_island(objects: typing.List[bpy.types.Object], settings: tool_settings.UVs):
+def ensure_pixel_per_island(objects: typing.List[bpy.types.Object], settings: tool_settings.Pack_UVs):
     print('ensure_pixel_per_island...')
 
     objects = bpy_utils.get_unique_mesh_objects(objects)
@@ -1094,8 +1087,12 @@ def clear_uv_layers_from_objects(objects: typing.List[bpy.types.Object], uv_laye
 
 
 
-def unwrap(objects: typing.List[bpy.types.Object], *, uv_layer = tool_settings.DEFAULT_UV_LAYER_NAME, uv_layer_reuse = '', settings: typing.Optional[tool_settings.UVs] = None, ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None):
-
+def unwrap(objects: typing.List[bpy.types.Object], *,
+           uv_layer = tool_settings.DEFAULT_UV_LAYER_NAME,
+           uv_layer_reuse = '',
+           settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
+           ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None
+        ):
 
     incompatible_objects = set(objects) - set(object for object in objects if object.data and hasattr(object.data, 'uv_layers'))
     if incompatible_objects:
@@ -1104,7 +1101,7 @@ def unwrap(objects: typing.List[bpy.types.Object], *, uv_layer = tool_settings.D
 
     objects = bpy_utils.get_unique_mesh_objects(objects)
 
-    settings = tool_settings.UVs(uv_layer_name = uv_layer)._update(settings)
+    settings = tool_settings.Unwrap_UVs(uv_layer_name = uv_layer)._update(settings)
 
 
     ensure_uv_layer(objects, settings.uv_layer_name, init_from = uv_layer_reuse, init_from_does_not_exist_ok=True)
