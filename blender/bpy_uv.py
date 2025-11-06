@@ -306,8 +306,6 @@ def get_object_copy_for_uv_unwrap(object: bpy.types.Object):
 
         object_copy.modifiers.clear()
 
-        object_copy.vertex_groups.clear()
-
         if object_copy.data.shape_keys:
             for key_block in reversed(object_copy.data.shape_keys.key_blocks):
                 object_copy.shape_key_remove(key_block)
@@ -625,11 +623,8 @@ def scale_uv_to_world_per_uv_island(objects: typing.List[bpy.types.Object], use_
 
                 for face in island:
                     for loop in face.loops:
-
                         uv_loop = loop[uv_layer]
-                        uv_loop.uv -= island_center
-                        uv_loop.uv *= scale_multiplier / mean
-                        uv_loop.uv += island_center
+                        uv_loop.uv = (uv_loop.uv - island_center) * scale_multiplier / mean + island_center
 
             bpy.ops.ed.flush_edits()
             bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
@@ -692,6 +687,40 @@ def scale_uv_to_world_per_uv_layout(objects: typing.List[bpy.types.Object]):
             bm_copy.free()
 
 
+
+def scale_uv_islands_by_weight_group(object: bpy.types.Object, uv_layer_name: str, weight_group_name: str, factor = 1.0):
+    print(f"{scale_uv_islands_by_weight_group.__name__}...")
+
+    with bpy_context.Focus_Objects(object, mode='EDIT'):
+
+        bm = bmesh.from_edit_mesh(object.data)
+
+        deform_layer = bm.verts.layers.deform.verify()
+        group_index = object.vertex_groups[weight_group_name].index
+
+        uv_layer = bm.loops.layers.uv.get(uv_layer_name)
+        islands = get_linked_uv_islands(bm, uv_layer)
+        for island in islands:
+
+            all_verts: typing.Set[bmesh.types.BMVert] = set()
+            for face in island:
+                all_verts.update(face.verts)
+
+            average_weight = sum(vert[deform_layer].get(group_index, 0) for vert in all_verts)/len(all_verts)
+
+            average_weight = average_weight * (1.0 - factor) + factor
+
+            island_vertices = [loop[uv_layer].uv for face in island for loop in face.loops]
+            island_center = sum(island_vertices, mathutils.Vector((0,0)))/len(island_vertices)
+
+            for face in island:
+                for loop in face.loops:
+                    uv_loop = loop[uv_layer]
+                    uv_loop.uv = (uv_loop.uv - island_center) * average_weight + island_center
+
+        bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
+
+
 def aabb_pack(margin = 0.001, merge_overlap = False):
     """ Used for pre-packing. """
 
@@ -745,8 +774,10 @@ def uv_packer_pack(uvp_width: int, uvp_height: int, uvp_padding: int, uvp_prerot
     execute_uv_packer_addon(Dummy(), Dummy_Context())
 
 
-def pack(objects: typing.List[bpy.types.Object], settings: tool_settings.Pack_UVs) -> str:
+def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_settings.Pack_UVs] = None) -> str:
     """ Assumes the objects are selected and in the object mode. """
+
+    settings =  tool_settings.Pack_UVs()._update(settings)
 
     print('pack_uvs...')
 

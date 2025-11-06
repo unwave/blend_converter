@@ -1071,6 +1071,21 @@ class Unwrap_UVs(Settings):
     #### Default: `False`
     """
 
+    uv_importance_weight_group: str = ''
+    """
+    Used for the MINIMUM_STRETCH method.
+
+    #### Default: `''`
+    """
+
+    uv_importance_weight_factor: float = 1.0
+    """
+    Used for the MINIMUM_STRETCH method.
+
+    #### Default: `1.0`
+    """
+
+
 
 @dataclasses.dataclass
 class Pack_UVs(Settings):

@@ -526,7 +526,16 @@ def unwrap_ministry_of_flat_with_fallback(
                 if settings.reunwrap_all_with_minimal_stretch:
                     bpy.ops.mesh.select_all(action='SELECT')
                     bpy.ops.uv.select_all(action='SELECT')
-                    bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, method='MINIMUM_STRETCH', fill_holes=True, no_flip=True, can_be_canceled=True)
+                    bpy_context.call_in_uv_editor(
+                        bpy.ops.uv.unwrap,
+                        method='MINIMUM_STRETCH',
+                        fill_holes=True,
+                        no_flip=True,
+                        use_weights = bool(settings.uv_importance_weight_group),
+                        weight_group = settings.uv_importance_weight_group,
+                        weight_factor = settings.uv_importance_weight_factor,
+                        can_be_canceled=True,
+                    )
 
                 bpy_uv.reunwrap_bad_uvs([object_copy])
 
@@ -1406,6 +1415,8 @@ def get_texture_resolution(object: bpy.types.Object, *, uv_layer_name: str, mate
     # current_from_total = math.sqrt(total_mesh_area / total_uv_area) * current_texture_size
 
     perfect_resolution = sum(map(operator.mul, texel_densities_to_find, weights))/sum(weights)
+
+    print(f"Perfect resolution for {object.name_full}:", round(perfect_resolution), 'px')
 
     final_resolution = get_closest_power_of_two(perfect_resolution, min_res, max_res)
 
