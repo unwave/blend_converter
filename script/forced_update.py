@@ -139,6 +139,18 @@ def color_print(fg_rgb: list, bg_rgb: list, *args, **kwargs):
 non_convert_options = {'help', 'from', 'to', 'diff', 'makeupdated', 'validate'}
 
 
+def unshorten(arg: str):
+    """ Make the shortcut not short. """
+
+    if arg.startswith('i:'):
+        return 'inspect:' + arg[2:]
+
+    if arg.startswith('s:'):
+        return 'skip:' + arg[2:]
+
+    return arg
+
+
 for index, arg in enumerate(ARGS):
 
     arg = arg.lower()
@@ -148,12 +160,7 @@ for index, arg in enumerate(ARGS):
         print(arg)
         continue
 
-    # make the shortcut not short
-    if arg.startswith('i:'):
-        arg = 'inspect:' + arg[2:]
-
-    if arg.startswith('s:'):
-        arg = 'skip:' + arg[2:]
+    arg = unshorten(arg)
 
     if arg in non_convert_options:
         color_print([255, 255, 255], [37, 30, 207], arg)
@@ -176,6 +183,8 @@ for index, arg in enumerate(ARGS):
     if arg.startswith(regex_options):
 
         option, value = ARGS[index].split('=', 1)
+        option = unshorten(option.lower())
+
         try:
             re.compile(value)
         except re.error as e:
@@ -201,7 +210,7 @@ for index, arg in enumerate(ARGS):
         continue
 
     if arg.startswith('set:'):
-        var_name, var_value = arg[len('set:'):].split('=')
+        var_name, var_value = ARGS[index][len('set:'):].split('=')
         color_print([255, 255, 255], [48, 88, 138], f'{var_name} = {var_value}')
         program._inspect_values[var_name] = var_value
         continue
