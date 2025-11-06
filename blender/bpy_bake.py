@@ -736,7 +736,11 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
 
                     with utils.Capture_Stdout() as capture:
                         threading.Thread(target=capturing, daemon=True).start()
-                        the_bake(object, [object], kwargs)
+                        if bpy.context.view_layer.objects.active in objects:
+                            active_object = bpy.context.view_layer.objects.active
+                        else:
+                            active_object = objects[0]
+                        the_bake(active_object, objects, kwargs)
                         capture.lines.put_nowait(None)
 
 
