@@ -20,11 +20,8 @@ from . import common
 from . import utils
 
 UPDATE_DELAY = 2
+""" For update debouncing. """
 
-# MAX_AMOUNT_OF_UPDATING_ENTRIES = multiprocessing.cpu_count() - 1
-MAX_AMOUNT_OF_PARALLEL_EXECUTIONS = 2
-
-TIMEOUT = None
 
 LOG_DIR = r'D:\Desktop\temp_log_location_bc'
 
@@ -83,7 +80,7 @@ class Program_Entry:
 
         self.lock = multiprocessing.Lock()
 
-        self.timeout: typing.Optional[float] = TIMEOUT
+        self.timeout: typing.Optional[float] = program.timeout
 
         self.stdout_queue = multiprocessing.Queue()
         self.stderr_queue = multiprocessing.Queue()
@@ -115,6 +112,7 @@ class Program_Entry:
 
 
     def update_job(self):
+        """ This function is run in `multiprocessing.Process` """
 
         from . import utils
         from . unreal import remote_execution_handler
@@ -283,11 +281,18 @@ class Updater:
         self.modules: list[types.ModuleType] = []
 
         self.init_modules = set(sys.modules)
+
         self.imported_modules = set()
 
         self.init_files = []
 
         self.max_parallel_execution_per_tag = {}
+
+        self.default_max_parallel_executions = 2
+        """  Max parallel executions for programs with no limiting tags. """
+
+        self.total_max_parallel_executions = 2
+        """ Total max parallel executions. """
 
 
     def init_observer(self):
@@ -432,9 +437,8 @@ class Updater:
                     self.poke_entry(entry)
 
 
-    def max_parallel_executions_exceeded(self):
-        updating_entires = len([entry for entry in self.entries if entry.status == 'updating'])
-        return updating_entires >= MAX_AMOUNT_OF_PARALLEL_EXECUTIONS
+    def total_max_parallel_executions_exceeded(self):
+        return sum(entry.status == 'updating' for entry in self.entries) >= self.total_max_parallel_executions
 
 
     def despatching(self):
@@ -443,13 +447,13 @@ class Updater:
 
             time.sleep(1)
 
-            if self.max_parallel_executions_exceeded():
-                continue
-
             for entry in self.entries:
 
                 if not entry.is_manual_update:
                     continue
+
+                if self.total_max_parallel_executions_exceeded():
+                    break
 
                 if self.max_executions_per_tag_exceeded(entry.program.tags):
                     continue
@@ -473,6 +477,9 @@ class Updater:
 
                 if entry.status != 'needs_update':
                     continue
+
+                if self.total_max_parallel_executions_exceeded():
+                    break
 
                 if self.max_executions_per_tag_exceeded(entry.program.tags):
                     continue
@@ -498,9 +505,17 @@ class Updater:
 
 
     def max_executions_per_tag_exceeded(self, tags: typing.Iterable[str]):
-        for tag in tags:
-            if self.max_parallel_execution_per_tag[tag] <= len([entry for entry in self.entries if entry.status == 'updating' and tag in entry.program.tags]):
+
+        updating_entries = [entry for entry in self.entries if entry.status == 'updating']
+
+        execution_limiting_tags = [tag for tag in tags if tag in self.max_parallel_execution_per_tag]
+        if not execution_limiting_tags:
+            return self.default_max_parallel_executions <= len(updating_entries)
+
+        for tag in execution_limiting_tags:
+            if self.max_parallel_execution_per_tag[tag] <= sum(tag in entry.program.tags for entry in updating_entries):
                 return True
+
         return False
 
 

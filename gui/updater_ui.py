@@ -417,7 +417,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         main_frame: Main_Frame = self.GetTopLevelParent()
 
-        if main_frame.updater.max_parallel_executions_exceeded():
+        if main_frame.updater.total_max_parallel_executions_exceeded():
             wx.MessageBox("Max amount of simultaneous updates exceeded.", "Error", style= wx.OK | wx.ICON_ERROR)
             return
 

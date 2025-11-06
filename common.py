@@ -137,18 +137,39 @@ class Instruction:
 class Program:
 
 
-    def __init__(self, *, blend_path: str, result_path: str, blender_executable: str, report_path: typing.Optional[str] = None):
+    def __init__(self, *,
+                blend_path: str,
+                result_path: str,
+                blender_executable: str,
+                report_path: typing.Optional[str] = None,
+                config: typing.Optional[Config_Base] = None,
+                tags: typing.Optional[typing.Set[str]] = None,
+                timeout: typing.Optional[float] = None,
+            ):
 
 
-        # this is for the GUI
         self.blend_path = os.fspath(blend_path)
+        """ Used for the GUI """
+
         self.result_path = os.fspath(result_path)
+        """ Used for the GUI """
+
         self.blender_executable = os.fspath(blender_executable)
+        """ Used for the GUI """
 
         if report_path is None:
             self.report_path = self.result_path + '.json'
         else:
             self.report_path = os.fspath(report_path)
+
+        self.config: typing.Optional[Config_Base] = config
+        """ Pre execution configuration. """
+
+        self.tags: typing.Set[str] = tags if tags else set()
+        """ Use for differentiation. See `set_max_workers_by_program_tag`. """
+
+        self.timeout = timeout
+        """ A max execution time in seconds after which the program will be terminated with an error. """
 
 
         self.instructions: typing.List[Instruction] = []
@@ -164,16 +185,10 @@ class Program:
         """ Values to set when inspecting and get like `blend_inspector.get_value('my_value', 100)` """
 
         self.return_values = {}
+        """ This will be populated after the execution. """
 
         self.return_values_file: typing.Optional[str] = None
         """ A file where the return values will be written. """
-
-        self.config: typing.Optional[Config_Base] = None
-        """ Pre execution configuration. """
-
-        self.tags: typing.Set[str] = set()
-        """ Use for differentiation. See `set_max_workers_by_program_tag`. """
-
 
 
     def read_report(self):
