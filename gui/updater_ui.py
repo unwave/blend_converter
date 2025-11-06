@@ -43,11 +43,11 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.columns = [
             ('live', 40, self.get_column_live_update),
             ('ℹ️', 40, self.get_column_icon_status),
+            ('status', 175, self.get_column_status),
             ('path', 800, self.get_column_path),
             # ('path_parts', 600, self.get_column_path_parts),
             ('ext', 100, self.get_column_result_type),
             # ('poke_time', 200, self.get_column_poke_time),
-            ('status', 200, self.get_column_status),
         ]
 
         self.columns.extend(columns)
@@ -73,12 +73,12 @@ class Model_List(wxp_utils.Item_Viewer_Native):
     def set_item_attrs(self):
 
         self.status_to_bg_color = dict(
-            ok = wx.Colour(95, 212, 119),
-            needs_update = wx.Colour(244, 241, 134),
-            updating = wx.Colour(255, 179, 71),
+            ok = wx.Colour(91, 237, 120),
+            needs_update = wx.Colour(240, 235, 98),
+            updating = wx.Colour(242, 176, 83),
             error = wx.Colour(255, 105, 97),
             does_not_exist = wx.Colour(211, 211, 211),
-            waiting_for_dependency = wx.Colour(150, 217, 202),
+            waiting_for_dependency = wx.Colour(201, 177, 113),
         )
 
         for key, value in self.status_to_bg_color.items():
@@ -108,7 +108,17 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         if item.status == 'ok':
             return '✔️'
         elif item.status == 'updating':
-            return '⏳'
+            return '🔨'
+        elif item.status == 'needs_update':
+            return '🔥'
+        elif item.status == 'error':
+            return '❌'
+        elif item.status == 'waiting_for_dependency':
+            return '🔒'
+        elif item.status == 'does_not_exist':
+            return '👻'
+        elif item.status == 'unknown':
+            return '❓'
         else:
             return ''
 
@@ -467,7 +477,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
                 return
 
         entry.program.write_report()
-        self.main_frame.updater.poke_entry(entry)
+        self.main_frame.updater.poke_all()
 
 
 class Output_Lines(wxp_utils.Item_Viewer_Native):
