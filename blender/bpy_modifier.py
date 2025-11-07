@@ -8,10 +8,10 @@ import os
 from . import bpy_context
 
 
-def apply_modifier(modifier: bpy.types.Modifier):
+def apply_modifier(modifier: bpy.types.Modifier, can_be_canceled = False):
     object = modifier.id_data
     print(modifier.name + "...")
-    bpy_context.call_for_object(object, bpy.ops.object.modifier_apply, modifier = modifier.name, single_user = True)
+    bpy_context.call_for_object(object, bpy.ops.object.modifier_apply, modifier = modifier.name, single_user = True, can_be_canceled = can_be_canceled)
 
 
 def apply_collapse(object: bpy.types.Object, ratio: float):

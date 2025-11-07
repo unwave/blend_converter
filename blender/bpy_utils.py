@@ -22,6 +22,7 @@ from . import bpy_context
 from . import bake_settings as tool_settings_bake
 from . import bpy_node
 from . import bpy_uv
+from . import bpy_modifier
 
 from .. import tool_settings
 from .. import utils
@@ -1934,15 +1935,11 @@ def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '',
         if not modifiers_to_apply:
             continue
 
-
-        with bpy_context.Isolate_Focus([object]):
-
+        try:
             for modifier in modifiers_to_apply:
-
-                result = bpy.ops.object.modifier_apply(modifier = modifier.name, single_user = True)
-
-                if not ignore_canceled and 'CANCELLED' in result:
-                    raise Exception(f"Fail to apply {modifier.type} modifier '{modifier.name}' to object '{object.name_full}'.")
+                bpy_modifier.apply_modifier(modifier, can_be_canceled = ignore_canceled)
+        except Exception as e:
+            raise Exception(f"Fail to apply {modifier.type} modifier '{modifier.name}' to object '{object.name_full}'.") from e
 
 
 def get_unique_materials(objects: typing.List[bpy.types.Object]):

@@ -44,6 +44,8 @@ class COMMON:
     INSPECT_BLEND_FINAL = 'inspect:blend:final'
     """ inspect the final blend """
 
+    INSPECT_ERROR = 'inspect:error'
+    """ inspect on a script error """
 
     INSPECT_BAKE_PRE = 'inspect:bake:pre'
     """ inspect before baking a texture """
@@ -96,14 +98,10 @@ class COMMON:
 
 
 
-def inspect_blend(name = 'DEBUG', blender_executable: typing.Optional[str] = None, exit_after = False, detached = False):
+def _inspect_blend(name = 'DEBUG', blender_executable: typing.Optional[str] = None, exit_after = False, detached = False):
     """ Blocking blend file inspection. """
 
-    if has_identifier(COMMON.SKIP_INSPECT):
-        return
-
     import bpy
-
 
     if blender_executable is None:
         blender_executable = bpy.app.binary_path
@@ -138,6 +136,16 @@ def inspect_blend(name = 'DEBUG', blender_executable: typing.Optional[str] = Non
 
     if exit_after:
         raise SystemExit('DEBUG EXIT')
+
+
+@functools.wraps(_inspect_blend)
+def inspect_blend(*args, **kwargs):
+
+    if has_identifier(COMMON.SKIP_INSPECT):
+        print('Inspect skipped:', *args, **kwargs)
+        return
+
+    _inspect_blend(*args, **kwargs)
 
 
 def inspectable(func):

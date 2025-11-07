@@ -205,6 +205,8 @@ def process():
 
             blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL)
 
+            blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_ERROR)
+
             raise SystemExit(1)
 
 

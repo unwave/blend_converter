@@ -1587,6 +1587,10 @@ class Isolate_Focus:
 
 
     def __init__(self, objects: typing.List[bpy.types.Object], mode = 'OBJECT'):
+
+        if type(objects) is bpy.types.Object:
+            objects = [objects]
+
         self.objects = objects
         self.mode = mode
 
