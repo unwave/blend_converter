@@ -13,6 +13,7 @@ import queue
 import sys
 import array
 import traceback
+import tempfile
 
 import bpy
 import mathutils
@@ -1156,7 +1157,7 @@ def unwrap(objects: typing.List[bpy.types.Object], *,
             bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
 
         with bpy_context.Empty_Scene():
-            bpy_utils.unwrap_ministry_of_flat_with_fallback(objects, settings, ministry_of_flat_settings)
+            unwrap_ministry_of_flat_with_fallback(objects, settings, ministry_of_flat_settings)
 
         scale_uv_to_world_per_uv_layout(objects)
 
@@ -1386,3 +1387,98 @@ def copy_uv(from_object: bpy.types.Object, to_object: bpy.types.Object, uv_layer
         from_object.data.uv_layers[uv_layer_name].data.foreach_get('uv', uvs)
 
         to_object.data.uv_layers[uv_layer_name].data.foreach_set('uv', uvs)
+
+
+def unwrap_ministry_of_flat_with_fallback(
+            objects: typing.List[bpy.types.Object],
+            settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
+            ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None,
+        ):
+
+    settings = tool_settings.Unwrap_UVs()._update(settings)
+    ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(vertex_weld=False, rasterization_resolution=1, packing_iterations=1)._update(ministry_of_flat_settings)
+
+    for object in objects:
+
+        if not object.data.polygons:
+            utils.print_in_color(utils.get_foreground_color_code(217, 103, 41), f"Object has no faces: {object.name_full}")
+            continue
+
+        object_copy = get_object_copy_for_uv_unwrap(object)
+        object_copy.name = "UV_UNWRAP_" + object_copy.name
+
+        with bpy_context.Isolate_Focus([object_copy], mode='EDIT'):
+
+            bpy.ops.mesh.reveal()
+            bpy.ops.uv.reveal()
+            bpy_context.call_in_uv_editor(bpy.ops.uv.select_mode, type='VERTEX', can_be_canceled = True)
+            bpy.context.scene.tool_settings.use_uv_select_sync = False
+
+            # mark seams by materials
+            bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='EDGE')
+            bpy.ops.mesh.select_all(action='DESELECT')
+
+            for material_index in range(len(object_copy.material_slots)):
+
+                object_copy.active_material_index = material_index
+
+                bpy.ops.mesh.select_all(action='DESELECT')
+                bpy.ops.object.material_slot_select()
+                bpy.ops.mesh.region_to_loop()
+                bpy.ops.mesh.mark_seam(clear=False)
+
+            b_mesh = bmesh.from_edit_mesh(object_copy.data)
+            b_mesh.edges.ensure_lookup_table()
+
+            edges = [edge for edge in b_mesh.edges if edge.seam]
+            bmesh.ops.split_edges(b_mesh, edges = edges)
+
+            bmesh.update_edit_mesh(object_copy.data, loop_triangles=False, destructive=False)
+
+            # unwrapping
+            try:
+                with tempfile.TemporaryDirectory() as temp_dir:
+
+                    unwrap_ministry_of_flat(object_copy, temp_dir, settings = ministry_of_flat_settings, uv_layer_name = settings.uv_layer_name)
+            except utils.Fallback as e:
+
+                utils.print_in_color(utils.get_color_code(240,0,0, 0,0,0), f"Fallback to smart_project: {e}")
+
+                object_copy.data.uv_layers.active = object_copy.data.uv_layers[settings.uv_layer_name]
+
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.uv.select_all(action='SELECT')
+                bpy.ops.uv.pin(clear=True)
+                bpy.ops.uv.smart_project(angle_limit = math.radians(settings.smart_project_angle_limit))
+
+            do_reunwrap = settings.reunwrap_bad_uvs_with_minimal_stretch or settings.reunwrap_all_with_minimal_stretch
+
+            if do_reunwrap and 'iterations' in repr(bpy.ops.uv.unwrap):
+
+                mark_seams_from_islands(object_copy, settings.uv_layer_name)
+
+                if settings.reunwrap_all_with_minimal_stretch:
+                    bpy.ops.mesh.select_all(action='SELECT')
+                    bpy.ops.uv.select_all(action='SELECT')
+                    bpy_context.call_in_uv_editor(
+                        bpy.ops.uv.unwrap,
+                        method='MINIMUM_STRETCH',
+                        fill_holes=True,
+                        no_flip=True,
+                        use_weights = bool(settings.uv_importance_weight_group),
+                        weight_group = settings.uv_importance_weight_group,
+                        weight_factor = settings.uv_importance_weight_factor,
+                        can_be_canceled=True,
+                    )
+
+                reunwrap_bad_uvs([object_copy])
+
+
+        copy_uv(object_copy, object, settings.uv_layer_name)
+
+        bpy.data.objects.remove(object_copy)
+
+        if settings.mark_seams_from_islands:
+            mark_seams_from_islands(object, settings.uv_layer_name)
+
+    blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_UV_UNWRAP)

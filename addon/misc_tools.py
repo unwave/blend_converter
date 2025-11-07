@@ -548,7 +548,7 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
                 tubes= operator.use_tubes
             )
 
-            bpy_utils.unwrap_ministry_of_flat_with_fallback([object], uvs_unwrap_settings, ministry_of_flat_settings)
+            bpy_uv.unwrap_ministry_of_flat_with_fallback([object], uvs_unwrap_settings, ministry_of_flat_settings)
 
 
             with bpy_context.Focus_Objects(object, mode='EDIT'):

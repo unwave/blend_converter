@@ -54,8 +54,8 @@ class COMMON:
     INSPECT_BAKE_COMPOSER = 'inspect:bake:comp'
     """ inspect composer """
 
-    # TODO
-    # INSPECT_UV_UNWRAP = 'inspect:uv:unwrap'
+
+    INSPECT_UV_UNWRAP = 'inspect:uv:unwrap'
     """ after uv unwrapping """
 
     INSPECT_UV_PACK = 'inspect:uv:pack'
