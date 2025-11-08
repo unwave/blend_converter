@@ -7,6 +7,7 @@ import sys
 import subprocess
 import re
 import functools
+import inspect
 
 from . import utils
 
@@ -160,6 +161,12 @@ def inspectable(func):
             return
 
         try:
+            depth = max(len(inspect.stack()) - 8, 0)
+
+            args_print = ', '.join([repr(value) for value in args])
+            kwargs_print = ', '.join([f"{key}={repr(value)}" for key, value in kwargs.items()])
+
+            print('\t' * depth + f"{func.__name__}({args_print}, {kwargs_print})")
             return func(*args, **kwargs)
         finally:
             inspect_if_has_identifier(f'inspect:func:post={func.__name__}')
@@ -202,3 +209,35 @@ def get_value(key: str, default: typing.Optional[T]) -> T:
 
 def add_value(**kwargs):
     _values.update(kwargs)
+
+
+def make_top_functions_inspectable():
+
+    from . import bake_settings
+    from . import bc_script
+    from . import bpy_bake
+    from . import bpy_context
+    from . import bpy_data
+    from . import bpy_mesh
+    from . import bpy_modifier
+    from . import bpy_node
+    from . import bpy_utils
+    from . import bpy_uv
+
+    modules = [
+        bake_settings,
+        bc_script,
+        bpy_bake,
+        bpy_context,
+        bpy_data,
+        bpy_mesh,
+        bpy_modifier,
+        bpy_node,
+        bpy_utils,
+        bpy_uv,
+    ]
+
+    for module in modules:
+        for name, object in module.__dict__.items():
+            if inspect.isfunction(object):
+                setattr(module, name, inspectable(object))

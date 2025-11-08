@@ -433,7 +433,7 @@ def obj_only_ministry_of_flat(operator: bpy.types.Operator, context: bpy.types.C
     ),
     bl_options = {'REGISTER', 'UNDO'},
 )
-def uv_to_world_scale(operator: bpy.types.Operator, context: bpy.types.Context):
+def scale_uv_to_world_per_uv_island(operator: bpy.types.Operator, context: bpy.types.Context):
     objects = [object for object in context.selected_objects if object.data and hasattr(object.data, 'uv_layers') and object.data.is_editmode]
     objects = bpy_utils.get_unique_data_objects(objects)
     bpy_uv.scale_uv_to_world_per_uv_island(objects, use_selected=operator.use_selected, divide_by_mean=operator.divide_by_mean)
@@ -453,7 +453,7 @@ def merge_objects_respect_materials(operator: bpy.types.Operator, context: bpy.t
     poll = edit_mode_poll,
     bl_options = {'REGISTER', 'UNDO'},
 )
-def scale_uv_to_world_per_uv_layout_median(operator: bpy.types.Operator, context: bpy.types.Context):
+def scale_uv_to_world_per_uv_layout(operator: bpy.types.Operator, context: bpy.types.Context):
     objects = [object for object in context.selected_objects if object.data and hasattr(object.data, 'uv_layers') and object.data.is_editmode]
     objects = bpy_utils.get_unique_data_objects(objects)
     bpy_uv.scale_uv_to_world_per_uv_layout(objects)
@@ -601,3 +601,14 @@ def scale_uv_to_bounds(operator: bpy.types.Operator, context: bpy.types.Context)
     objects = bpy_utils.get_unique_data_objects(objects)
     for object in objects:
         bpy_uv.scale_uv_to_bounds(object, margin=operator.margin)
+
+
+@operator_factory.operator(
+    poll = edit_mode_poll,
+    bl_options = {'REGISTER', 'UNDO'},
+)
+def select_collapsed_islands(operator: bpy.types.Operator, context: bpy.types.Context):
+    objects = [object for object in context.selected_objects if object.data and hasattr(object.data, 'uv_layers') and object.data.is_editmode]
+    objects = bpy_utils.get_unique_data_objects(objects)
+    for object in objects:
+        bpy_uv.select_collapsed_islands(object, object.data.uv_layers.active.name)

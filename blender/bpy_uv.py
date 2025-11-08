@@ -317,7 +317,6 @@ def get_object_copy_for_uv_unwrap(object: bpy.types.Object):
     return object_copy
 
 
-@blend_inspector.inspectable
 def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, settings: tool_settings.Ministry_Of_Flat, uv_layer_name: typing.Optional[str] = None):
     """ Currently operates on per mesh basis, so it is not possible to unwrap only a part of `bpy.types.Mesh`. """
     print(unwrap_ministry_of_flat.__name__, object.name_full)
@@ -1187,7 +1186,6 @@ def get_stdev_mean(values: typing.Union[typing.Sized, typing.Iterable]):
         return statistics.mean(multiplier for multiplier in values if multiplier <= maximum and multiplier >= minimum)
 
 
-@blend_inspector.inspectable
 @blend_inspector.skipable(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_UNWRAP)
 def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False, divide_by_mean = True):
     print(f"{reunwrap_bad_uvs.__name__}...")
@@ -1288,7 +1286,7 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
 
             is_bad_islands = [bound_box_ratio > maximum_bound_box_ratio or world_to_uv_ratio == 0 or bound_box_ratio == 0 for world_to_uv_ratio, bound_box_ratio in zip( world_to_uv_ratios, bound_box_ratios)]
 
-            mean_scale_multiplier = statistics.harmonic_mean([math.sqrt(world_to_uv_ratio) for is_bad, world_to_uv_ratio in zip(is_bad_islands, world_to_uv_ratios) if not is_bad])
+            # mean_scale_multiplier = statistics.harmonic_mean([math.sqrt(world_to_uv_ratio) for is_bad, world_to_uv_ratio in zip(is_bad_islands, world_to_uv_ratios) if not is_bad])
 
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.uv.select_all(action='DESELECT')
@@ -1321,24 +1319,24 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
                 if only_select:
                     continue
 
-                if uv_area == 0:
-                    scale_multiplier = mean_scale_multiplier
-                else:
-                    scale_multiplier = math.sqrt(mesh_area/uv_area)
+                # if uv_area == 0:
+                #     scale_multiplier = mean_scale_multiplier
+                # else:
+                #     scale_multiplier = math.sqrt(mesh_area/uv_area)
 
                 island_vertices = [loop[uv_layer].uv for face in island for loop in face.loops]
                 island_center = sum(island_vertices, mathutils.Vector((0,0)))/len(island_vertices)
 
-                if divide_by_mean:
-                    scale_multiplier /= mean_scale_multiplier
+                # if divide_by_mean:
+                #     scale_multiplier /= mean_scale_multiplier
 
-                for face in island:
-                    for loop in face.loops:
+                # for face in island:
+                #     for loop in face.loops:
 
-                        uv_loop = loop[uv_layer]
-                        uv_loop.uv -= island_center
-                        uv_loop.uv *= scale_multiplier
-                        uv_loop.uv += island_center
+                #         uv_loop = loop[uv_layer]
+                #         uv_loop.uv -= island_center
+                #         uv_loop.uv *= scale_multiplier
+                #         uv_loop.uv += island_center
 
 
                 # stretch the bad uv island to make it no large than the maximum
@@ -1519,19 +1517,23 @@ def get_texel_density_for_uv_quality(object: bpy.types.Object, uv_layer_name: st
 
 
     total_uv_area = sum(face_uv_areas)
-    assert not math.isnan(total_uv_area)
+    if math.isnan(total_uv_area):
+        total_uv_area = sum(filter(math.isnan, face_uv_areas))
+
 
     texel_densities = []
     texel_densities_to_find = []
     weights = []
+    aria_ratios = []
 
     target_px_per_meter = 1024
 
     for face_area, face_area_uv in zip(face_areas, face_uv_areas):
 
         try:
+            aria_ratio = face_area / face_area_uv
             texel_density = math.sqrt(pow(current_texture_size, 2) / face_area * face_area_uv)
-            texel_density_to_find = math.sqrt(face_area / face_area_uv) * target_px_per_meter
+            texel_density_to_find = math.sqrt(aria_ratio) * target_px_per_meter
             weight = face_area_uv / total_uv_area
         except ZeroDivisionError:
             continue
@@ -1539,10 +1541,19 @@ def get_texel_density_for_uv_quality(object: bpy.types.Object, uv_layer_name: st
         texel_densities.append(texel_density)
         texel_densities_to_find.append(texel_density_to_find)
         weights.append(weight)
+        aria_ratios.append(math.sqrt(aria_ratio))
 
     total_mesh_area = sum(face_areas)
-    current_from_weighted_mean = sum(map(operator.mul, texel_densities, weights))/sum(weights)
+
+    weighted_texel_densities = list(map(operator.mul, texel_densities, weights))
+
+    current_from_weighted_mean = sum(weighted_texel_densities)/sum(weights)
     current_from_total = math.sqrt(total_mesh_area / total_uv_area) * current_texture_size
+
+    aria_ratios_harmonic_mean =  statistics.harmonic_mean([x for x in aria_ratios if x > 0])
+    aria_ratios_standard_deviation = statistics.stdev([x/aria_ratios_harmonic_mean for x in aria_ratios])
+
+    texel_density_standard_deviation = statistics.stdev(weighted_texel_densities)
 
     perfect_resolution = sum(map(operator.mul, texel_densities_to_find, weights))/sum(weights)
 
@@ -1553,15 +1564,63 @@ def get_texel_density_for_uv_quality(object: bpy.types.Object, uv_layer_name: st
         total_uv_area = 0
         current_from_weighted_mean = 0
 
-    return current_from_weighted_mean, total_uv_area, perfect_resolution
+    return current_from_weighted_mean, total_uv_area, perfect_resolution, texel_density_standard_deviation, aria_ratios_standard_deviation
+
+
+def select_collapsed_islands(object: bpy.types.Object, uv_layer_name: str, tolerance = 1e-5):
+    """ The unwrap with minimal stretch can produce these when fails. """
+
+
+    def get_bound_box_size(island: typing.List[bmesh.types.BMFace]):
+        xs, ys = zip(*(bm_loop[uv_layer].uv for face in island for bm_loop in face.loops))
+        return abs(max(xs) - min(xs)), abs(max(ys) - min(ys))
+
+    loop_count = 0
+
+    with bpy_context.Focus_Objects([object], mode='EDIT'):
+
+        bpy.ops.mesh.reveal()
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.uv.reveal()
+        bpy.ops.uv.select_all(action='DESELECT')
+
+        bm = bmesh.from_edit_mesh(object.data)
+        uv_layer = bm.loops.layers.uv[uv_layer_name]
+
+        islands = get_linked_uv_islands(bm, uv_layer)
+
+        for island in islands:
+
+            x, y = get_bound_box_size(island)
+            is_collapsed = x <= tolerance or y <= tolerance
+
+            if is_collapsed:
+                for face in island:
+                    for loop in face.loops:
+                        loop[uv_layer].select = True
+                        loop_count += 1
+
+        bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
+
+    return loop_count
 
 
 def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
+
+    # save the uvs
+    with bpy_context.Focus_Objects(object):
+        saved_uvs = array.array('f', [0.0, 0.0]) * len(object.data.loops)
+        object.data.uv_layers[uv_layer_name].data.foreach_get('uv', saved_uvs)
 
 
     with bpy_context.Isolate_Focus([object], mode='EDIT'):
 
         bpy.ops.mesh.select_all(action='SELECT')
+
+        bpy.ops.uv.select_all(action='DESELECT')
+        collapsed_loops_count = select_collapsed_islands(object, uv_layer_name)
+        if collapsed_loops_count:
+            bpy.ops.uv.hide(unselected=False)  # hiding because invalid anyway
 
         bm = bmesh.from_edit_mesh(object.data)
         bm.faces.ensure_lookup_table()
@@ -1570,13 +1629,14 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
         linked_uv_islands = get_linked_uv_islands(bm, uv_layer)
 
         bpy.ops.uv.select_all(action='DESELECT')
+        print('bpy.ops.uv.select_overlap...', '[ can be long for badly overlapped uvs ]')
         bpy.ops.uv.select_overlap()
-        overlapping_verts = sum(vert.select for island in linked_uv_islands for face in island for vert in face.verts)
+        overlapping_loops = sum(loop[uv_layer].select for island in linked_uv_islands for face in island for loop in face.loops) + collapsed_loops_count
+
+        bpy.ops.uv.reveal()
         bpy.ops.uv.select_all(action='DESELECT')
 
-        mean_faces_per_island = statistics.mean([len(island) for island in linked_uv_islands])
-
-        texel_density_aabb, uv_area_aabb, _ = get_texel_density_for_uv_quality(object, uv_layer_name)
+        faces_per_island_median = statistics.median([len(island) for island in linked_uv_islands])
 
         if enable_uv_packer_addon():
 
@@ -1584,11 +1644,10 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
             bpy.ops.uv.pin(clear=True)
 
             uv_packer_pack(2048, 2048, 4, True, False)
-            scale_uv_to_bounds(object)
-            texel_density_uv_packer, uv_area_uv_packer, _ = get_texel_density_for_uv_quality(object, uv_layer_name)
-        else:
-            texel_density_uv_packer, uv_area_uv_packer = 0, 0
 
+        # scale_uv_to_bounds(object)
+
+        texel_density, uv_area_taken, _, texel_density_standard_deviation, aria_ratios_standard_deviation = get_texel_density_for_uv_quality(object, uv_layer_name)
 
     stretches = []
 
@@ -1599,7 +1658,7 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
         from mathutils import Vector
 
         me = object.data
-        uv_layer = me.uv_layers.active
+        uv_layer = me.uv_layers[uv_layer_name]
 
         for f in me.polygons:
             verts = [me.vertices[me.loops[l].vertex_index].co for l in f.loop_indices]
@@ -1612,19 +1671,16 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
 
     metric = Unwrap_Quality_Score(
         islands_count = len(linked_uv_islands),
-        mean_faces_per_island = mean_faces_per_island,
-        texel_density_aabb = texel_density_aabb,
-        uv_area_aabb = uv_area_aabb,
-        texel_density_uv_packer = texel_density_uv_packer,
-        uv_area_uv_packer = uv_area_uv_packer,
+        faces_per_island_median = faces_per_island_median,
+        texel_density = texel_density,
+        uv_area_taken = uv_area_taken,
         mean_stretches = statistics.mean(stretches),
-        overlapping_verts = overlapping_verts,
+        overlapping_loops = overlapping_loops,
+        texel_density_standard_deviation = texel_density_standard_deviation,
+        aria_ratios_standard_deviation = aria_ratios_standard_deviation,
     )
 
-    with bpy_context.Focus_Objects(object):
-        uvs = array.array('f', [0.0, 0.0]) * len(object.data.loops)
-        object.data.uv_layers[uv_layer_name].data.foreach_get('uv', uvs)
-        metric._uvs = uvs
+    metric._uvs = saved_uvs
 
     return metric
 
@@ -1666,23 +1722,23 @@ class Unwrap_Quality_Score:
 
     def __init__(self, *,
             islands_count,
-            mean_faces_per_island,
-            texel_density_aabb,
-            uv_area_aabb,
-            texel_density_uv_packer,
-            uv_area_uv_packer,
+            faces_per_island_median,
+            texel_density,
+            uv_area_taken,
             mean_stretches,
-            overlapping_verts,
+            overlapping_loops,
+            texel_density_standard_deviation,
+            aria_ratios_standard_deviation,
         ):
 
         self.islands_count = islands_count
-        self.mean_faces_per_island = mean_faces_per_island
-        self.texel_density_aabb = texel_density_aabb
-        self.uv_area_aabb = uv_area_aabb
-        self.texel_density_uv_packer = texel_density_uv_packer
-        self.uv_area_uv_packer = uv_area_uv_packer
+        self.faces_per_island_median = faces_per_island_median
+        self.texel_density = texel_density
+        self.uv_area_taken = uv_area_taken
         self.mean_stretches = mean_stretches
-        self.overlapping_verts = overlapping_verts
+        self.overlapping_loops = overlapping_loops
+        self.texel_density_standard_deviation = texel_density_standard_deviation
+        self.aria_ratios_standard_deviation = aria_ratios_standard_deviation
 
         self._keys = tuple(key for key in self.__dict__.keys() if not key.startswith('_'))
 
@@ -1705,23 +1761,69 @@ class Unwrap_Quality_Score:
 
 
     def _get_score(self):
+        """ The values should be normalized first. """
         return (
-            (1 - self.islands_count) * 0.6
+            (1 - self.islands_count)
             +
-            self.mean_faces_per_island * 0.5
-            # +
-            # self.texel_density_aabb * 0.7
-            # +
-            # self.uv_area_aabb * 0.7
+            self.faces_per_island_median
             +
-            self.texel_density_uv_packer * 2
+            self.texel_density * 2
             +
-            self.uv_area_uv_packer
+            self.uv_area_taken * 2
             +
             (1 - self.mean_stretches)
             +
-            (1 - self.overlapping_verts)
+            (1 - self.overlapping_loops) * 3
+            +
+            (1 - self.texel_density_standard_deviation) * 2
+            +
+            (1 - self.aria_ratios_standard_deviation) * 5
         )
+
+
+    def _copy(self):
+        return Unwrap_Quality_Score(**{key : getattr(self, key) for key in self._keys})
+
+
+    @staticmethod
+    def _get_best(candidates: typing.Dict[str, Unwrap_Quality_Score]):
+
+        for name, measure in list(candidates.items()):
+            if not measure:
+                print(f"Method failed: {name}")
+                candidates.pop(name)
+
+        if not candidates:
+            return ('None', None)
+
+        number_of_metrics = len(list(candidates.values())[-1]._keys)
+
+        for name, measure in list(candidates.items()):
+            print(name)
+            for i in range(number_of_metrics):
+                print('\t', round(measure[i], 3), end='\t', sep = '')
+            print()
+
+        # normalize
+        copies = {key : value._copy() for key, value in candidates.items()}
+
+        for i in range(number_of_metrics):
+
+            values = [copies[name][i] for name in copies]
+            min_value = min(values)
+            max_value = max(values)
+
+            for name in copies:
+                copies[name]._normalize(i, min_value, max_value)
+
+        variants = sorted(copies.items(), key = lambda x: x[1]._get_score())
+
+        for name, score in variants:
+            print(name, score._get_score())
+
+        the_best_name = variants[-1][0]
+
+        return (the_best_name, candidates[the_best_name])
 
 
     def _print(self, prefix = ''):
@@ -1779,24 +1881,28 @@ def brute_force_unwrap(
         bpy.ops.uv.select_all(action='SELECT')
         bpy.ops.uv.pin(clear=True)
 
+
         def rescale():
-            scale_uv_to_world_per_uv_island([object_copy])
+            scale_uv_to_world_per_uv_layout([object_copy])
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.uv.select_all(action='SELECT')
             aabb_pack()
-            scale_uv_to_bounds(object_copy)
 
 
         def mof_1():
             try:
                 with tempfile.TemporaryDirectory() as temp_dir:
-                    unwrap_ministry_of_flat(object_copy, temp_dir, settings = ministry_of_flat_settings, uv_layer_name = settings.uv_layer_name)
-                    # reunwrap_bad_uvs([object_copy])
+
+                    mof_settings = ministry_of_flat_settings._get_copy()
+                    mof_settings.stretch = False
+
+                    unwrap_ministry_of_flat(object_copy, temp_dir, settings = mof_settings, uv_layer_name = settings.uv_layer_name)
 
                     rescale()
 
                     return get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
             except utils.Fallback:
+                    traceback.print_exc(file=sys.stderr)
                     return None
 
 
@@ -1805,21 +1911,37 @@ def brute_force_unwrap(
                 with tempfile.TemporaryDirectory() as temp_dir:
 
                     mof_settings = ministry_of_flat_settings._get_copy()
+                    mof_settings.stretch = False
                     mof_settings.grids = False
                     mof_settings.quads = False
                     mof_settings.planes = False
                     mof_settings.separate_hard_edges = True
 
                     unwrap_ministry_of_flat(object_copy, temp_dir, settings = mof_settings, uv_layer_name = settings.uv_layer_name)
-                    # reunwrap_bad_uvs([object_copy])
 
                     rescale()
 
                     return get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
             except utils.Fallback:
+                    traceback.print_exc(file=sys.stderr)
                     return None
 
+        def mof_use_normal():
+            try:
+                with tempfile.TemporaryDirectory() as temp_dir:
 
+                    mof_settings = ministry_of_flat_settings._get_copy()
+                    mof_settings.stretch = False
+                    mof_settings.use_normal = True
+
+                    unwrap_ministry_of_flat(object_copy, temp_dir, settings = mof_settings, uv_layer_name = settings.uv_layer_name)
+
+                    rescale()
+
+                    return get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+            except utils.Fallback:
+                    traceback.print_exc(file=sys.stderr)
+                    return None
 
 
         def smart_project(angle_limit: float):
@@ -1829,7 +1951,9 @@ def brute_force_unwrap(
             bpy.ops.uv.pin(clear=True)
             bpy.ops.uv.smart_project(angle_limit = angle_limit)
 
-            # reunwrap_bad_uvs([object_copy])
+            # can produce bad result that affect the normalization negatively
+
+            reunwrap_bad_uvs([object_copy])
             rescale()
 
             return get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
@@ -1840,9 +1964,9 @@ def brute_force_unwrap(
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.uv.select_all(action='SELECT')
             bpy.ops.uv.pin(clear=True)
-            bpy.ops.uv.cube_project(cube_size=2, clip_to_bounds=False, scale_to_bounds=True)
+            bpy.ops.uv.cube_project(cube_size=2, clip_to_bounds=False, scale_to_bounds=False)
 
-            # reunwrap_bad_uvs([object_copy])
+            reunwrap_bad_uvs([object_copy])
             rescale()
 
             return get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
@@ -1874,107 +1998,128 @@ def brute_force_unwrap(
                 # can_be_canceled=True,
             )
 
-        quality_measures: typing.Dict[str, Unwrap_Quality_Score] = {}
+
 
         skip_inspect = not blend_inspector.get_value('inspect_brute_force_unwrap', False)
 
 
-        quality_measures['mof_1'] = mof_1()
+        def clear_seams():
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.uv.select_all(action='SELECT')
+            bpy.ops.uv.mark_seam(clear=True)
+
+
+        if False and len(object_copy.data.uv_layers) > 1:
+
+            with bpy_context.Focus_Objects(object_copy):
+                uvs = array.array('f', [0.0, 0.0]) * len(object_copy.data.loops)
+                object_copy.data.uv_layers[object_copy.data.uv_layers[0].name].data.foreach_get('uv', uvs)
+                object_copy.data.uv_layers[object_copy.data.uv_layers.active.name].data.foreach_set('uv', uvs)
+
+            rescale()
+
+            mark_seams_from_islands(object_copy, settings.uv_layer_name)
+
+            try:
+                _measures['current'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+                skip_inspect or binspect('current')
+
+                reunwrap_with_minimal_stretch()
+
+                _measures['current_minimal_stretch'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+                skip_inspect or binspect('current_minimal_stretch')
+
+            except Exception:
+                traceback.print_exc(file=sys.stderr)
+                pass
+
+
+        mof_measures: typing.Dict[str, Unwrap_Quality_Score] = {}
+
+        clear_seams()
+
+        mof_measures['mof_1'] = mof_1()
         skip_inspect or binspect('mof_1')
 
-        # mark_seams_from_islands(object_copy, settings.uv_layer_name)
+        clear_seams()
 
-        # reunwrap_with_minimal_stretch()
-        # rescale()
-        # quality_measures['mof_1_reunwrap'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-        # do_inspect or binspect('mof_1_reunwrap')
-
-        # reunwrap_conformal()
-        # rescale()
-        # quality_measures['mof_1_conformal'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-        # do_inspect or binspect('mof_1_conformal')
-
-
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.uv.select_all(action='SELECT')
-        bpy.ops.uv.mark_seam(clear=True)
-
-        quality_measures['mof_2'] = mof_2()
+        mof_measures['mof_2'] = mof_2()
         skip_inspect or binspect('mof_2')
 
-        # mark_seams_from_islands(object_copy, settings.uv_layer_name)
+        clear_seams()
 
-        # reunwrap_with_minimal_stretch()
-        # rescale()
-        # quality_measures['mof_1_reunwrap'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-        # do_inspect or binspect('mof_2_reunwrap')
-
-        # reunwrap_conformal()
-        # rescale()
-        # quality_measures['mof_1_conformal'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-        # do_inspect or binspect('mof_2_conformal')
+        mof_measures['mof_use_normals'] = mof_use_normal()
+        skip_inspect or binspect('mof_use_normals')
 
 
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.uv.select_all(action='SELECT')
-        bpy.ops.uv.mark_seam(clear=True)
+        clear_seams()
+
+        just_minimal_stretch_measures: typing.Dict[str, Unwrap_Quality_Score] = {}
+
+        reunwrap_with_minimal_stretch()
+
+        try:
+            measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        except Exception:
+            measure = None
+
+        just_minimal_stretch_measures['just_minimal_stretch'] = measure
+        skip_inspect or binspect('just_minimal_stretch')
+
+        clear_seams()
 
 
-        quality_measures['smart_project'] = smart_project(66)
-        skip_inspect or binspect('smart_project')
+        smart_and_cube_measures: typing.Dict[str, Unwrap_Quality_Score] = {}
+
+        smart_project(settings.smart_project_angle_limit)
+
+        # smart_and_cube_measures['smart_project'] = smart_project(settings.smart_project_angle_limit)
+        # skip_inspect or binspect('smart_project')
+        # binspect('smart_project')
 
         mark_seams_from_islands(object_copy, settings.uv_layer_name)
 
         reunwrap_with_minimal_stretch()
         rescale()
-        quality_measures['smart_project_reunwrap'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        smart_and_cube_measures['smart_project_reunwrap'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         skip_inspect or binspect('smart_project_reunwrap')
 
         reunwrap_conformal()
         rescale()
-        quality_measures['smart_project_conformal'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        smart_and_cube_measures['smart_project_conformal'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         skip_inspect or binspect('smart_project_conformal')
 
+        clear_seams()
 
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.uv.select_all(action='SELECT')
-        bpy.ops.uv.mark_seam(clear=True)
+        cube_project()
 
-
-        quality_measures['cube_project'] = cube_project()
-        skip_inspect or binspect('cube_project')
+        # smart_and_cube_measures['cube_project'] = cube_project()
+        # skip_inspect or binspect('cube_project')
 
         mark_seams_from_islands(object_copy, settings.uv_layer_name)
 
         reunwrap_with_minimal_stretch()
         rescale()
-        quality_measures['cube_project_reunwrap'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        smart_and_cube_measures['cube_project_reunwrap'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         skip_inspect or binspect('cube_project_reunwrap')
 
         reunwrap_conformal()
         rescale()
-        quality_measures['cube_project_conformal'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        smart_and_cube_measures['cube_project_conformal'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         skip_inspect or binspect('cube_project_conformal')
 
 
-    # normalize
-    for i in range(len(list(quality_measures.values())[-1]._keys)):
+    measures = dict([
+        Unwrap_Quality_Score._get_best(mof_measures),
+        Unwrap_Quality_Score._get_best(smart_and_cube_measures),
+        Unwrap_Quality_Score._get_best(just_minimal_stretch_measures),
+    ])
 
-        values = [quality_measures[name][i] for name in quality_measures]
-        min_value = min(values)
-        max_value = max(values)
+    the_best = Unwrap_Quality_Score._get_best(measures)[1]
 
-        for name in quality_measures:
-            quality_measures[name]._normalize(i, min_value, max_value)
-
-    variants = sorted(quality_measures.items(), key = lambda x: x[1]._get_score())
-
-    for name, score in variants:
-        print(name, score._get_score())
-        # score._print('\t')
 
     with bpy_context.Focus_Objects(object):
-        object.data.uv_layers[settings.uv_layer_name].data.foreach_set('uv', variants[-1][1]._uvs)
+        object.data.uv_layers[settings.uv_layer_name].data.foreach_set('uv', the_best._uvs)
 
     re_unwrap_overlaps(object, settings.uv_layer_name)
 
