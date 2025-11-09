@@ -311,21 +311,28 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.main_frame.updater.poke_entry(entry)
 
 
-    def get_conversion_command(self, entry: updater.Program_Entry):
+    def get_conversion_command(self, entries: typing.Iterable[updater.Program_Entry]):
+
+        programs = []
+
+        for entry in entries:
+            programs.append([
+                entry.from_module_file,
+                entry.programs_getter_name,
+                entry.dictionary_key,
+            ])
 
         command = utils.get_command_from_list([
             sys.executable,
             common.get_script_path('forced_update'),
-            entry.from_module_file,
-            entry.programs_getter_name,
-            entry.dictionary_key,
+            json.dumps(dict(programs=programs), ensure_ascii=False)
         ])
 
         return command
 
 
     def on_copy_conversion_command(self, entry: updater.Program_Entry):
-        wxp_utils.set_clipboard_text(self.get_conversion_command(entry))
+        wxp_utils.set_clipboard_text(self.get_conversion_command(self.get_selected_items()))
 
 
     def on_show_source_in_explorer(self, entry: updater.Program_Entry):
@@ -372,7 +379,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         key_code = event.GetKeyCode()
 
         if key_code == ord('C'):
-            pyperclip.copy('\n'.join((self.get_conversion_command(entry) for entry in self.get_selected_items())))
+            pyperclip.copy(self.get_conversion_command(self.get_selected_items()))
         elif key_code == ord('A'):
             prev_func = self.on_item_selected
             self.on_item_selected = lambda a, b: None

@@ -1,32 +1,37 @@
 import sys
 import os
 
-module_path = sys.argv[1]
-programs_getter_name = sys.argv[2]
-object_name = sys.argv[3]
+programs = sys.argv[1]
 
-ARGS = sys.argv[4:]
+ARGS = sys.argv[2:]
 
 import sys
 import importlib.util
 import os
 import typing
 import re
+import json
+import traceback
 
-module_dir = os.path.dirname(module_path)
-if not module_dir in sys.path:
-    sys.path.append(module_dir)
 
-module_name = os.path.splitext(os.path.basename(module_path))[0]
+def import_module(module_path: str):
 
-spec = importlib.util.spec_from_file_location(module_name, module_path)
-if spec is None:
-    raise Exception(f"Spec not found: {module_name}, {module_path}")
+    module_dir = os.path.dirname(module_path)
+    if not module_dir in sys.path:
+        sys.path.append(module_dir)
 
-module = importlib.util.module_from_spec(spec)
+    module_name = os.path.splitext(os.path.basename(module_path))[0]
 
-sys.modules[module_name] = module
-spec.loader.exec_module(module)  # type: ignore[reportOptionalMemberAccess]
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None:
+        raise Exception(f"Spec not found: {module_name}, {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)  # type: ignore[reportOptionalMemberAccess]
+
+    return module
 
 
 from blend_converter import common
@@ -37,7 +42,7 @@ from blend_converter import utils
 
 from blend_converter.blender import blend_inspector
 
-program: common.Program = getattr(module, programs_getter_name)()[object_name]
+
 
 
 inspect_options: typing.List[str] = []
@@ -151,6 +156,12 @@ def unshorten(arg: str):
     return arg
 
 
+_profile = False
+_debug = False
+_inspect_identifiers = set()
+_inspect_values = {}
+
+
 for index, arg in enumerate(ARGS):
 
     arg = arg.lower()
@@ -172,12 +183,12 @@ for index, arg in enumerate(ARGS):
 
     if arg == 'profile':
         color_print([0, 0, 0], [223, 237, 48], arg)
-        program._profile = True
+        _profile = True
         continue
 
     if arg == 'debug':
         color_print([0, 0, 0], [230, 60, 60], arg)
-        program._debug = True
+        _debug = True
         continue
 
     if arg.startswith(regex_options):
@@ -194,74 +205,102 @@ for index, arg in enumerate(ARGS):
 
         color_print([230, 226, 0], [8, 8, 8], f"REGEX:", end=' ')
         print(formatted_option)
-        program._inspect_identifiers.add(formatted_option)
+        _inspect_identifiers.add(formatted_option)
         continue
 
     if arg in inspect_options:
         color_print([69, 222, 42], [8, 8, 8], f"Inspect:", end=' ')
         print(arg)
-        program._inspect_identifiers.add(arg)
+        _inspect_identifiers.add(arg)
         continue
 
     if arg in skip_options:
         color_print([230, 157, 0], [8, 8, 8], f"Skip:", end=' ')
         print(arg)
-        program._inspect_identifiers.add(arg)
+        _inspect_identifiers.add(arg)
         continue
 
     if arg.startswith('set:'):
         var_name, var_value = ARGS[index][len('set:'):].split('=')
         color_print([255, 255, 255], [48, 88, 138], f'{var_name} = {var_value}')
-        program._inspect_values[var_name] = var_value
+        _inspect_values[var_name] = var_value
         continue
 
     error(f"Invalid option: {ARGS[index]}")  # Using index to print the original, possible shortened version of the command
 
 
-if not non_convert_options.isdisjoint(ARGS):
 
-    if 'help' in ARGS:
-        print()
-        print_help()
 
-    if 'validate' in ARGS:
-        print()
-        color_print([75, 123, 227], [8, 8, 8], "The input is valid. Remove the 'validate' option to execute.")
+def run_program(module_path, programs_getter_name, program_name):
+
+    program: common.Program = getattr(import_module(module_path), programs_getter_name)()[program_name]
+
+    program._profile = _profile
+    program._debug = _debug
+
+    program._inspect_identifiers.update(_inspect_identifiers)
+    program._inspect_values.update(_inspect_values)
+
+
+    if not non_convert_options.isdisjoint(ARGS):
+
+        if 'help' in ARGS:
+            print()
+            print_help()
+
+        if 'validate' in ARGS:
+            print()
+            color_print([75, 123, 227], [8, 8, 8], "The input is valid. Remove the 'validate' option to execute.")
+            raise SystemExit(0)
+
+        if 'diff' in ARGS:
+            diff_utils.show_program_diff_vscode(program)
+
+        if 'makeupdated' in ARGS:
+            if input("Are you sure you want to set the json as up to date? (y/n)").lower() == 'y':
+                program.write_report()
+
+        if 'from' in ARGS:
+            utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.blend_path)
+            utils.os_show(program.blend_path)
+
+        if 'to' in ARGS:
+            if os.path.exists(program.result_path):
+                utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.result_path)
+                utils.os_show(program.result_path)
+            elif os.path.exists(os.path.dirname(program.result_path)):
+                utils.print_in_color(utils.get_foreground_color_code(0,191,255), os.path.dirname(program.result_path))
+                utils.os_show(os.path.dirname(program.result_path))
+            else:
+                utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), "The result folder does not exist yet.")
+
         raise SystemExit(0)
 
-    if 'diff' in ARGS:
-        diff_utils.show_program_diff_vscode(program)
 
-    if 'makeupdated' in ARGS:
-        if input("Are you sure you want to set the json as up to date? (y/n)").lower() == 'y':
-            program.write_report()
-
-    if 'from' in ARGS:
-        utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.blend_path)
-        utils.os_show(program.blend_path)
-
-    if 'to' in ARGS:
-        if os.path.exists(program.result_path):
-            utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.result_path)
-            utils.os_show(program.result_path)
-        elif os.path.exists(os.path.dirname(program.result_path)):
-            utils.print_in_color(utils.get_foreground_color_code(0,191,255), os.path.dirname(program.result_path))
-            utils.os_show(os.path.dirname(program.result_path))
-        else:
-            utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), "The result folder does not exist yet.")
-
-    raise SystemExit(0)
-
-
-if 'check' in ARGS:
-    if program.are_instructions_changed:
+    if 'check' in ARGS:
+        if program.are_instructions_changed:
+            program.execute()
+    else:
         program.execute()
-else:
-    program.execute()
 
 
-if 'show' in ARGS:
-    utils.os_show(program.result_path)
+    if 'show' in ARGS:
+        utils.os_show(program.result_path)
 
-if 'open' in ARGS:
-    utils.open_blender_detached(program.blender_executable, program.result_path)
+    if 'open' in ARGS:
+        utils.open_blender_detached(program.blender_executable, program.result_path)
+
+
+for module_path, programs_getter_name, name in json.loads(programs)['programs']:
+
+    try:
+        run_program(module_path, programs_getter_name, name)
+    except Exception:
+
+        error_type, error_value, error_tb = sys.exc_info()
+
+        print()
+        utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"{module_path}::{programs_getter_name}::{name}", file=sys.stderr)
+        utils.print_in_color(utils.get_color_code(180,0,0,0,0,0,), ''.join(traceback.format_tb(error_tb)), file=sys.stderr)
+        utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), ''.join(traceback.format_exception_only(error_type, error_value)), file=sys.stderr)
+        print()

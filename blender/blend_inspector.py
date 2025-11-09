@@ -142,6 +142,27 @@ def _inspect_blend(name = 'DEBUG', blender_executable: typing.Optional[str] = No
 @functools.wraps(_inspect_blend)
 def inspect_blend(*args, **kwargs):
 
+    if get_value('confirm_inspect', False):
+
+        print("Pending inspect", *args, **kwargs)
+
+        import bpy
+        print('bpy.data.filepath:', bpy.data.filepath)
+
+        print("To disable the confirmation enter: disable")
+        print("To ignore all inspections enter: noinspect")
+
+        value = input("y/n?:").lower()
+        if value == 'disable':
+            add_value(confirm_inspect=False)
+        elif value == 'noinspect':
+            add_value(confirm_inspect=False)
+            add_identifier(COMMON.SKIP_INSPECT)
+            return
+        elif value != 'y':
+            return
+
+
     if has_identifier(COMMON.SKIP_INSPECT):
         print('Inspect skipped:', *args, **kwargs)
         return
