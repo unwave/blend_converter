@@ -1484,12 +1484,13 @@ def unwrap_ministry_of_flat_with_fallback(
 
         copy_uv(object_copy, object, settings.uv_layer_name)
 
+        blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_UV_UNWRAP)
+
         bpy.data.objects.remove(object_copy)
 
         if settings.mark_seams_from_islands:
             mark_seams_from_islands(object, settings.uv_layer_name)
 
-    blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_UV_UNWRAP)
 
 
 
@@ -1818,8 +1819,9 @@ class Unwrap_Quality_Score:
 
         variants = sorted(copies.items(), key = lambda x: x[1]._get_score())
 
-        for name, score in variants:
-            print(name, score._get_score())
+        for i, (name, score) in enumerate(variants, start = 1):
+            green_color = int(255/len(variants) * i)
+            utils.print_in_color(utils.get_color_code(51, green_color, 51, 0,0,0), name, score._get_score())
 
         the_best_name = variants[-1][0]
 
@@ -2108,27 +2110,39 @@ def brute_force_unwrap(
         smart_and_cube_measures['cube_project_conformal'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         skip_inspect or binspect('cube_project_conformal')
 
-
-    measures = dict([
-        Unwrap_Quality_Score._get_best(mof_measures),
-        Unwrap_Quality_Score._get_best(smart_and_cube_measures),
-        Unwrap_Quality_Score._get_best(just_minimal_stretch_measures),
-    ])
-
-    the_best = Unwrap_Quality_Score._get_best(measures)[1]
+        clear_seams()
 
 
-    with bpy_context.Focus_Objects(object):
-        object.data.uv_layers[settings.uv_layer_name].data.foreach_set('uv', the_best._uvs)
+        measures = dict([
+            Unwrap_Quality_Score._get_best(mof_measures),
+            Unwrap_Quality_Score._get_best(smart_and_cube_measures),
+            Unwrap_Quality_Score._get_best(just_minimal_stretch_measures),
+        ])
 
-    re_unwrap_overlaps(object, settings.uv_layer_name)
+        the_best = Unwrap_Quality_Score._get_best(measures)[1]
 
-    bpy.data.objects.remove(object_copy)
+
+        with bpy_context.Focus_Objects(object):
+            object.data.uv_layers[settings.uv_layer_name].data.foreach_set('uv', the_best._uvs)
+
+        re_unwrap_overlaps(object, settings.uv_layer_name)
+
+        if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_UV_UNWRAP):
+
+            with bpy_context.Focus_Objects(object_copy):
+                object_copy.data.uv_layers[settings.uv_layer_name].data.foreach_set('uv', the_best._uvs)
+
+            re_unwrap_overlaps(object_copy, settings.uv_layer_name)
+
+            mark_seams_from_islands(object_copy, settings.uv_layer_name)
+
+            blend_inspector.inspect_blend(blend_inspector.COMMON.INSPECT_UV_UNWRAP)
+
+        bpy.data.objects.remove(object_copy)
 
     if settings.mark_seams_from_islands:
         mark_seams_from_islands(object, settings.uv_layer_name)
 
-    blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_UV_UNWRAP)
 
 
 if blend_inspector.get_value('use_brute_force_unwrap', False):

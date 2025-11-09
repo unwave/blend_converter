@@ -471,12 +471,15 @@ def get_color_code_simple(base):
     return f'\033[{base}m'
 
 def get_foreground_color_code(r, g, b):
+    r, g, b = int(r), int(g), int(b)
     return f'\033[38;2;{r};{g};{b}m'
 
 def get_background_color_code(r, g, b):
+    r, g, b = int(r), int(g), int(b)
     return f'\033[48;2;{r};{g};{b}m'
 
 def get_color_code(r, g, b, _r, _g, _b):
+    r, g, b, _r, _g, _b = int(r), int(g), int(b), int(_r), int(_g), int(_b)
     return f'\033[38;2;{r};{g};{b};48;2;{_r};{_g};{_b}m'
 
 
