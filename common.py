@@ -271,7 +271,7 @@ class Program:
                     if return_value:
                         value[index] = return_value
                 elif type(sub_value) in (list, dict):
-                    value[index] = self.replace_return_values(value)
+                    value[index] = self.replace_return_values(sub_value)
                 elif isinstance(sub_value, tool_settings.Settings):
                     value[index] = self.replace_return_values(sub_value._to_dict())
         elif isinstance(value, dict):
@@ -281,7 +281,7 @@ class Program:
                     if return_value:
                         value[key] = return_value
                 elif type(sub_value) is (list, dict):
-                    value[key] = self.replace_return_values(value)
+                    value[key] = self.replace_return_values(sub_value)
                 elif isinstance(sub_value, tool_settings.Settings):
                     value[key] = self.replace_return_values(sub_value._to_dict())
         else:

@@ -84,10 +84,12 @@ def apply_remesh(object: bpy.types.Object, voxel_size: float):
     apply_modifier(modifier)
 
 
-def apply_triangulate(object: bpy.types.Object):
+def apply_triangulate(object: bpy.types.Object, keep_custom_normals = False, min_vertices = 4):
     modifier: bpy.types.TriangulateModifier = object.modifiers.new(name = '_', type='TRIANGULATE')
     modifier.quad_method = 'BEAUTY'
     modifier.ngon_method = 'BEAUTY'
+    modifier.keep_custom_normals = False
+    modifier.min_vertices = 4
 
     modifier.name = modifier.type
     apply_modifier(modifier)

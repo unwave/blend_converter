@@ -618,8 +618,13 @@ class Capture_Output:
         self.pipe_reading.start()
 
         os.dup2(self.pipe_write_fileno, self.file_descriptor)
-        self.write_pipe_textwrapper = os.fdopen(self.pipe_write_fileno, 'w', encoding='utf-8')
-        self.write_pipe_textwrapper.reconfigure(write_through=True, line_buffering=False)
+
+        write_pipe_binary = os.fdopen(self.pipe_write_fileno, 'wb', buffering= 0)
+        self.write_pipe_textwrapper = io.TextIOWrapper(
+            write_pipe_binary,
+            encoding='utf-8',
+            write_through=True,
+        )
 
         setattr(sys, self._std_output_name, self.write_pipe_textwrapper)
 

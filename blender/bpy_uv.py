@@ -15,6 +15,7 @@ import array
 import traceback
 import tempfile
 import operator
+import re
 
 import bpy
 import mathutils
@@ -1777,6 +1778,25 @@ def scale_uv_to_bounds(object: bpy.types.Object, margin: float = 0):
         bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
 
 
+def get_interquartile_range(values):
+
+    if len(values) <= 1:
+        return 0
+
+    values_sorted = sorted(values)
+
+    middle_index = len(values_sorted) // 2
+
+    if len(values_sorted) % 2 == 1:
+        lower_half = values_sorted[:middle_index]
+        upper_half = values_sorted[middle_index + 1:]
+    else:
+        lower_half = values_sorted[:middle_index]
+        upper_half = values_sorted[middle_index:]
+
+    return statistics.median(upper_half) - statistics.median(lower_half)
+
+
 class Unwrap_Quality_Score:
 
     def __init__(self, *,
@@ -1824,23 +1844,23 @@ class Unwrap_Quality_Score:
     def _get_score(self):
         """ The values should be normalized first. """
         return (
-            (1 - self.islands_count)
+            (- self.islands_count) * 2
             +
-            self.faces_per_island_weighted_mean
+            self.faces_per_island_weighted_mean * 2
             +
-            self.texel_density * 2
+            self.texel_density * 7
             +
-            self.uv_area_taken * 2
+            self.uv_area_taken * 6
             +
-            (1 - self.mean_stretches)
+            (- self.mean_stretches) * 2
             +
-            (1 - self.overlapping_loops) * 5
+            (- self.overlapping_loops) * 10
             +
-            (1 - self.texel_density_standard_deviation) * 2
+            (- self.texel_density_standard_deviation) * 2
             +
-            (1 - self.aria_ratios_standard_deviation) * 10
+            (- self.aria_ratios_standard_deviation) * 13
             +
-            (1 - self.seam_length) * 2
+            (- self.seam_length) * 5
         )
 
 
@@ -1867,17 +1887,27 @@ class Unwrap_Quality_Score:
                 print('\t', round(measure[i], 3), end='\t', sep = '')
             print()
 
+
         # normalize
         copies = {key : value._copy() for key, value in candidates.items()}
 
         for i in range(number_of_metrics):
 
             values = [copies[name][i] for name in copies]
-            min_value = min(values)
-            max_value = max(values)
 
-            for name in copies:
-                copies[name]._normalize(i, min_value, max_value)
+            values_median = statistics.median(values)
+
+            iqr = get_interquartile_range(values)
+
+            if math.isclose(iqr, 0, rel_tol=1e-9, abs_tol=1e-9):
+                min_value = min(values)
+                max_value = max(values)
+                for name in copies:
+                    copies[name]._normalize(i, min_value, max_value)
+            else:
+                for name in copies:
+                    copies[name][i] = (copies[name][i] - values_median) / iqr
+
 
         variants = sorted(copies.items(), key = lambda x: x[1]._get_score())
 
@@ -2052,26 +2082,47 @@ def brute_force_unwrap(
 
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.uv.select_all(action='SELECT')
-            bpy_context.call_in_uv_editor(
-                bpy.ops.uv.unwrap,
-                method='MINIMUM_STRETCH',
-                use_weights = bool(settings.uv_importance_weight_group),
-                weight_group = settings.uv_importance_weight_group,
-                weight_factor = settings.uv_importance_weight_factor,
-                correct_aspect = False,
-                )
 
-            # TODO: solve "Warning: Unwrap failed to solve 1 of 1 island(s), edge seams may need to be added"
+            with utils.Capture_Stdout() as capture:
+                bpy_context.call_in_uv_editor(
+                    bpy.ops.uv.unwrap,
+                    method='MINIMUM_STRETCH',
+                    use_weights = bool(settings.uv_importance_weight_group),
+                    weight_group = settings.uv_importance_weight_group,
+                    weight_factor = settings.uv_importance_weight_factor,
+                    correct_aspect = False,
+                    )
+
+            # Warning: Unwrap failed to solve 1 of 1 island(s), edge seams may need to be added
+            # When this happens it just re-packs the existing uv layout leading to a wrong conclusion
+
+            for line in capture.lines.queue:
+                print(line)
+                match = re.search(r'(\d+) of (\d+)', line)
+                if int(match.group(1)) == int(match.group(2)):
+                    raise Exception(line)
+
 
         def reunwrap_conformal():
 
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.uv.select_all(action='SELECT')
-            bpy_context.call_in_uv_editor(
-                bpy.ops.uv.unwrap,
-                method='CONFORMAL',
-                correct_aspect = False,
-            )
+
+            with utils.Capture_Stdout() as capture:
+                bpy_context.call_in_uv_editor(
+                    bpy.ops.uv.unwrap,
+                    method='CONFORMAL',
+                    correct_aspect = False,
+                )
+
+            # Warning: Unwrap failed to solve 1 of 1 island(s), edge seams may need to be added
+            # When this happens it just re-packs the existing uv layout leading to a wrong conclusion
+
+            for line in capture.lines.queue:
+                print(line)
+                match = re.search(r'(\d+) of (\d+)', line)
+                if int(match.group(1)) == int(match.group(2)):
+                    raise Exception(line)
 
 
 
@@ -2131,9 +2182,9 @@ def brute_force_unwrap(
 
         just_minimal_stretch_measures: typing.Dict[str, Unwrap_Quality_Score] = {}
 
-        reunwrap_with_minimal_stretch()
 
         try:
+            reunwrap_with_minimal_stretch()
             measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         except Exception:
             measure = None
@@ -2141,9 +2192,9 @@ def brute_force_unwrap(
         just_minimal_stretch_measures['just_minimal_stretch'] = measure
         skip_inspect or binspect('just_minimal_stretch')
 
-        reunwrap_conformal()
 
         try:
+            reunwrap_conformal()
             measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         except Exception:
             measure = None
@@ -2164,17 +2215,28 @@ def brute_force_unwrap(
 
         mark_seams_from_islands(object_copy, settings.uv_layer_name)
 
-        reunwrap_with_minimal_stretch()
-        rescale()
-        smart_and_cube_measures['smart_project_reunwrap'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        try:
+            reunwrap_with_minimal_stretch()
+            rescale()
+            measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        except Exception:
+            measure = None
+
+        smart_and_cube_measures['smart_project_reunwrap'] = measure
         skip_inspect or binspect('smart_project_reunwrap')
 
-        reunwrap_conformal()
-        rescale()
-        smart_and_cube_measures['smart_project_conformal'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        try:
+            reunwrap_conformal()
+            rescale()
+            measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        except Exception:
+            measure = None
+
+        smart_and_cube_measures['smart_project_conformal'] = measure
         skip_inspect or binspect('smart_project_conformal')
 
         clear_seams()
+
 
         cube_project()
 
@@ -2183,24 +2245,39 @@ def brute_force_unwrap(
 
         mark_seams_from_islands(object_copy, settings.uv_layer_name)
 
-        reunwrap_with_minimal_stretch()
-        rescale()
-        smart_and_cube_measures['cube_project_reunwrap'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        try:
+            reunwrap_with_minimal_stretch()
+            rescale()
+            measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        except Exception:
+            measure = None
+
+        smart_and_cube_measures['cube_project_reunwrap'] = measure
         skip_inspect or binspect('cube_project_reunwrap')
 
-        reunwrap_conformal()
-        rescale()
-        smart_and_cube_measures['cube_project_conformal'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        try:
+            reunwrap_conformal()
+            rescale()
+            measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+        except Exception:
+            measure = None
+
+        smart_and_cube_measures['cube_project_conformal'] = measure
         skip_inspect or binspect('cube_project_conformal')
 
         clear_seams()
 
 
-        measures = dict([
-            Unwrap_Quality_Score._get_best(mof_measures),
-            Unwrap_Quality_Score._get_best(smart_and_cube_measures),
-            Unwrap_Quality_Score._get_best(just_minimal_stretch_measures),
-        ])
+        # measures = dict([
+        #     Unwrap_Quality_Score._get_best(mof_measures),
+        #     Unwrap_Quality_Score._get_best(smart_and_cube_measures),
+        #     Unwrap_Quality_Score._get_best(just_minimal_stretch_measures),
+        # ])
+
+        measures = {}
+        measures.update(mof_measures)
+        measures.update(smart_and_cube_measures)
+        measures.update(just_minimal_stretch_measures)
 
         the_best = Unwrap_Quality_Score._get_best(measures)[1]
 
