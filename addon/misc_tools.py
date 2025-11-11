@@ -87,6 +87,7 @@ def mesh_linked_triangles(operator: bpy.types.Operator, context: bpy.types.Conte
     poll = edit_mode_poll
 )
 def print_selected_uv_verts(operator: bpy.types.Operator, context: bpy.types.Context):
+    """ https://blender.stackexchange.com/questions/95824/how-to-obtain-selected-uv-pairs-on-same-edge-in-python """
 
     obj = bpy.context.active_object
     bm = bmesh.from_edit_mesh(obj.data)
@@ -100,12 +101,22 @@ def print_selected_uv_verts(operator: bpy.types.Operator, context: bpy.types.Con
             for l in f.loops:
                 yield l
 
-    def find_selected_loops():
-        """Generator, yields loops that are selected in UV editor"""
+    if bpy.app.version >= (5, 0):
 
-        for l in find_loops():
-            if l[uv_layer].select and l.link_loop_next[uv_layer].select:
-                yield l
+        def find_selected_loops():
+            """Generator, yields loops that are selected in UV editor"""
+
+            for l in find_loops():
+                if l.uv_select_vert and l.link_loop_next.uv_select_vert:
+                    yield l
+    else:
+        def find_selected_loops():
+            """Generator, yields loops that are selected in UV editor"""
+
+            for l in find_loops():
+                if l[uv_layer].select and l.link_loop_next[uv_layer].select:
+                    yield l
+
 
     # Show the coordinates of selected loops. Note that loops are printed
     # twice, once for the (A -> B) edge, and once for the (B -> A) edge.

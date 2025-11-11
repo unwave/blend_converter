@@ -16,9 +16,7 @@ def get_result_dir(blend_dir):
     return result_dir
 
 
-@pytest.mark.parametrize('blend_dir', BLEND_DIRS)
-def test_merge_and_bake_gltf(blend_dir, blender_executable):
-    """ this test is not meant for evaluating the quality of the results, just for code being executed without errors """
+def get_program_1(blend_dir: str, blender_executable: str):
 
     from blend_converter.blender.formats.gltf import export_gltf, Settings_GLTF
     from blend_converter.blender.formats.blend import open_mainfile
@@ -53,12 +51,17 @@ def test_merge_and_bake_gltf(blend_dir, blender_executable):
 
     program.run(blender, export_gltf, program.result_path, Settings_GLTF(export_apply=True))
 
-    program.execute()
+    return program
 
 
 @pytest.mark.parametrize('blend_dir', BLEND_DIRS)
-def test_copy_and_bake_gltf(blend_dir, blender_executable):
+def test_merge_and_bake_gltf(blend_dir, blender_executable):
     """ this test is not meant for evaluating the quality of the results, just for code being executed without errors """
+
+    get_program_1(blend_dir, blender_executable).execute()
+
+
+def get_program_2(blend_dir: str, blender_executable: str):
 
     from blend_converter.blender.formats.gltf import export_gltf, Settings_GLTF
     from blend_converter.blender.formats.blend import open_mainfile
@@ -106,4 +109,11 @@ def test_copy_and_bake_gltf(blend_dir, blender_executable):
 
     program.run(blender, export_gltf, program.result_path, Settings_GLTF(export_apply=True))
 
-    program.execute()
+    return program
+
+
+@pytest.mark.parametrize('blend_dir', BLEND_DIRS)
+def test_copy_and_bake_gltf(blend_dir, blender_executable):
+    """ this test is not meant for evaluating the quality of the results, just for code being executed without errors """
+
+    get_program_2(blend_dir, blender_executable).execute()

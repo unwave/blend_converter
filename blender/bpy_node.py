@@ -134,6 +134,29 @@ class Socket_Identifier:
         CLEARCOAT = 'Clearcoat'
         SHEEN = 'Sheen'
 
+class Compositor_Node_Type:
+    """
+    Nodes: Remove legacy combine/separate nodes #135376
+    https://projects.blender.org/blender/blender/pulls/135376
+    """
+
+    if bpy.app.version >= (5, 0):
+        COMBINE_RGBA = 'CompositorNodeCombineColor'
+        SEPARATE_RGBA = 'CompositorNodeSeparateColor'
+        MATH = 'ShaderNodeMath'
+    else:
+        COMBINE_RGBA = 'CompositorNodeCombRGBA'
+        SEPARATE_RGBA = 'CompositorNodeSepRGBA'
+        MATH = 'CompositorNodeMath'
+
+
+class Shader_Node_Type:
+
+    if bpy.app.version >= (5, 0):
+        SEPARATE_RGB = 'ShaderNodeSeparateColor'
+    else:
+        SEPARATE_RGB = 'ShaderNodeSeparateRGB'
+
 
 NODE_GROUP_TYPE_NAMES = ('ShaderNodeGroup', 'CompositorNodeGroup', 'GeometryNodeGroup')
 
@@ -556,14 +579,14 @@ class _Node_Wrapper(bpy.types.Node if typing.TYPE_CHECKING else _No_Type, typing
         new_outputs: _Sockets_Wrapper[_N_SOCKET, 'typing_extensions.Self'] = _Sockets_Wrapper(self, self.tree._socket_class, True)
         for socket in self.outputs:
             if socket.identifier in new_outputs:
-                new_outputs[socket.identifier].connections = socket.connections
-        self.outputs = new_outputs
+                object.__setattr__(new_outputs[socket.identifier], 'connections', socket.connections)
+        object.__setattr__(self, 'outputs', new_outputs)
 
         new_inputs: _Sockets_Wrapper[_N_SOCKET, 'typing_extensions.Self'] = _Sockets_Wrapper(self, self.tree._socket_class, False)
         for socket in self.inputs:
             if socket.identifier in new_inputs:
-                new_inputs[socket.identifier].connections = socket.connections
-        self.inputs = new_inputs
+                object.__setattr__(new_inputs[socket.identifier], 'connections', socket.connections)
+        object.__setattr__(self, 'inputs', new_inputs)
 
 
     def __repr__(self):
@@ -1769,3 +1792,23 @@ class Compositor_Tree_Wrapper(_Tree_Wrapper[_Compositor_Node_Wrapper, _Composito
 
     _socket_class = _Compositor_Socket_Wrapper
     _node_class = _Compositor_Node_Wrapper
+
+
+    @classmethod
+    def from_scene(cls, scene: bpy.types.Scene):
+        """
+        Compositor: remove scene.node_tree from Python API
+        https://projects.blender.org/blender/blender/pulls/143619
+        """
+
+        if bpy.app.version < (5, 0):
+            return cls(scene.node_tree)
+        else:
+
+            tree = bpy.data.node_groups.get('__bc_compositor')
+            if not tree:
+                tree = bpy.data.node_groups.new('__bc_compositor', 'CompositorNodeTree')
+
+            scene.compositing_node_group = tree
+
+            return cls(tree)

@@ -19,4 +19,7 @@ def load_compositor_node_tree(name: str) -> bpy.types.CompositorNodeTree:
 
     node_group = data_to.node_groups[0]
 
+    if not node_group:
+        raise Exception(f"Fail to load: {name}")
+
     return node_group

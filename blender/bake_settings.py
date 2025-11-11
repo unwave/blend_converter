@@ -7,8 +7,10 @@ if __package__:
     from . import bpy_node
     from .. import tool_settings
     from . import bpy_context
+    from . import blend_inspector
 else:
     from blend_converter import tool_settings
+    from blend_converter import blend_inspector
 
 
 if typing.TYPE_CHECKING:
@@ -71,6 +73,9 @@ class _Bake_Type(typing.Protocol):
     def _get_composer_context(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], images: typing.Union['bpy.types.Image', typing.List['bpy.types.Image']]) -> typing.ContextManager:
         """ Returns a context that will be entered when composing and saving the image. """
 
+
+def get_margin():
+    return blend_inspector.get_value('denoise_margin', bpy.context.scene.render.bake.margin)
 
 
 # https://github.com/blender/blender/blob/main/source/blender/blenloader/intern/versioning_400.cc
@@ -188,7 +193,16 @@ class _Principled_Input(_Bake_Type, tool_settings.Settings):
 
 
     def _get_setup_context(self):
-        return contextlib.nullcontext()
+
+        settings = []
+
+        if self.use_denoise:
+            settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
+
+            if hasattr(bpy.context.scene.render.bake, 'margin_type'):
+                settings.append((bpy.context.scene.render.bake, 'margin_type', 'ADJACENT_FACES'))
+
+        return bpy_context.Bpy_State(settings)
 
 
     def _get_material_context(self, material: 'bpy.types.Material'):
@@ -234,10 +248,17 @@ class Normal(_Principled_Input):
         ⚓ T96942 Bake Normal problem when adjoining faces have different UV orientation
         https://developer.blender.org/T96942
         """
+
+        settings = []
+
+        if self.use_denoise:
+            settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
+
         if hasattr(bpy.context.scene.render.bake, 'margin_type'):
-            return bpy_context.Bpy_State([(bpy.context.scene.render.bake, 'margin_type', 'EXTEND')])
-        else:
-            return contextlib.nullcontext()
+            settings.append((bpy.context.scene.render.bake, 'margin_type', 'EXTEND'))
+
+        return bpy_context.Bpy_State(settings)
+
 
     def _get_material_context(self, material: 'bpy.types.Material'):
         return bpy_context.Output_Socket_World_Space_To_Tangent_Space(material, _get_principled_socket(material, 'Normal'), self.uv_layer)
@@ -343,7 +364,16 @@ class AO_Node(_AO):
 
 
     def _get_setup_context(self):
-        return contextlib.nullcontext()
+
+        settings = []
+
+        if self.use_denoise:
+            settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
+
+            if hasattr(bpy.context.scene.render.bake, 'margin_type'):
+                settings.append((bpy.context.scene.render.bake, 'margin_type', 'ADJACENT_FACES'))
+
+        return bpy_context.Bpy_State(settings)
 
 
     def _get_material_context(self, material: 'bpy.types.Material'):
@@ -457,6 +487,9 @@ class Diffuse(_Bake_Type, tool_settings.Settings):
         if 'samples' in self._has_been_set:
             settings.append((bpy.context.scene.cycles, 'samples', self.samples))
 
+        if self.use_denoise:
+            settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
+
         return bpy_context.Bpy_State(settings)
 
 
@@ -514,6 +547,9 @@ class Glossy(_Bake_Type, tool_settings.Settings):
 
         if 'samples' in self._has_been_set:
             settings.append((bpy.context.scene.cycles, 'samples', self.samples))
+
+        if self.use_denoise:
+            settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
 
         return bpy_context.Bpy_State(settings)
 

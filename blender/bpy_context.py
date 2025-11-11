@@ -16,6 +16,7 @@ import mathutils
 from . import bpy_node
 from . import bpy_utils
 from . import bpy_data
+from . import blend_inspector
 
 from .. import utils
 from .. import tool_settings
@@ -460,7 +461,11 @@ class Bake_Settings(Bpy_State):
         if not self.bake_settings.use_global_bake_settings:
             return
 
-        self.set(render, 'use_bake_multires', False)
+        if bpy.app.version >= (5, 0):
+            self.set(render.bake, 'use_multires', False)
+        else:
+            self.set(render, 'use_bake_multires', False)
+
         self.set(cycles, 'samples', self.bake_settings.samples)
 
         self.set(render, 'use_compositing', True)
@@ -1015,7 +1020,7 @@ class Diffuse_AO_Bake_Settings(Bpy_State):
         self.set(render.bake, 'use_pass_glossy', True)
         self.set(render.bake, 'use_pass_transmission', True)
 
-        # self.set(render.bake, 'margin', 1)
+        self.set(render.bake, 'margin', blend_inspector.get_value('ao_denoise_margin', 1))
 
         self.set(render.bake, 'use_pass_emit', False)
         for object in bpy.data.objects:
@@ -1030,7 +1035,11 @@ class Diffuse_AO_Bake_Settings(Bpy_State):
             return world
 
         world = bpy.data.worlds.new(name=self.ao_bake_world_name)
-        world.use_nodes = True
+
+        if bpy.app.version < (5, 0):
+            # Nodes: Remove "Use Nodes" in Shader Editor for World #142342
+            # https://projects.blender.org/blender/blender/pulls/142342
+            world.use_nodes = True
 
         background = next(bl_node for bl_node in world.node_tree.nodes if bl_node.bl_idname == 'ShaderNodeBackground')
         background.inputs[0].default_value = (1, 1, 1, 1)
@@ -1044,7 +1053,7 @@ class Composer_Input_Simple:
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, use_denoise = False):
 
-        self.tree = bpy_node.Compositor_Tree_Wrapper(bpy.context.scene.node_tree)
+        self.tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
         self.input_socket = self.tree.get_socket_wrapper(input_socket)
         self.image = image
 
@@ -1055,35 +1064,33 @@ class Composer_Input_Simple:
 
         image_node = self.input_socket.new('CompositorNodeImage', image = self.image)
 
-
-        set_alpha_node = image_node.outputs[0].insert_new('CompositorNodeSetAlpha')
-
-        math_node = image_node.outputs[1].new('CompositorNodeMath', operation = 'GREATER_THAN')
-        math_node.inputs[1].default_value = 0.9999
-
-        math_node.outputs[0].join(set_alpha_node.inputs[1])
-
-        distance = max(self.image.generated_height, self.image.generated_width)
-        distance = min(distance, 512)
+        inpaint_distance = max(self.image.generated_height, self.image.generated_width)
+        inpaint_distance = min(inpaint_distance, 512)
 
         if self.use_denoise:
-            denoise_node = set_alpha_node.outputs[0].insert_new('CompositorNodeDenoise')
-            denoise_node.prefilter = 'NONE'
-            denoise_node.use_hdr = False
-            denoise_node.inputs['Albedo'].join(image_node.outputs['Alpha'], move=False)
 
+            denoise_tree = bpy_data.load_compositor_node_tree('BC_C_Denoise_Default')
+            set_denoise_tree_settings(denoise_tree, inpaint_distance)
 
-            denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=1)
-            denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=1)
+            denoise_group = image_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = denoise_tree)
 
-            erode_node = math_node.outputs[0].new('CompositorNodeDilateErode', mode = 'DISTANCE', distance = -1 if bpy.context.scene.render.bake.margin > 1 else 0)
-            set_alpha_node_2 = denoise_node.outputs[0].insert_new('CompositorNodeSetAlpha')
-            erode_node.outputs[0].join(set_alpha_node_2.inputs[1])
+            image_node.outputs[1].join(denoise_group.inputs[1])  # connect Alpha
 
-            set_alpha_node_2.outputs[0].insert_new('CompositorNodeInpaint', distance = distance)
 
         else:
-            set_alpha_node.outputs[0].insert_new('CompositorNodeInpaint', distance = distance)
+
+            set_alpha_node = image_node.outputs[0].insert_new('CompositorNodeSetAlpha')
+
+            math_node = image_node.outputs[1].new(bpy_node.Compositor_Node_Type.MATH, operation = 'GREATER_THAN')
+            math_node.inputs[1].default_value = 0.9999
+            math_node.outputs[0].join(set_alpha_node.inputs[1])
+
+            inpaint_node = set_alpha_node.outputs[0].insert_new('CompositorNodeInpaint')
+
+            if bpy.app.version >= (5, 0):
+                inpaint_node.inputs[1].default_value = inpaint_distance
+            else:
+                inpaint_node.distance = inpaint_distance
 
 
     def __exit__(self, type, value, traceback):
@@ -1096,7 +1103,7 @@ class Composer_Input_Fill_Color:
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image):
 
-        self.tree = bpy_node.Compositor_Tree_Wrapper(bpy.context.scene.node_tree)
+        self.tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
         self.input_socket = self.tree.get_socket_wrapper(input_socket)
         self.image = image
 
@@ -1114,7 +1121,7 @@ class Composer_Input_AO_Diffuse:
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image):
 
-        self.tree = bpy_node.Compositor_Tree_Wrapper(bpy.context.scene.node_tree)
+        self.tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
         self.input_socket = self.tree.get_socket_wrapper(input_socket)
         self.image = image
 
@@ -1123,42 +1130,15 @@ class Composer_Input_AO_Diffuse:
 
         image_node = self.input_socket.new('CompositorNodeImage', image = self.image)
 
-        albedo_socket = image_node.outputs['Alpha']
+        inpaint_distance = max(self.image.generated_height, self.image.generated_width)
+        inpaint_distance = min(inpaint_distance, 512)
 
-        denoise_node = self.input_socket.insert_new('CompositorNodeDenoise')
-        denoise_node.prefilter = 'NONE'
-        denoise_node.use_hdr = False
+        denoise_tree = bpy_data.load_compositor_node_tree('BC_C_Denoise_AO_Diffuse')
+        set_denoise_tree_settings(denoise_tree, inpaint_distance)
 
-        denoise_node.inputs['Albedo'].join(albedo_socket, move=False)
+        denoise_group = image_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = denoise_tree)
 
-
-        denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=1)
-        denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=1)
-        denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=1)
-        denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=1)
-
-        denoise_node.inputs[2].insert_new('CompositorNodeBlur', filter_type = 'FAST_GAUSS', size_y = 2, size_x = 2)
-
-        set_alpha_node = denoise_node.outputs[0].insert_new('CompositorNodeSetAlpha')
-
-        erode_node = set_alpha_node.inputs[1].new('CompositorNodeDilateErode', mode = 'DISTANCE', distance = -1 if bpy.context.scene.render.bake.margin > 1 else 0)
-        math_node = erode_node.inputs[0].new('CompositorNodeMath', operation = 'GREATER_THAN')
-        math_node.inputs[0].join(albedo_socket)
-        math_node.inputs[1].default_value = 0.9999
-
-        distance = max(self.image.generated_height, self.image.generated_width)
-        distance = min(distance, 512)
-
-        inpaint_node = set_alpha_node.outputs[0].new('CompositorNodeInpaint', distance = distance)
-
-        rgb_to_bw_node = inpaint_node.outputs[0].new('CompositorNodeRGBToBW')
-
-        mix_rgb_node = rgb_to_bw_node.outputs[0].new('CompositorNodeMixRGB', 1)
-        mix_rgb_node.outputs[0].join(self.input_socket)
-
-        mix_rgb_node.inputs[0].new('CompositorNodeBlur', filter_type = 'CUBIC', size_y = 8, size_x = 8).inputs[0].new('CompositorNodeFilter', filter_type = 'SOBEL').inputs[1].join(rgb_to_bw_node.outputs[0])
-
-        mix_rgb_node.inputs[2].new('CompositorNodeBlur', filter_type = 'CUBIC', size_y = 2, size_x = 2).inputs[0].new('CompositorNodeDilateErode', mode = 'DISTANCE', distance = 1).inputs[0].join(rgb_to_bw_node.outputs[0])
+        image_node.outputs[1].join(denoise_group.inputs[1])  # connect Alpha
 
 
     def __exit__(self, type, value, traceback):
@@ -1504,7 +1484,7 @@ class Composer_Input_Lightmap:
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image):
 
-        self.tree = bpy_node.Compositor_Tree_Wrapper(bpy.context.scene.node_tree)
+        self.tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
         self.input_socket = self.tree.get_socket_wrapper(input_socket)
         self.image = image
 
@@ -1522,10 +1502,18 @@ class Composer_Input_Lightmap:
 
         set_alpha_1 = inpaint.inputs[0].new('CompositorNodeSetAlpha')
 
-        denoise = set_alpha_1.inputs[0].new('CompositorNodeDenoise', prefilter = 'NONE', use_hdr = False)
+        denoise = set_alpha_1.inputs[0].new('CompositorNodeDenoise')
+
+        if bpy.app.version >= (5, 0):
+            denoise.inputs[3].default_value = False
+            denoise.inputs[4].default_value = 'None'
+        else:
+            denoise.prefilter = 'NONE'
+            denoise.use_hdr = False
 
         inpaint_px_1 = denoise.inputs['Image'].new('CompositorNodeInpaint', distance=1)
-        # inpaint_px_1.outputs[0].new('CompositorNodeSepRGBA').outputs[3].join(denoise.inputs['Albedo'])
+        # inpaint_px_1.outputs[0].new(bpy_node.Compositor_Node_Type.SEPARATE_RGBA).outputs[3].join(denoise.inputs['Albedo'])
+
 
         inpaint_px_2 = inpaint_px_1.inputs[0].new('CompositorNodeInpaint', distance=1)
 
@@ -1533,7 +1521,7 @@ class Composer_Input_Lightmap:
 
         image_node = set_alpha_2.inputs['Image'].new('CompositorNodeImage', image = self.image)
 
-        math_node = set_alpha_2.inputs['Alpha'].new('CompositorNodeMath', operation = 'GREATER_THAN')
+        math_node = set_alpha_2.inputs['Alpha'].new(bpy_node.Compositor_Node_Type.MATH, operation = 'GREATER_THAN')
         math_node.inputs[0].join(image_node.outputs['Alpha'])
         math_node.inputs[1].default_value = 0.9999
 
@@ -1631,7 +1619,7 @@ class Composer_Input_Factor:
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, use_denoise = False):
 
-        self.tree = bpy_node.Compositor_Tree_Wrapper(bpy.context.scene.node_tree)
+        self.tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
         self.input_socket = self.tree.get_socket_wrapper(input_socket)
         self.image = image
 
@@ -1643,14 +1631,20 @@ class Composer_Input_Factor:
         image_node = self.input_socket.new('CompositorNodeImage', image = self.image)
 
         init_alpha_node = image_node.outputs[0].insert_new('CompositorNodeSetAlpha')
-        math_node = image_node.outputs[1].new('CompositorNodeMath', operation = 'GREATER_THAN')
+        math_node = image_node.outputs[1].new(bpy_node.Compositor_Node_Type.MATH, operation = 'GREATER_THAN')
         math_node.inputs[1].default_value = 0.9999
         math_node.outputs[0].join(init_alpha_node.inputs[1])
 
         if self.use_denoise:
             denoise_node = init_alpha_node.outputs[0].insert_new('CompositorNodeDenoise')
-            denoise_node.prefilter = 'NONE'
-            denoise_node.use_hdr = False
+
+            if bpy.app.version >= (5, 0):
+                denoise_node.inputs[3].default_value = False
+                denoise_node.inputs[4].default_value = 'None'
+            else:
+                denoise_node.prefilter = 'NONE'
+                denoise_node.use_hdr = False
+
             denoise_node.inputs['Albedo'].join(image_node.outputs['Alpha'], move=False)
 
             denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=2)
@@ -1687,7 +1681,7 @@ class Composer_Input_Normal:
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, use_denoise = False):
 
-        self.tree = bpy_node.Compositor_Tree_Wrapper(bpy.context.scene.node_tree)
+        self.tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
         self.input_socket = self.tree.get_socket_wrapper(input_socket)
         self.image = image
 
@@ -1701,7 +1695,7 @@ class Composer_Input_Normal:
 
         set_alpha_node = image_node.outputs[0].insert_new('CompositorNodeSetAlpha')
 
-        math_node = image_node.outputs[1].new('CompositorNodeMath', operation = 'GREATER_THAN')
+        math_node = image_node.outputs[1].new(bpy_node.Compositor_Node_Type.MATH, operation = 'GREATER_THAN')
         math_node.inputs[1].default_value = 0.9999
 
         math_node.outputs[0].join(set_alpha_node.inputs[1])
@@ -1711,8 +1705,14 @@ class Composer_Input_Normal:
 
         if self.use_denoise:
             denoise_node = set_alpha_node.outputs[0].insert_new('CompositorNodeDenoise')
-            denoise_node.prefilter = 'NONE'
-            denoise_node.use_hdr = False
+
+            if bpy.app.version >= (5, 0):
+                denoise_node.inputs[3].default_value = False
+                denoise_node.inputs[4].default_value = 'None'
+            else:
+                denoise_node.prefilter = 'NONE'
+                denoise_node.use_hdr = False
+
             denoise_node.inputs['Albedo'].join(image_node.outputs['Alpha'], move=False)
 
 
@@ -1754,3 +1754,53 @@ class Composer_Input_Normal:
 
     def __exit__(self, type, value, traceback):
         self.tree.delete_new_nodes()
+
+
+
+def set_denoise_tree_settings(bl_tree: bpy.types.CompositorNodeTree, inpaint_distance: int):
+    """
+    Deprecated compositor nodes were removed. (#140355)
+    Compositor: Remove deprecated compositor properties #140355
+    https://projects.blender.org/blender/blender/pulls/140355
+    """
+
+    tree = bpy_node.Compositor_Tree_Wrapper(bl_tree)
+
+    for node in tree.get_by_bl_idname('CompositorNodeInpaint'):
+
+        if node.label == 'DO_NOT_CHANGE':
+            continue
+
+        node.inputs[1].default_value = inpaint_distance
+
+    for node in tree.get_by_bl_idname('CompositorNodeDenoise'):
+
+        if node.label == 'DO_NOT_CHANGE':
+            continue
+
+        node.inputs[3].default_value = False
+        node.inputs[4].default_value = 'None'
+
+
+def set_denoise_tree_settings_pre_5_0(bl_tree: bpy.types.CompositorNodeTree, inpaint_distance: int):
+
+    tree = bpy_node.Compositor_Tree_Wrapper(bl_tree)
+
+    for node in tree.get_by_bl_idname('CompositorNodeInpaint'):
+
+        if node.label == 'DO_NOT_CHANGE':
+            continue
+
+        node.distance = inpaint_distance
+
+    for node in tree.get_by_bl_idname('CompositorNodeDenoise'):
+
+        if node.label == 'DO_NOT_CHANGE':
+            continue
+
+        node.prefilter = 'NONE'
+        node.use_hdr = False
+
+
+if bpy.app.version < (5, 0):
+    set_denoise_tree_settings = set_denoise_tree_settings_pre_5_0

@@ -293,24 +293,38 @@ class Baked_Image:
 
 
             ## set nodes
-            bpy_state.set(bpy.context.scene, 'use_nodes', True)
+            if bpy.app.version < (5, 0):
+                # Compositor: Remove scene.use_nodes from Python API #143578
+                # https://projects.blender.org/blender/blender/pulls/143578
+                bpy_state.set(bpy.context.scene, 'use_nodes', True)
 
             bpy_state.set(bpy.context.scene.render, 'use_file_extension', False)
             bpy_state.set(bpy.context.scene.render, 'dither_intensity', self.settings.dither_intensity)
 
-            tree = bpy_node.Compositor_Tree_Wrapper(bpy.context.scene.node_tree)
+            tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
 
             for node in tree.get_by_bl_idname({'CompositorNodeRLayers', 'CompositorNodeComposite', 'CompositorNodeOutputFile', 'CompositorNodeViewer'}):
                 bpy_state.set(node.bl_node, 'mute', True)
 
             file_node = tree.new('CompositorNodeOutputFile')
 
+            if bpy.app.version >= (5, 0):
+                file_node.format.media_type = 'IMAGE'
+
             for key, value in self.image_file_settings._to_dict().items():
                 setattr(file_node.format, key, value)
 
-            file_node.base_path = self.settings.image_dir
+            if bpy.app.version >= (5, 0):
+                file_node.directory = self.settings.image_dir
+            else:
+                file_node.base_path = self.settings.image_dir
 
-            file_slot: bpy.types.NodeOutputFileSlotFile = file_node.file_slots[0]
+            if bpy.app.version >= (5, 0):
+                file_slot = file_node.file_output_items.new(socket_type='RGBA', name = '')
+                file_node.update_sockets()
+            else:
+                file_slot: bpy.types.NodeOutputFileSlotFile = file_node.file_slots[0]
+
             try:
                 file_slot.save_as_render = True
             except AttributeError:
@@ -321,7 +335,10 @@ class Baked_Image:
             # https://docs.blender.org/manual/en/latest/compositing/types/output/file_output.html#properties
             file_name = file_name.replace('#', '_')
 
-            file_slot.path = file_name
+            if bpy.app.version >= (5, 0):
+                file_node.file_name = file_name
+            else:
+                file_slot.path = file_name
 
             file_node_input = file_node.inputs[0]
             file_node.format.color_mode = 'RGB'
@@ -365,8 +382,12 @@ class Baked_Image:
             combine_rgba: bpy_node._Compositor_Node_Wrapper
 
             def get_combined_input(channel: str):
-                return combine_rgba.inputs[channel].new('CompositorNodeSepRGBA', channel).inputs[0]
+                return combine_rgba.inputs[channel].new(bpy_node.Compositor_Node_Type.SEPARATE_RGBA, channel).inputs[0]
 
+            R = 0
+            G = 1
+            B = 2
+            A = 3
 
             with contextlib.ExitStack() as context_stack:
 
@@ -381,89 +402,89 @@ class Baked_Image:
 
                         file_node.format.color_mode = 'RGBA'
 
-                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+                        combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        split_rgba = combine_rgba.inputs['R'].new('CompositorNodeSepRGBA', 'R')
-                        split_rgba.outputs['G'].join(combine_rgba.inputs['G'], move=False)
-                        split_rgba.outputs['B'].join(combine_rgba.inputs['B'], move=False)
+                        split_rgba = combine_rgba.inputs[R].new(bpy_node.Compositor_Node_Type.SEPARATE_RGBA, R)
+                        split_rgba.outputs[G].join(combine_rgba.inputs[G], move=False)
+                        split_rgba.outputs[B].join(combine_rgba.inputs[B], move=False)
 
                         context_stack.enter_context(self.bake_types[0]._get_composer_context(split_rgba.inputs[0], self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs[3], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs[A], self.sub_images[1]))
 
 
                     elif any(type._socket_type == bake_settings._Socket_Type.SHADER for type in self.bake_types):
                         print('[R] + [G]')
 
-                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+                        combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs['R'], self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs['G'], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs[R], self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs[G], self.sub_images[1]))
 
                     else:
                         print('[R + G + None]')
 
-                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+                        combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input('R'), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input('G'), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input(R), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input(G), self.sub_images[0]))
 
 
                 elif len(self.bake_types) in (3, 4):
                     if all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:3]):
                         print('[R + G + B]')
 
-                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+                        combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
                         # TODO: this is inefficient
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input('R'), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input('G'), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input('B'), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input(R), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input(G), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input(B), self.sub_images[0]))
 
 
                     elif self.bake_types[0]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[1:3]):
                         print('[R] + [None + G + B]')
 
-                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+                        combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs['R'], self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input('G'), self.sub_images[1]))
-                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input('B'), self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs[R], self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input(G), self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input(B), self.sub_images[1]))
 
 
                     elif self.bake_types[1]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:3:2]):
                         print('[R + None + B] + [G]')
 
-                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+                        combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input('R'), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs['G'], self.sub_images[1]))
-                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input('B'), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input(R), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs[G], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input(B), self.sub_images[0]))
 
 
                     elif self.bake_types[2]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:2]):
                         print('[R + G + None] + [B]')
 
-                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+                        combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input('R'), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input('G'), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[2]._get_composer_context(combine_rgba.inputs['B'], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input(R), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input(G), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[2]._get_composer_context(combine_rgba.inputs[B], self.sub_images[1]))
 
                     else:
                         print('[R] + [G] + [B]')
 
-                        combine_rgba = target_input.new('CompositorNodeCombRGBA')
+                        combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs['R'], self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs['G'], self.sub_images[1]))
-                        context_stack.enter_context(self.bake_types[2]._get_composer_context(combine_rgba.inputs['B'], self.sub_images[2]))
+                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs[R], self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs[G], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[2]._get_composer_context(combine_rgba.inputs[B], self.sub_images[2]))
 
                     if len(self.bake_types) == 4:
                         print('_ + [A]')
 
                         file_node.format.color_mode = 'RGBA'
 
-                        context_stack.enter_context(self.bake_types[3]._get_composer_context(combine_rgba.inputs['A'], self.sub_images[3]))
+                        context_stack.enter_context(self.bake_types[3]._get_composer_context(combine_rgba.inputs[A], self.sub_images[3]))
 
                 else:
                     raise ValueError(f"Unexpected identifier length: {self.bake_types}")
@@ -481,8 +502,13 @@ class Baked_Image:
                         bpy.ops.render.render()
 
                 final_path = os.path.join(self.settings.image_dir, file_name)
+
                 if not self.settings.fake_bake:
-                    os.replace(final_path + str(bpy.context.scene.frame_current).zfill(4), final_path)
+
+                    if bpy.app.version >= (5, 0):
+                        pass
+                    else:
+                        os.replace(final_path + str(bpy.context.scene.frame_current).zfill(4), final_path)
 
                 if self.settings.fake_bake:
                     image = bpy.data.images.new(name=self.image_name, width=4, height=4)
@@ -785,7 +811,8 @@ def create_material(name: str, uv_layer: str, images: typing.Iterable[bpy.types.
 
     if not material:
         material = bpy.data.materials.new(name)
-        material.use_nodes = True
+        if bpy.app.version < (5, 0):
+            material.use_nodes = True
     else:
         do_reset = True
 
@@ -850,7 +877,7 @@ def create_material(name: str, uv_layer: str, images: typing.Iterable[bpy.types.
 
             input = get_input(map_identifier[non_none_index])
 
-            separate_rgb = input.new('ShaderNodeSeparateRGB')
+            separate_rgb = input.new(bpy_node.Shader_Node_Type.SEPARATE_RGB)
 
             image_node = separate_rgb.inputs[non_none_index].new('ShaderNodeTexImage', image = image)
             uv_node.outputs[0].join(image_node.inputs['Vector'], False)
@@ -991,7 +1018,8 @@ def get_default_material() -> bpy.types.Material:
     material = bpy.data.materials.get('__bc_default_material')
     if not material:
         material = bpy.data.materials.new('__bc_default_material')
-        material.use_nodes = True
+        if bpy.app.version < (5, 0):
+            material.use_nodes = True
 
     return material
 
@@ -1098,7 +1126,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
 
             if material:
 
-                if not material.use_nodes:
+                if bpy.app.version < (5, 0) and not material.use_nodes:
                     do_warning(f"Object's material does not use nodes: {object.name_full}, {material.name_full}")
 
                 if not material.node_tree:

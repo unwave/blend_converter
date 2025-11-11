@@ -539,6 +539,11 @@ def convert_materials_to_principled(objects: typing.List[bpy.types.Object], remo
     # convert all non-node materials to nodes
     for material in materials:
 
+        if bpy.app.version >= (5, 0):
+            # Nodes: remove "Use Nodes" in Shader Editor #141278
+            # https://projects.blender.org/blender/blender/pulls/141278
+            continue
+
         if material.use_nodes:
             continue
 
@@ -1229,7 +1234,14 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
             bake_settings.bake_types = bake_types
 
             if resolution == 0:
-                bake_settings.resolution = get_texture_resolution(merged_object, uv_layer_bake, material_group, px_per_meter, min_res, max_res)
+                bake_settings.resolution = get_texture_resolution(
+                    merged_object,
+                    uv_layer_name = uv_layer_bake,
+                    materials = material_group,
+                    px_per_meter = px_per_meter,
+                    min_res = min_res,
+                    max_res = max_res
+                )
             else:
                 bake_settings.resolution = resolution
 
@@ -1855,6 +1867,11 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         for orig, copy in map_original_to_copy.items():
             with bpy_context.Focus_Objects(copy):
                 bpy.ops.object.material_slot_remove_unused()  # when called with call_for_objects returns CANCELLED
+
+            # Operator bpy.ops.object.material_slot_copy.poll() failed, context is incorrect
+            for index in reversed(range(len(copy.material_slots))):
+                copy.active_material_index = index
+
             bpy_context.call_for_objects(copy, [orig, copy], bpy.ops.object.material_slot_copy)
 
         merge_material_slots_with_the_same_materials(objects)

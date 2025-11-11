@@ -870,7 +870,7 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
         if blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_PACK):
             pass
         elif settings.use_uv_packer_addon and settings.use_uv_packer_for_pre_packing and enable_uv_packer_addon():
-            uv_packer_pack(settings._actual_width, settings._actual_height, settings.padding, settings.uvp_prerotate, settings.uvp_rescale)
+            uv_packer_pack(settings._actual_width, settings._actual_height, settings.padding, settings.uvp_prerotate, settings.uvp_rescale, use_high_quality_engine=False)
         else:
             aabb_pack(merge_overlap=settings.merge_overlap)
 
@@ -1053,9 +1053,7 @@ def _ensure_pixel_per_island(objects: typing.List[bpy.types.Object], res_x: int,
 
         for island in islands_without_pixels:
 
-            # for face in island:
-            #     for loop in face.loops:
-            #         loop[uv_layer].select = True
+            # select_island(island, uv_layer)
 
             ## by central uv triangle
             island_uvs: typing.List[Vector] = []
@@ -1314,10 +1312,7 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
                         bpy.ops.mesh.select_all(action='SELECT')
                         bpy.ops.uv.select_all(action='DESELECT')
 
-                    for face in island:
-                        face.select = True
-                        for loop in face.loops:
-                            loop[uv_layer].select = True
+                    select_island(island, uv_layer)
 
                     if only_select:
                         continue
@@ -1609,10 +1604,7 @@ def select_collapsed_islands(object: bpy.types.Object, uv_layer_name: str, toler
             is_collapsed = x <= tolerance or y <= tolerance or math.isnan(x) or math.isnan(y)
 
             if is_collapsed:
-                for face in island:
-                    for loop in face.loops:
-                        loop[uv_layer].select = True
-                        loop_count += 1
+                select_island(island, uv_layer)
 
         bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
 
@@ -1666,7 +1658,7 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
         bpy.ops.uv.select_all(action='DESELECT')
         print('bpy.ops.uv.select_overlap...', '[ can be long for badly overlapped uvs ]')
         bpy.ops.uv.select_overlap()
-        overlapping_loops = sum(loop[uv_layer].select for island in linked_uv_islands for face in island for loop in face.loops) + collapsed_loops_count
+        overlapping_loops = get_selected_uvs_count(linked_uv_islands, uv_layer) + collapsed_loops_count
 
         bpy.ops.uv.reveal()
         bpy.ops.uv.select_all(action='DESELECT')
@@ -2319,3 +2311,29 @@ if blend_inspector.get_value('use_brute_force_unwrap', False):
 
         if blend_inspector.get_value('brute_force_unwrap_score_only', False):
             raise SystemExit(0)
+
+
+
+if bpy.app.version >= (5, 0):
+
+    def select_island(island: typing.List[bmesh.types.BMFace], uv_layer: bmesh.types.BMLayerItem):
+
+        for face in island:
+            face.select = True
+            for loop in face.loops:
+                loop.uv_select_vert = True
+
+    def get_selected_uvs_count(islands: typing.List[typing.List[bmesh.types.BMFace]], uv_layer: bmesh.types.BMLayerItem):
+        return sum(loop.uv_select_vert for island in islands for face in island for loop in face.loops)
+
+else:
+
+    def select_island(island: typing.List[bmesh.types.BMFace], uv_layer: bmesh.types.BMLayerItem):
+        for face in island:
+            face.select = True
+            for loop in face.loops:
+                loop[uv_layer].select = True
+
+
+    def get_selected_uvs_count(islands: typing.List[typing.List[bmesh.types.BMFace]], uv_layer: bmesh.types.BMLayerItem):
+        return sum(loop[uv_layer].select for island in islands for face in island for loop in face.loops)
