@@ -537,8 +537,14 @@ def re_unwrap_overlaps(object: bpy.types.Object, uv_layer_name: str):
         aabb_pack(margin=0.05, merge_overlap=False)
         bpy.ops.uv.select_all(action='DESELECT')
 
+        if select_collapsed_islands(object, uv_layer_name):
+            bpy.ops.uv.hide(unselected=False)  # hiding to save time on select_overlap
+        bpy.ops.uv.select_all(action='DESELECT')
+
+        print('bpy.ops.uv.select_overlap...', '[ can be long for badly overlapped uvs ]')
         bpy.ops.uv.select_overlap()
-        select_collapsed_islands(object, uv_layer_name)
+
+        bpy.ops.uv.reveal(select=True)
 
         bpy.ops.uv.select_all(action='INVERT')
         bpy.ops.uv.pin(clear=False)
@@ -1500,6 +1506,35 @@ def unwrap_ministry_of_flat_with_fallback(
             mark_seams_from_islands(object, settings.uv_layer_name)
 
 
+def get_weighted_percentile(values, quantiles, weights):
+    """ https://stackoverflow.com/a/29677616/11799308 """
+
+    import numpy as np
+
+    values = np.array(values)
+    quantiles = np.array(quantiles)
+    weights = np.array(weights)
+
+    sort_indices = np.argsort(values)
+
+    values = values[sort_indices]
+    weights = weights[sort_indices]
+
+    weighted_quantiles = (np.cumsum(weights) - 0.5 * weights) / np.sum(weights)
+
+    return np.interp(quantiles, weighted_quantiles, values)
+
+
+def get_weighted_interquartile_range(values, weights = None):
+
+    import numpy as np
+
+    if weights is None:
+        percentile = np.percentile(values, (25, 75), axis=None, method='linear', keepdims=False)
+    else:
+        percentile = get_weighted_percentile(values, (0.25, 0.75), weights)
+
+    return np.subtract(percentile[1], percentile[0])
 
 
 def get_texel_density_for_uv_quality(object: bpy.types.Object, uv_layer_name: str, current_texture_size = 2048):
@@ -1529,51 +1564,41 @@ def get_texel_density_for_uv_quality(object: bpy.types.Object, uv_layer_name: st
     if math.isnan(total_uv_area):
         total_uv_area = sum(filter(math.isnan, face_uv_areas))
 
+    total_face_area = sum(face_areas)
+    if math.isnan(total_uv_area):
+        total_face_area = sum(filter(math.isnan, face_areas))
 
     texel_densities = []
-    texel_densities_to_find = []
     weights = []
-    aria_ratios = []
-
-    target_px_per_meter = 1024
+    area_ratios = []
 
     for face_area, face_area_uv in zip(face_areas, face_uv_areas):
 
         try:
-            aria_ratio = face_area / face_area_uv
+            area_ratio = face_area / face_area_uv
             texel_density = math.sqrt(pow(current_texture_size, 2) / face_area * face_area_uv)
-            texel_density_to_find = math.sqrt(aria_ratio) * target_px_per_meter
-            weight = face_area_uv / total_uv_area
+            weight = face_area / total_face_area
         except ZeroDivisionError:
             continue
 
         texel_densities.append(texel_density)
-        texel_densities_to_find.append(texel_density_to_find)
         weights.append(weight)
-        aria_ratios.append(math.sqrt(aria_ratio))
+        area_ratios.append(area_ratio)
 
-    total_mesh_area = sum(face_areas)
+    texel_density_weighted_median = get_weighted_percentile(texel_densities, 0.5, weights)
 
-    weighted_texel_densities = list(map(operator.mul, texel_densities, weights))
+    texel_density_deviation = get_weighted_interquartile_range(texel_densities, weights)
 
-    current_from_weighted_mean = sum(weighted_texel_densities)/sum(weights)
-    current_from_total = math.sqrt(total_mesh_area / total_uv_area) * current_texture_size
-
-    aria_ratios_harmonic_mean =  statistics.harmonic_mean([x for x in aria_ratios if x > 0])
-    aria_ratios_standard_deviation = statistics.stdev([x/aria_ratios_harmonic_mean for x in aria_ratios])
-
-    texel_density_standard_deviation = statistics.stdev(weighted_texel_densities)
-
-    perfect_resolution = sum(map(operator.mul, texel_densities_to_find, weights))/sum(weights)
+    area_ratios_deviation = get_weighted_interquartile_range(area_ratios, weights)
 
     object.data.uv_layers.active = init_active
 
     # this is invalid
     if total_uv_area >= 1:
         total_uv_area = 0
-        current_from_weighted_mean = 0
+        texel_density_weighted_median = 0
 
-    return current_from_weighted_mean, total_uv_area, perfect_resolution, texel_density_standard_deviation, aria_ratios_standard_deviation
+    return texel_density_weighted_median, total_uv_area, texel_density_deviation, area_ratios_deviation
 
 
 def select_collapsed_islands(object: bpy.types.Object, uv_layer_name: str, tolerance = 1e-5):
@@ -1680,14 +1705,14 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
                 face_areas.append(face.calc_area())
                 face_uv_areas.append(sum(area_tri(*loop) for loop in face_to_uv_triangles[face]))
 
-            island_mesh_aria = sum(face_areas)
+            island_mesh_area = sum(face_areas)
             island_uv_area = sum(face_uv_areas)
 
             if island_uv_area == 0:
                 continue
 
             number_of_faces_in_island.append(len(island))
-            weights.append(island_mesh_aria/island_uv_area)
+            weights.append(island_mesh_area/island_uv_area)
 
 
         faces_per_island_weighted_mean = sum(map(operator.mul, number_of_faces_in_island, weights))/sum(weights)
@@ -1713,11 +1738,11 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
 
             uv_packer_pack(2048, 2048, 4, True, False, use_high_quality_engine = False)
 
-        _, _, _, texel_density_standard_deviation, aria_ratios_standard_deviation = get_texel_density_for_uv_quality(object, uv_layer_name)
+        _, _,  texel_density_deviation, area_ratios_deviation = get_texel_density_for_uv_quality(object, uv_layer_name)
 
         scale_uv_to_bounds(object)
 
-        texel_density, uv_area_taken, _, _, _ = get_texel_density_for_uv_quality(object, uv_layer_name)
+        texel_density, uv_area_taken,  _, _ = get_texel_density_for_uv_quality(object, uv_layer_name)
 
 
     metric = Unwrap_Quality_Score(
@@ -1727,8 +1752,8 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
         uv_area_taken = uv_area_taken,
         mean_stretches = statistics.mean(stretches),
         overlapping_loops = overlapping_loops,
-        texel_density_standard_deviation = texel_density_standard_deviation,
-        aria_ratios_standard_deviation = aria_ratios_standard_deviation,
+        texel_density_deviation = texel_density_deviation,
+        area_ratios_deviation = area_ratios_deviation,
         seam_length = seam_length,
     )
 
@@ -1798,8 +1823,8 @@ class Unwrap_Quality_Score:
             uv_area_taken,
             mean_stretches,
             overlapping_loops,
-            texel_density_standard_deviation,
-            aria_ratios_standard_deviation,
+            texel_density_deviation,
+            area_ratios_deviation,
             seam_length,
         ):
 
@@ -1809,8 +1834,8 @@ class Unwrap_Quality_Score:
         self.uv_area_taken = uv_area_taken
         self.mean_stretches = mean_stretches
         self.overlapping_loops = overlapping_loops
-        self.texel_density_standard_deviation = texel_density_standard_deviation
-        self.aria_ratios_standard_deviation = aria_ratios_standard_deviation
+        self.texel_density_deviation = texel_density_deviation
+        self.area_ratios_deviation = area_ratios_deviation
         self.seam_length = seam_length
 
         self._keys = tuple(key for key in self.__dict__.keys() if not key.startswith('_'))
@@ -1836,21 +1861,21 @@ class Unwrap_Quality_Score:
     def _get_score(self):
         """ The values should be normalized first. """
         return (
-            (- self.islands_count) * 2
+            (- self.islands_count) * 3
             +
-            self.faces_per_island_weighted_mean * 2
+            self.faces_per_island_weighted_mean * 3
             +
             self.texel_density * 7
             +
             self.uv_area_taken * 6
             +
-            (- self.mean_stretches) * 2
+            (- self.mean_stretches) * 5
             +
-            (- self.overlapping_loops) * 10
+            (- self.overlapping_loops) * 15
             +
-            (- self.texel_density_standard_deviation) * 2
+            (- self.texel_density_deviation) * 4
             +
-            (- self.aria_ratios_standard_deviation) * 13
+            (- self.area_ratios_deviation) * 10
             +
             (- self.seam_length) * 5
         )
@@ -2174,11 +2199,13 @@ def brute_force_unwrap(
 
         just_minimal_stretch_measures: typing.Dict[str, Unwrap_Quality_Score] = {}
 
+        is_minimal_stretch_failed = False
 
         try:
             reunwrap_with_minimal_stretch()
             measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         except Exception:
+            is_minimal_stretch_failed = True
             measure = None
 
         just_minimal_stretch_measures['just_minimal_stretch'] = measure
@@ -2186,6 +2213,8 @@ def brute_force_unwrap(
 
 
         try:
+            if is_minimal_stretch_failed:
+                raise Exception('MINIMUM_STRETCH has failed')  # this to reduce the outlier effect and save time, it most likely won't give a good result
             reunwrap_conformal()
             measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         except Exception:
