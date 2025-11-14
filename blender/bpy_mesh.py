@@ -1,8 +1,10 @@
 """ Utilities for mesh objects. """
 
+import typing
+
 import bpy
 import bmesh
-import typing
+import mathutils
 
 from . import bpy_context
 from . import bpy_utils
@@ -143,3 +145,45 @@ def make_bake_cage(object: bpy.types.Object, cage_offset = 0.15, voxel_size = 0.
     bpy.data.objects.remove(guide_cage)
 
     return bake_cage
+
+
+def bisect(object: bpy.types.Object, axis = 'X', flip = False, mirror_object: typing.Optional[bpy.types.Object] = None, threshold = 0.001):
+
+    if not mirror_object:
+        mirror_object = object
+
+    rotation_euler = mathutils.Euler(mirror_object.evaluated_get(bpy.context.evaluated_depsgraph_get()).matrix_world.to_euler('XYZ'), 'XYZ')
+    plane_no = mathutils.Vector((axis == 'X', axis == 'Y' , axis == 'Z'))
+    plane_no.rotate(rotation_euler)
+
+    with bpy_context.Focus_Objects(object, 'EDIT'):
+
+        bpy.ops.mesh.reveal()
+        bpy.ops.mesh.select_all(action = 'SELECT')
+
+        bpy.ops.mesh.bisect(
+            plane_co = mirror_object.location,
+            plane_no = plane_no,
+            clear_inner = True,
+            threshold = threshold,
+            flip = flip,
+        )
+
+
+def bisect_by_mirror_modifiers(object: bpy.types.Object):
+
+    modifier: bpy.types.MirrorModifier
+    for modifier in object.modifiers:
+
+        if modifier.type != 'MIRROR':
+            continue
+
+        for axis, use_axis, use_bisect_axis, flip in zip(['X', 'Y', 'Z'], modifier.use_axis, modifier.use_bisect_axis, modifier.use_bisect_flip_axis):
+
+            if not use_axis:
+                continue
+
+            if not use_bisect_axis:
+                continue
+
+            bisect(object, axis, flip, modifier.mirror_object, modifier.bisect_threshold)

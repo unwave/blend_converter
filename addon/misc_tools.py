@@ -610,8 +610,7 @@ def reunwrap_bad_uvs(operator: bpy.types.Operator, context: bpy.types.Context):
 def scale_uv_to_bounds(operator: bpy.types.Operator, context: bpy.types.Context):
     objects = [object for object in context.selected_objects if object.data and hasattr(object.data, 'uv_layers') and object.data.is_editmode]
     objects = bpy_utils.get_unique_data_objects(objects)
-    for object in objects:
-        bpy_uv.scale_uv_to_bounds(object, margin=operator.margin)
+    bpy_uv.scale_uv_to_bounds(objects, margin=operator.margin)
 
 
 @operator_factory.operator(

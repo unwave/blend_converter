@@ -16,6 +16,7 @@ import traceback
 import tempfile
 import operator
 import re
+import itertools
 
 import bpy
 import mathutils
@@ -569,7 +570,7 @@ def get_uv_triangles(b_mesh: bmesh.types.BMesh, uv_layer):
     return face_to_uv_triangles
 
 
-def scale_uv_to_world_per_uv_island(objects: typing.List[bpy.types.Object], use_selected = False, divide_by_mean = True):
+def scale_uv_to_world_per_uv_island(objects: typing.List[bpy.types.Object], uv_layer_name: str = '', use_selected = False, divide_by_mean = True):
     """ Works on the active uv layer. """
     print(f"{scale_uv_to_world_per_uv_island.__name__}...")
 
@@ -591,7 +592,10 @@ def scale_uv_to_world_per_uv_island(objects: typing.List[bpy.types.Object], use_
 
             bm_copy.faces.ensure_lookup_table()
 
-            uv_layer = bm.loops.layers.uv.verify()
+            if uv_layer_name:
+                uv_layer = bm.loops.layers.uv[uv_layer_name]
+            else:
+                uv_layer = bm.loops.layers.uv.verify()
 
             islands = get_linked_uv_islands(bm, uv_layer)
             if use_selected:
@@ -911,8 +915,7 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
                 margin = get_island_margin(bpy_utils.get_unique_meshes(objects), settings)
                 bpy.ops.uv.pack_islands(margin = margin)
 
-        for object in objects:
-            scale_uv_to_bounds(object, settings._uv_island_margin_fraction)
+        scale_uv_to_bounds(objects, settings._uv_island_margin_fraction)
 
         blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_UV_PACK)
 
@@ -1562,11 +1565,11 @@ def get_texel_density_for_uv_quality(object: bpy.types.Object, uv_layer_name: st
 
     total_uv_area = sum(face_uv_areas)
     if math.isnan(total_uv_area):
-        total_uv_area = sum(filter(math.isnan, face_uv_areas))
+        total_uv_area = sum(itertools.filterfalse(math.isnan, face_uv_areas))
 
     total_face_area = sum(face_areas)
     if math.isnan(total_uv_area):
-        total_face_area = sum(filter(math.isnan, face_areas))
+        total_face_area = sum(itertools.filterfalse(math.isnan, face_areas))
 
     texel_densities = []
     weights = []
@@ -1740,7 +1743,7 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
 
         _, _,  texel_density_deviation, area_ratios_deviation = get_texel_density_for_uv_quality(object, uv_layer_name)
 
-        scale_uv_to_bounds(object)
+        scale_uv_to_bounds([object])
 
         texel_density, uv_area_taken,  _, _ = get_texel_density_for_uv_quality(object, uv_layer_name)
 
@@ -1762,37 +1765,45 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
     return metric
 
 
-def scale_uv_to_bounds(object: bpy.types.Object, margin: float = 0):
+def scale_uv_to_bounds(objects: typing.List[bpy.types.Object], margin: float = 0):
 
-    with bpy_context.Focus_Objects([object], mode='EDIT'):
+    objects = bpy_utils.get_unique_data_objects(objects)
 
-        bm = bmesh.from_edit_mesh(object.data)
+    with bpy_context.Focus_Objects(objects, mode='EDIT'):
 
-        uv_layer = bm.loops.layers.uv.verify()
+        bmeshes = [bmesh.from_edit_mesh(object.data) for object in objects]
 
         min_x = float('inf')
         min_y = float('inf')
         max_x = float('-inf')
         max_y = float('-inf')
 
-        for face in bm.faces:
-            for loop in face.loops:
-                uv = loop[uv_layer].uv
-                min_x = min(min_x, uv.x)
-                min_y = min(min_y, uv.y)
-                max_x = max(max_x, uv.x)
-                max_y = max(max_y, uv.y)
+        for bm in bmeshes:
+
+            uv_layer = bm.loops.layers.uv.verify()
+
+            for face in bm.faces:
+                for loop in face.loops:
+                    uv = loop[uv_layer].uv
+                    min_x = min(min_x, uv.x)
+                    min_y = min(min_y, uv.y)
+                    max_x = max(max_x, uv.x)
+                    max_y = max(max_y, uv.y)
 
         scale_x = (1.0 - margin) / (max_x - min_x)
         scale_y = (1.0 - margin) / (max_y - min_y)
 
-        for face in bm.faces:
-            for loop in face.loops:
-                uv = loop[uv_layer].uv
-                uv.x = (uv.x - min_x) * scale_x + margin / 2
-                uv.y = (uv.y - min_y) * scale_y + margin / 2
+        for bm, object in zip(bmeshes, objects):
 
-        bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
+            uv_layer = bm.loops.layers.uv.verify()
+
+            for face in bm.faces:
+                for loop in face.loops:
+                    uv = loop[uv_layer].uv
+                    uv.x = (uv.x - min_x) * scale_x + margin / 2
+                    uv.y = (uv.y - min_y) * scale_y + margin / 2
+
+            bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
 
 
 def get_interquartile_range(values):
@@ -1863,7 +1874,7 @@ class Unwrap_Quality_Score:
         return (
             (- self.islands_count) * 3
             +
-            self.faces_per_island_weighted_mean * 3
+            self.faces_per_island_weighted_mean * 4
             +
             self.texel_density * 7
             +
@@ -1871,13 +1882,13 @@ class Unwrap_Quality_Score:
             +
             (- self.mean_stretches) * 5
             +
-            (- self.overlapping_loops) * 15
+            (- self.overlapping_loops) * 20
             +
             (- self.texel_density_deviation) * 4
             +
             (- self.area_ratios_deviation) * 10
             +
-            (- self.seam_length) * 5
+            (- self.seam_length) * 10
         )
 
 

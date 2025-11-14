@@ -615,7 +615,7 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
     if settings.texture_name_prefix:
         texture_name_prefix = settings.texture_name_prefix
     else:
-        texture_name_prefix = ensure_unique_name(get_common_name(filter(None, objects_by_material.keys()), objects[0].name))
+        texture_name_prefix = ensure_unique_name(bpy_utils.get_common_name(filter(None, objects_by_material.keys()), objects[0].name))
 
     baking_images = [Baked_Image(map, texture_name_prefix, settings) for map in settings.bake_types]
 
@@ -905,26 +905,6 @@ def create_material(name: str, uv_layer: str, images: typing.Iterable[bpy.types.
     return material
 
 
-def get_common_name(id_blocks: typing.Iterable[bpy.types.ID], default: typing.Optional[str] = None):
-
-    name = utils.get_longest_substring((re.sub(r'\.\d+$', '', _object.name) for _object in id_blocks))
-
-    if len(name) < 1:
-        if default is None:
-            if id_blocks:
-                name = id_blocks[0].name
-            else:
-                name = 'UNNAMED'
-        else:
-            name = default
-
-    # https://docs.blender.org/manual/en/latest/compositing/types/output/file_output.html
-    # https://docs.blender.org/manual/en/latest/render/output/properties/output.html
-    name = name.replace('#', '_')
-
-    return name
-
-
 def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
 
     uv_layer_name = settings.uv_layer_name
@@ -943,7 +923,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
 
             material_name = settings.texture_name_prefix
             if not material_name:
-                material_name = get_common_name(objects)
+                material_name = bpy_utils.get_common_name(objects)
 
             material = create_material(material_name, 'UVMap', images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
             for object in objects:
@@ -979,7 +959,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
 
             material_name = settings.texture_name_prefix
             if not material_name:
-                material_name = get_common_name(materials_to_bake)
+                material_name = bpy_utils.get_common_name(materials_to_bake)
 
             material = create_material(material_name, uv_layer_name, images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
 

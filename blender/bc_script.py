@@ -36,6 +36,8 @@ if 'bpy' in sys.modules:
     from blend_converter.blender import bpy_utils
     from blend_converter.blender import bpy_uv
     from blend_converter.blender import blend_inspector
+    from blend_converter.blender import bpy_mesh
+
 
 
 
@@ -388,6 +390,23 @@ def copy_and_bake_materials(
     )
 
 
+@wraps(bpy_utils.pack_copy_bake if typing.TYPE_CHECKING else object)
+def pack_copy_bake(
+            objects: Objects_Like,
+            settings,
+            *,
+            bake_settings = None,
+            pack_settings = None,
+        ):
+
+    return bpy_utils.pack_copy_bake(
+        get_objects(objects),
+        tool_settings.Bake_Materials._from_dict(settings),
+        bake_settings = tool_settings.Bake._from_dict(bake_settings) if bake_settings else None,
+        pack_settings = tool_settings.Pack_UVs._from_dict(pack_settings) if pack_settings else None,
+    )
+
+
 def scene_clean_up():
     """ Remove all objects and collection starting from `#` and purge unused. """
 
@@ -425,3 +444,14 @@ def unwrap(objects: Objects_Like, **kwargs):
         kwargs['ministry_of_flat_settings'] = tool_settings.Ministry_Of_Flat._from_dict(kwargs['ministry_of_flat_settings'])
 
     bpy_uv.unwrap(get_objects(objects), **kwargs)
+
+
+@wraps(bpy_mesh.bisect_by_mirror_modifiers if typing.TYPE_CHECKING else object)
+def bisect_by_mirror_modifiers(objects: Objects_Like):
+    for object in get_objects(objects):
+        bpy_mesh.bisect_by_mirror_modifiers(object)
+
+
+@wraps(bpy_uv.scale_uv_to_world_per_uv_island if typing.TYPE_CHECKING else object)
+def scale_uv_to_world_per_uv_island(objects: Objects_Like, uv_layer_name: str = ''):
+    bpy_uv.scale_uv_to_world_per_uv_island(get_objects(objects), uv_layer_name = uv_layer_name)

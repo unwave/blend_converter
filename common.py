@@ -16,6 +16,9 @@ from . import utils
 from . import tool_settings
 
 
+SENTINEL = object()
+
+
 ROOT_DIR = os.path.dirname(__file__)
 
 def get_script_path(name: str):
@@ -267,8 +270,8 @@ class Program:
         if isinstance(value, list):
             for index, sub_value in enumerate(value):
                 if sub_value in self.instructions:
-                    return_value = self.return_values.get(self.instructions.index(sub_value))
-                    if return_value:
+                    return_value = self.return_values.get(self.instructions.index(sub_value), SENTINEL)
+                    if return_value is not SENTINEL:
                         value[index] = return_value
                 elif type(sub_value) in (list, dict):
                     value[index] = self.replace_return_values(sub_value)
@@ -277,8 +280,8 @@ class Program:
         elif isinstance(value, dict):
             for key, sub_value in value.items():
                 if sub_value in self.instructions:
-                    return_value = self.return_values.get(self.instructions.index(sub_value))
-                    if return_value:
+                    return_value = self.return_values.get(self.instructions.index(sub_value), SENTINEL)
+                    if return_value is not SENTINEL:
                         value[key] = return_value
                 elif type(sub_value) is (list, dict):
                     value[key] = self.replace_return_values(sub_value)

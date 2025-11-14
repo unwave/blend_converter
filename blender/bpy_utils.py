@@ -11,6 +11,7 @@ import uuid
 import operator
 import hashlib
 import re
+import itertools
 
 import bpy
 from bpy import utils as b_utils
@@ -274,6 +275,26 @@ def get_all_data_blocks():
             blocks.extend(value)
 
     return blocks
+
+
+def get_common_name(id_blocks: typing.Iterable[bpy.types.ID], default: typing.Optional[str] = None):
+
+    name = utils.get_longest_substring((re.sub(r'\.\d+$', '', block.name) for block in id_blocks))
+
+    if len(name) < 1:
+        if default is None:
+            if id_blocks:
+                name = id_blocks[0].name
+            else:
+                name = 'UNNAMED'
+        else:
+            name = default
+
+    # https://docs.blender.org/manual/en/latest/compositing/types/output/file_output.html
+    # https://docs.blender.org/manual/en/latest/render/output/properties/output.html
+    name = name.replace('#', '_')
+
+    return name
 
 
 def get_joinable_objects(objects: typing.List[bpy.types.Object]):
@@ -1235,7 +1256,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
 
             if resolution == 0:
                 bake_settings.resolution = get_texture_resolution(
-                    merged_object,
+                    [merged_object],
                     uv_layer_name = uv_layer_bake,
                     materials = material_group,
                     px_per_meter = px_per_meter,
@@ -1273,73 +1294,69 @@ def get_closest_power_of_two(resolution: float, min_res = 64, max_res = 4096) ->
     return closest_resolution[1]
 
 
-def get_texture_resolution(object: bpy.types.Object, *, uv_layer_name: str, materials: typing.Optional[typing.List[bpy.types.Material]] = None, px_per_meter = 1024, min_res = 64, max_res = 4096):
+def get_texture_resolution(objects: typing.List[bpy.types.Object], *, uv_layer_name: str, materials: typing.Optional[typing.List[bpy.types.Material]] = None, px_per_meter = 1024, min_res = 64, max_res = 4096):
     """ Get a texture resolution needed to achieve the given texel density. """
 
     from mathutils.geometry import area_tri
 
-    init_active = object.data.uv_layers.active
 
-    object.data.uv_layers.active = object.data.uv_layers[uv_layer_name]
+    with bpy_context.Focus_Objects(objects), bpy_context.Bpy_State() as state:
 
-    bm = bmesh.new()
-    bm.from_mesh(object.data)
-    bm.transform(object.matrix_world)
-
-    face_to_uv_triangles = bpy_uv.get_uv_triangles(bm, bm.loops.layers.uv.verify())
+        for object in objects:
+            state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
 
 
-    face_areas = []
-    face_uv_areas = []
+        face_areas = []
+        face_uv_areas = []
 
-    if materials:
-        material_indexes = set(index for index, material in enumerate(object.data.materials) if material in materials)
-    else:
-        material_indexes = None
+        if materials:
+            material_indexes = set(index for index, material in enumerate(object.data.materials) if material in materials)
+        else:
+            material_indexes = None
 
-    for face in bm.faces:
+        for object in objects:
 
-        if material_indexes is not None:
-            if face.material_index not in material_indexes:
+            bm = bmesh.new()
+            bm.from_mesh(object.data)
+            bm.transform(object.matrix_world)
+
+            face_to_uv_triangles = bpy_uv.get_uv_triangles(bm, bm.loops.layers.uv.verify())
+
+            for face in bm.faces:
+
+                if material_indexes is not None:
+                    if face.material_index not in material_indexes:
+                        continue
+
+                face_areas.append(face.calc_area())
+                face_uv_areas.append(sum(area_tri(*loop) for loop in face_to_uv_triangles[face]))
+
+            bm.free()
+
+
+        # total_face_area = sum(itertools.filterfalse(math.isnan, face_areas))
+        total_uv_area = sum(itertools.filterfalse(math.isnan, face_uv_areas))
+
+        texel_densities = []
+        weights = []
+
+        for face_area, face_area_uv in zip(face_areas, face_uv_areas):
+
+            try:
+                texel_density = math.sqrt(face_area / face_area_uv) * px_per_meter
+                weight = face_area_uv / total_uv_area
+            except ZeroDivisionError:
                 continue
 
-        face_areas.append(face.calc_area())
-        face_uv_areas.append(sum(area_tri(*loop) for loop in face_to_uv_triangles[face]))
+            texel_densities.append(texel_density)
+            weights.append(weight)
 
+        perfect_resolution = bpy_uv.get_weighted_percentile(texel_densities, 0.5, weights)
 
-    total_uv_area = sum(face_uv_areas)
-    assert not math.isnan(total_uv_area)
+        print(f"Perfect resolution for {[o.name_full for o in objects]}:", round(perfect_resolution), 'px')
 
-    # texel_densities = []
-    texel_densities_to_find = []
-    weights = []
+        final_resolution = get_closest_power_of_two(perfect_resolution, min_res, max_res)
 
-    # current_texture_size = 1024
-
-    for face_area, face_area_uv in zip(face_areas, face_uv_areas):
-
-        try:
-            # texel_density = math.sqrt(pow(current_texture_size, 2) / face_area * face_area_uv)
-            texel_density_to_find = math.sqrt(face_area / face_area_uv) * px_per_meter
-            weight = face_area_uv / total_uv_area
-        except ZeroDivisionError:
-            continue
-
-        # texel_densities.append(texel_density)
-        texel_densities_to_find.append(texel_density_to_find)
-        weights.append(weight)
-
-    # total_mesh_area = sum(face_areas)
-    # current_from_weighted_mean = sum(map(operator.mul, texel_densities, weights))/sum(weights)
-    # current_from_total = math.sqrt(total_mesh_area / total_uv_area) * current_texture_size
-
-    perfect_resolution = sum(map(operator.mul, texel_densities_to_find, weights))/sum(weights)
-
-    print(f"Perfect resolution for {object.name_full}:", round(perfect_resolution), 'px')
-
-    final_resolution = get_closest_power_of_two(perfect_resolution, min_res, max_res)
-
-    object.data.uv_layers.active = init_active
 
     return final_resolution
 
@@ -1780,7 +1797,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
             else:
                 # calculate target resolution and repack
                 _bake_settings.resolution = get_texture_resolution(
-                    merged_object,
+                    [merged_object],
                     uv_layer_name = settings.uv_layer_bake,
                     materials = material_group,
                     px_per_meter = settings.texel_density,
@@ -1890,6 +1907,211 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         return objects
+
+
+
+def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake_Materials, *,
+            bake_settings: typing.Optional[tool_settings.Bake] = None,
+            pack_settings: typing.Optional[tool_settings.Pack_UVs] = None,
+        ):
+
+
+    incompatible_objects = set(objects) - set(get_meshable_objects(objects))
+    if incompatible_objects:
+        raise ValueError(
+            f"Specified objects cannot be baked, type must be MESH or convertible to MESH."
+            "\n"
+            f"Objects: {[o.name_full for o in objects]}"
+            "\n"
+            f"Incompatible: {[o.name_full for o in incompatible_objects]}"
+        )
+
+
+    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.Bpy_State() as bpy_state:
+
+
+        ## this can help to reduce `Dependency cycle detected` spam in rigs
+        for object in bpy.data.objects:
+            if object.type == 'ARMATURE':
+                bpy_state.set(object.pose, 'ik_solver', 'LEGACY')
+
+
+        ## disable animation for consistency
+        for object in objects:
+            if object.animation_data:
+
+                for driver in object.animation_data.drivers:
+                    bpy_state.set(driver, 'mute', True)
+
+                for nla_track in object.animation_data.nla_tracks:
+                    bpy_state.set(nla_track, 'mute', True)
+
+
+        ## process the materials
+
+        # this is needed in order to split_into_alpha_and_non_alpha_groups to work
+        # and for the bake itself
+        # TODO: it might be possible to convert the materials on the bake proxy and leave the original intact
+        # but to sort them into alpha and non-alpha they should be converter first
+
+        convert_materials_to_principled(objects, remove_unused=False)
+
+        set_out_of_range_material_indexes_to_zero(objects)
+        merge_material_slots_with_the_same_materials(objects)
+
+        alpha_material_key, opaque_material_key = split_into_alpha_and_non_alpha_groups(objects)
+
+
+        ## uv pack
+
+        # doing the pack inside the function because it depends on the material groups
+
+        materials = list(group_objects_by_material(objects))
+
+        def pack_uvs(resolution):
+            for material_key in (opaque_material_key, alpha_material_key):
+
+                if not any(m for m in materials if m.get(material_key)):
+                    continue
+
+                _pack_settings = tool_settings.Pack_UVs(
+                    resolution = resolution,
+                    uv_layer_name = settings.uv_layer_bake,
+                    material_key = material_key,
+                    average_uv_scale = False,
+                )
+
+                if pack_settings:
+                    _pack_settings._update(pack_settings)
+
+                _pack_settings._set_suggested_padding()
+                bpy_uv.pack(objects, _pack_settings)
+                bpy_uv.ensure_pixel_per_island(objects, _pack_settings)
+
+
+        if settings.resolution:
+            pack_uvs(settings.resolution)
+        else:
+            # pre packing
+            # needed to calculate the texel density
+            # but to match the final resolution, we have to pack a second time for preciseness
+            pack_uvs(get_closest_power_of_two((settings.min_resolution + settings.max_resolution)/2))
+
+
+        ## collect bake settings
+
+        bake_settings_tasks = []
+
+        # TODO: this only works for the materials that has been processed, not others in the scene
+        environment_has_transparent_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))
+
+        for material_key in (opaque_material_key, alpha_material_key):
+
+            material_group = [m for m in materials if m.get(material_key)]
+            if not material_group:
+                continue
+
+
+            _bake_settings = tool_settings.Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)._update(bake_settings)
+
+            if settings.resolution:
+                _bake_settings.resolution = settings.resolution
+            else:
+                # calculate target resolution and pack
+                _bake_settings.resolution = get_texture_resolution(
+                    objects,
+                    uv_layer_name = settings.uv_layer_bake,
+                    materials = material_group,
+                    px_per_meter = settings.texel_density,
+                    min_res = settings.min_resolution,
+                    max_res = settings.max_resolution,
+                    )
+                pack_uvs(_bake_settings.resolution)
+
+
+            ## bake
+            bake_types = [
+                [
+                    tool_settings_bake.AO_Diffuse(faster=settings.faster_ao_bake, environment_has_transparent_materials = environment_has_transparent_materials),
+                    tool_settings_bake.Roughness(use_denoise=settings.denoise_all),
+                    tool_settings_bake.Metallic(use_denoise=settings.denoise_all)
+                ]
+            ]
+
+            if any(material[Material_Bake_Type.HAS_EMISSION] for material in material_group):
+                bake_types.append(tool_settings_bake.Emission(use_denoise=settings.denoise_all))
+
+            if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
+                # TODO: denoising the normals destroys the details
+                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name))
+
+            if material_key == alpha_material_key:
+                bake_types.append([tool_settings_bake.Base_Color(use_denoise=settings.denoise_all), tool_settings_bake.Alpha(use_denoise=settings.denoise_all)])
+            else:
+                bake_types.append(tool_settings_bake.Base_Color(use_denoise=settings.denoise_all))
+
+            _bake_settings.material_key = material_key
+            _bake_settings.bake_types = bake_types
+
+            if _bake_settings.texture_name_prefix:
+                if material_key == alpha_material_key:
+                    _bake_settings.texture_name_prefix = _bake_settings.texture_name_prefix + '_alpha'
+                else:
+                    _bake_settings.texture_name_prefix = _bake_settings.texture_name_prefix
+            else:
+                if material_key == alpha_material_key:
+                    _bake_settings.texture_name_prefix = get_common_name(objects, 'mesh') + '_alpha'
+                else:
+                    _bake_settings.texture_name_prefix = get_common_name(objects, 'mesh')
+
+
+            bake_settings_tasks.append(_bake_settings)
+
+
+        ## merge the bake proxy object
+
+        bpy.context.view_layer.update()
+
+        objects_copy = deep_copy_objects(objects)
+
+        texture_coordinates_collection = make_material_independent_from_object(objects_copy)
+
+        convert_to_mesh(objects_copy)
+
+        if settings.isolate_object_hierarchies:
+            space_out_objects(objects_copy)
+
+        bake_proxy = merge_objects(objects_copy, name = '__bc_bake')
+
+
+        ## bake
+        for bake_settings in bake_settings_tasks:
+            bpy_bake.bake([bake_proxy], bake_settings)
+
+
+        ## assign the baked materials
+
+        for object in objects:
+            for material_slot in object.material_slots:
+
+                if material_slot.material.get(opaque_material_key):
+                    material_slot.material = bake_proxy.material_slots[0].material
+
+                if material_slot.material.get(alpha_material_key):
+                    material_slot.material = bake_proxy.material_slots[1].material
+
+
+        merge_material_slots_with_the_same_materials(objects)
+
+
+        ## delete temporal objects
+        bpy.data.objects.remove(bake_proxy)
+        bpy.data.batch_remove(set(texture_coordinates_collection.objects))
+        bpy.data.collections.remove(texture_coordinates_collection)
+
+
+        return objects
+
 
 
 
