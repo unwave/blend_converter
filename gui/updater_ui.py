@@ -13,6 +13,7 @@ import shutil
 import pyperclip
 import wx
 import wx.lib.newevent
+import wx.lib.agw.aui as aui
 
 
 from .. import utils
@@ -89,15 +90,16 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def set_data(self, data):
 
+        self.Freeze()
+
         self.data: list[updater.Program_Entry] = data
         self.SetItemCount(len(data))
         self.Refresh()
 
         if not self.data:
-            self.GetParent().Update()
-            self.GetParent().Refresh()
-            self.Update()
-            self.Refresh()
+            self.main_frame.Refresh()
+
+        self.Thaw()
 
 
     def OnGetItemText(self, row: int, col: int) -> str:
@@ -137,7 +139,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def get_column_path(self, item: updater.Program_Entry):
-        return item.program.blend_path
+        if item.program.blend_path.startswith(self.parent.common_blend_path):
+            return '...' + item.program.blend_path[len(self.parent.common_blend_path):]
+        else:
+            return item.program.blend_path
 
     def get_column_result_type(self, item: updater.Program_Entry):
         return os.path.splitext(item.program.result_path)[1]
@@ -295,8 +300,8 @@ class Model_List(wxp_utils.Item_Viewer_Native):
     def on_item_selected(self, event: wx.ListEvent):
         entry = self.data[int(event.GetIndex())]
 
-        self.parent.stdout_viewer.set_data(entry.stdout_lines)
-        self.parent.stderr_viewer.set_data(entry.stderr_lines)
+        self.main_frame.stdout_viewer.set_data(entry.stdout_lines)
+        self.main_frame.stderr_viewer.set_data(entry.stderr_lines)
         # if os.path.exists(entry.stdout_file):
         #     self.parent.console_output.LoadFile(entry.stdout_file)
         #     self.parent.console_output.SetScrollPos(wx.VERTICAL, self.parent.console_output.GetScrollRange(wx.VERTICAL))
@@ -304,7 +309,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         # else:
         #     self.parent.console_output.Clear()
 
-        self.parent.main_frame.Refresh()
+        self.main_frame.Refresh()
 
 
     def on_entry_poke(self, entry: updater.Program_Entry):
@@ -538,10 +543,14 @@ class Output_Lines(wxp_utils.Item_Viewer_Native):
 
     def set_data(self, data: typing.List[dict]):
 
+        self.Freeze()
+
         self.data = data
 
         self.SetItemCount(len(data))
         self.Focus(len(data) - 1)
+
+        self.Thaw()
 
 
     def update(self):
@@ -583,16 +592,8 @@ class Result_Panel(wx.Panel):
         self.model_list = Model_List(self, self.main_frame.user_columns)
         self.sizer.Add(self.model_list, 1, wx.EXPAND)
 
-        # self.console_output = wx.TextCtrl(self, style = wx.TE_READONLY | wx.TE_MULTILINE)
-        self.stdout_viewer = Output_Lines(self, 'stdout')
-        self.main_frame.Bind(EVT_STDOUT_LINE_PRINTED, self.on_stdout_need_update)
         self.stdout_need_update = False
-        self.sizer.Add(self.stdout_viewer, 1, wx.EXPAND)
-
-        self.stderr_viewer = Output_Lines(self, 'stderr')
-        self.main_frame.Bind(EVT_STDERR_LINE_PRINTED, self.on_stderr_need_update)
         self.stderr_need_update = False
-        self.sizer.Add(self.stderr_viewer, 1, wx.EXPAND)
 
         self.search_column_tuple = tuple(f"{column[0]}:" for column in self.model_list.columns)
         self.search_column_dict = {column[0]: column[2] for column in self.model_list.columns}
@@ -605,25 +606,31 @@ class Result_Panel(wx.Panel):
         self.Bind(wx.EVT_TIMER, self.on_output_timer)
         self.output_timer.Start(1000)
 
+        blend_paths = list(dict.fromkeys(entry.program.blend_path for entry in self.main_frame.updater.entries))
+        if len(blend_paths) > 1:
+            self.common_blend_path = os.path.commonpath(blend_paths)
+        else:
+            self.common_blend_path = os.sep
+
 
     def on_output_timer(self, event):
 
         if self.stdout_need_update:
-            self.stdout_viewer.update()
+            self.main_frame.stdout_viewer.update()
             self.stdout_need_update = False
 
         if self.stderr_need_update:
-            self.stderr_viewer.update()
+            self.main_frame.stderr_viewer.update()
             self.stderr_need_update = False
 
 
     def on_stdout_need_update(self, event):
-        if event.entry.stdout_lines == self.stdout_viewer.data:
+        if event.entry.stdout_lines == self.main_frame.stdout_viewer.data:
             self.stdout_need_update = True
 
 
     def on_stderr_need_update(self, event):
-        if event.entry.stderr_lines == self.stderr_viewer.data:
+        if event.entry.stderr_lines == self.main_frame.stderr_viewer.data:
             self.stderr_need_update = True
 
 
@@ -749,11 +756,13 @@ class Main_Frame(wxp_utils.Generic_Frame):
         updater.stdout_line_printed = lambda entry: wx.PostEvent(self, Event_Stdout_Line_Printed(entry=entry))
         updater.stderr_line_printed = lambda entry: wx.PostEvent(self, Event_Stderr_Line_Printed(entry=entry))
 
+        self.SetDoubleBuffered(True)
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
-        self.SetSizer(self.sizer)
 
         self.init_ui()
+
+        self.SetSizer(self.sizer)
 
         self.SetBackgroundColour("white")
         self.SetSize((1600, 900))
@@ -798,11 +807,40 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
     def init_ui(self):
 
-        self.notebook = wx.Notebook(self)
+        style = (
+            aui.AUI_NB_TOP |
+            aui.AUI_NB_TAB_SPLIT |
+            aui.AUI_NB_TAB_MOVE |
+            aui.AUI_NB_SCROLL_BUTTONS |
+            # aui.AUI_NB_CLOSE_ON_ACTIVE_TAB |
+            # aui.AUI_NB_MIDDLE_CLICK_CLOSE |
+            # aui.AUI_NB_CLOSE_ON_ALL_TABS |
+            aui.AUI_NB_DRAW_DND_TAB
+        )
+
+        self.notebook = aui.AuiNotebook(self, agwStyle=style)
         self.sizer.Add(self.notebook, 1, wx.EXPAND)
 
         self.result_panel = Result_Panel(self.notebook)
         self.notebook.AddPage(self.result_panel, "Result")
+
+        self.stdout_viewer = Output_Lines(self, 'stdout')
+
+        self.notebook.AddPage(self.stdout_viewer, 'stdout')
+
+        self.Bind(EVT_STDOUT_LINE_PRINTED, self.result_panel.on_stdout_need_update)
+
+        self.stderr_viewer = Output_Lines(self, 'stderr')
+
+        self.notebook.AddPage(self.stderr_viewer, 'stderr')
+
+        self.Bind(EVT_STDERR_LINE_PRINTED, self.result_panel.on_stderr_need_update)
+
+        self.on_restore_default_layout(None)
+
+        self.notebook.Update()
+
+        self.notebook.Bind(aui.EVT_AUINOTEBOOK_PAGE_CHANGED, self.on_page_changed)
 
         # self.blend_panel = wx_blend.Blend_Panel(self.notebook)
         # self.notebook.AddPage(self.blend_panel, "Blend")
@@ -838,6 +876,13 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.menubar.Append(menu, "&Tool")
 
         self.Bind(wx.EVT_MENU, self.on_settings, menu.Append(wx.ID_ANY, "Settings"))
+
+        menu.AppendSeparator()
+
+        self.Bind(wx.EVT_MENU, self.on_print_layout, menu.Append(wx.ID_ANY, "Print Layout"))
+
+        self.Bind(wx.EVT_MENU, self.on_restore_default_layout, menu.Append(wx.ID_ANY, "Restore Layout"))
+
 
         if os.name == 'nt':
             menu = wx.Menu()
@@ -965,3 +1010,22 @@ class Main_Frame(wxp_utils.Generic_Frame):
         console_manager.show(True)
         console_manager.always_on_top(True)
         self.is_console_shown = True
+
+
+    def on_print_layout(self, event):
+        print(self.notebook.SavePerspective())
+
+
+    def on_restore_default_layout(self, event):
+
+        self.Freeze()
+
+        default_aui_layout_path = os.path.join(os.path.dirname(__file__), 'default_aui_layout')
+        with open(default_aui_layout_path) as f:
+            self.notebook.LoadPerspective(f.read())
+
+        self.Thaw()
+
+
+    def on_page_changed(self, event):
+        self.Refresh()
