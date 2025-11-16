@@ -115,11 +115,7 @@ class Program_Entry:
         """ This function is run in `multiprocessing.Process` """
 
         from . import utils
-        from . unreal import remote_execution_handler
-
         utils.print_in_color = utils.dummy_print_in_color
-        remote_execution_handler.print_in_color = remote_execution_handler.dummy_print_in_color
-
 
         def stdout_capture_job():
             with open(self.stdout_file, 'a+', encoding='utf-8') as f:
@@ -294,6 +290,9 @@ class Updater:
         self.total_max_parallel_executions = 2
         """ Total max parallel executions. """
 
+        self.shared_failure_tags = set()
+        """ See `set_shared_failure_by_tag`. """
+
 
     def init_observer(self):
 
@@ -447,6 +446,25 @@ class Updater:
 
             time.sleep(1)
 
+
+            failed_tags = set()
+
+            for entry in self.entries:
+
+                if entry.status != 'error':
+                    continue
+
+                failed_tags.update(self.shared_failure_tags.intersection(entry.program.tags))
+
+            if failed_tags:
+
+                for entry in self.entries:
+                    if not entry.program.tags.isdisjoint(failed_tags):
+                        entry.status = 'error'
+
+                update_ui()
+
+
             for entry in self.entries:
 
                 if not entry.is_manual_update:
@@ -517,6 +535,11 @@ class Updater:
                 return True
 
         return False
+
+
+    def set_shared_failure_by_tag(self, tag: str):
+        """ If a program with the tag gets an `error` status then all the programs with that tag also get the `error` status. """
+        self.shared_failure_tags.add(tag)
 
 
 def update_ui():

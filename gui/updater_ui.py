@@ -265,7 +265,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         menu.append_separator()
 
         menu_item = menu.append_item(f"Mark As Needs Update", get_func(self.on_mark_as_needs_update))
-        menu_item = menu.append_item(f"Poke", get_func(self.on_entry_poke, entry))
+        menu_item = menu.append_item(f"Poke Selected", get_func(self.on_poke_entries, entry))
 
         menu.append_separator()
 
@@ -312,8 +312,9 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.main_frame.Refresh()
 
 
-    def on_entry_poke(self, entry: updater.Program_Entry):
-        self.main_frame.updater.poke_entry(entry)
+    def on_poke_entries(self, entry: updater.Program_Entry):
+        for entry in self.get_selected_items():
+            self.main_frame.updater.poke_entry(entry)
 
 
     def get_conversion_command(self, entries: typing.Iterable[updater.Program_Entry]):
@@ -936,6 +937,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         for entry in self.updater.entries:
             entry.terminate()
+            entry.is_manual_update = False
 
         self.updater.poke_all()
 

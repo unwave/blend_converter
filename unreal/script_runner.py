@@ -50,15 +50,8 @@ def run(data: dict):
         import blend_converter
 
 
-    for index, script in enumerate(data['instructions']):
+    for script in data['instructions']:
 
-        try:
-
-            append_sys_path(os.path.dirname(script['filepath']))
-            module = import_module_from_file(script['filepath'])
-            getattr(module, script['name'])(*script['args'], **script['kwargs'])
-
-        except Exception:
-            import traceback
-            traceback.print_exc(file=sys.stderr)
-            break
+        append_sys_path(os.path.dirname(script['filepath']))
+        module = import_module_from_file(script['filepath'])
+        getattr(module, script['name'])(*script['args'], **script['kwargs'])

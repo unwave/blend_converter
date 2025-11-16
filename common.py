@@ -343,6 +343,9 @@ class Program:
                     profile = self._profile,
                 )
 
+                if not os.path.exists(self.return_values_file):
+                    continue
+
                 with open(self.return_values_file, encoding='utf-8') as f:
                     self.return_values = {int(key): value for key, value in json.load(f).items()}
 

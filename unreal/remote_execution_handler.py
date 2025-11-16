@@ -4,30 +4,6 @@ import socket
 import typing
 import inspect
 import textwrap
-import sys
-import os
-
-
-def get_color_code(r, g, b, _r, _g, _b):
-    return f'\033[38;2;{r};{g};{b};48;2;{_r};{_g};{_b}m'
-
-RESET_COLOR = '\033[0m'
-
-
-def dummy_print_in_color(fg_rgb: list, bg_rgb: list, *args, **kwargs):
-    print(*args, **kwargs)
-
-if hasattr(sys.stdout, 'isatty') and sys.stdout.isatty():
-
-    if sys.platform == 'win32':
-        os.system('')
-
-    def print_in_color(fg_rgb: list, bg_rgb: list, *args, **kwargs):
-        print(f"{get_color_code(*fg_rgb, *bg_rgb)}{' '.join(str(arg) for arg in args)}{RESET_COLOR}", **kwargs)
-
-else:
-    print_in_color = dummy_print_in_color
-
 
 class UE_Remote_Execution_Handler:
 
@@ -160,18 +136,4 @@ class UE_Remote_Execution_Handler:
         message = self._command_socket.recv(self.RECEIVE_BUFFER_SIZE)
         message = json.loads(message)
 
-        result = message['data']['result']
-        if result != 'None':
-            raise RuntimeError(result)
-
-        output = message['data']['output']
-
-        for line in output:
-            if line['type'] == 'Error':
-                print_in_color([255, 51, 0] ,[0,0,0], line['output'], file=sys.stderr)
-            elif line['type'] == 'Info':
-                print_in_color([204, 255, 204] ,[0,0,0], line['output'], file=sys.stdout)
-            else:
-                print_in_color([255, 153, 0] ,[0,0,0], line['output'])
-
-        return output
+        return message
