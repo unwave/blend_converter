@@ -16,6 +16,7 @@ from ..blender import utils
 from ..blender import bpy_node
 from ..blender import bpy_context
 from ..blender import bpy_uv
+from ..blender import bpy_mesh
 
 
 
@@ -622,3 +623,15 @@ def select_collapsed_islands(operator: bpy.types.Operator, context: bpy.types.Co
     objects = bpy_utils.get_unique_data_objects(objects)
     for object in objects:
         bpy_uv.select_collapsed_islands(object, object.data.uv_layers.active.name)
+
+
+
+@operator_factory.operator(
+    poll = object_mode_poll,
+    bl_options = {'REGISTER', 'UNDO'},
+)
+def make_manifold(operator: bpy.types.Operator, context: bpy.types.Context):
+    objects = [object for object in context.selected_objects]
+    objects = bpy_utils.get_unique_data_objects(objects)
+    for object in objects:
+        bpy_mesh.make_manifold(object)

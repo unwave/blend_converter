@@ -187,3 +187,148 @@ def bisect_by_mirror_modifiers(object: bpy.types.Object):
                 continue
 
             bisect(object, axis, flip, modifier.mirror_object, modifier.bisect_threshold)
+
+
+def get_selected_edges_groups(mesh: bmesh.types.BMesh):
+
+    groups: typing.List[typing.List[bmesh.types.BMEdge]] = []
+    processed = set()
+
+    for init_edge in [edge for edge in mesh.edges if edge.select]:
+
+        if init_edge in processed:
+            continue
+
+        processed.add(init_edge)
+        group = [init_edge]
+        pool = [init_edge]
+
+        while pool:
+
+            edge = pool.pop()
+
+            for vert in edge.verts:
+                for connected_edge in vert.link_edges:
+
+                    if not connected_edge.select:
+                        continue
+
+                    if connected_edge in processed:
+                        continue
+
+                    processed.add(connected_edge)
+                    group.append(connected_edge)
+                    pool.append(connected_edge)
+
+        groups.append(group)
+
+    return groups
+
+
+def make_manifold(object: bpy.types.Object):
+    """
+    For the voxel remesh not to fail.
+    For the convex decomposition to avoid operating on the shell.
+    """
+
+    with bpy_context.Focus_Objects(object, 'EDIT'):
+
+        bpy.ops.mesh.select_mode(type="VERT")
+        bpy.ops.mesh.reveal()
+
+
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.remove_doubles()
+
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.delete_loose(use_verts=True, use_edges=True, use_faces=True)
+
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.fill_holes(sides=4)
+
+        mesh = bmesh.from_edit_mesh(object.data)
+        mesh.edges.ensure_lookup_table()
+
+        bpy.ops.mesh.select_all(action="DESELECT")
+        bpy.ops.mesh.select_non_manifold()
+
+        bpy.ops.ed.flush_edits()
+
+        edge_groups = get_selected_edges_groups(mesh)
+
+        bpy.ops.mesh.select_all(action="DESELECT")
+
+        for edges in edge_groups:
+
+            for edge in edges:
+                edge.select = True
+
+            bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
+
+            bpy.ops.mesh.extrude_region_shrink_fatten(
+                MESH_OT_extrude_region={
+                    "use_normal_flip":False,
+                    "use_dissolve_ortho_edges":False,
+                    "mirror":False
+                },
+                TRANSFORM_OT_shrink_fatten={
+                    "value":-0.1,
+                    "use_even_offset":False,
+                    "mirror":False,
+                    "use_proportional_edit":False,
+                    "proportional_edit_falloff":'SMOOTH',
+                    "proportional_size":1,
+                    "use_proportional_connected":False,
+                    "use_proportional_projected":False,
+                    "snap":False,
+                    "release_confirm":False,
+                    "use_accurate":False
+                })
+
+            bpy.ops.mesh.fill()
+            bpy.ops.mesh.vertices_smooth(factor=0.5, wait_for_input=False)
+
+            bpy.ops.mesh.select_all(action="DESELECT")
+
+
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.delete_loose(use_verts=True, use_edges=True, use_faces=True)
+
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.remove_doubles()
+
+        # this at some point just selects the whole mesh for a bad geometry
+        # bpy.ops.mesh.select_all(action="DESELECT")
+        # bpy.ops.mesh.select_interior_faces()
+        # bpy.ops.mesh.delete(type="FACE")
+
+        bpy.ops.mesh.select_all(action="DESELECT")
+        bpy.ops.mesh.select_non_manifold()
+        bpy.ops.mesh.delete(type="FACE")
+
+        mesh = bmesh.from_edit_mesh(object.data)
+        mesh.edges.ensure_lookup_table()
+
+        bpy.ops.mesh.select_all(action="DESELECT")
+        bpy.ops.mesh.select_non_manifold()
+
+        bpy.ops.ed.flush_edits()
+
+        edge_groups = get_selected_edges_groups(mesh)
+
+        bpy.ops.mesh.select_all(action="DESELECT")
+
+        for edges in edge_groups:
+
+            for edge in edges:
+                edge.select = True
+
+            bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
+
+            bpy.ops.mesh.fill()
+
+            bpy.ops.mesh.select_all(action="DESELECT")
+
+
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.normals_make_consistent()
