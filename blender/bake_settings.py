@@ -243,6 +243,27 @@ class Normal(_Principled_Input):
     #### Default: `tool_settings.Bake.uv_layer_name`
     """
 
+    use_remove_inward_normals: bool = False
+
+    denoise_mix_factor: float = 1.0
+
+
+    def _get_composer_context(self, input_socket, images):
+
+        if isinstance(images, bpy.types.Image):
+            image = images
+        else:
+            image = images[0]
+
+        return bpy_context.Composer_Input_Normal(
+            input_socket,
+            image,
+            use_denoise = self.use_denoise,
+            use_remove_inward_normals = self.use_remove_inward_normals,
+            denoise_mix_factor = self.denoise_mix_factor,
+        )
+
+
     def _get_setup_context(self):
         """
         ⚓ T96942 Bake Normal problem when adjoining faces have different UV orientation
@@ -799,22 +820,20 @@ class Buffer_Factor(_Bake_Type, tool_settings.Settings):
 
             return bpy_context.Composer_Input_Factor(input_socket, image, use_denoise=self.use_denoise)
 
-
-class Normal_Native(_Bake_Type):
+@dataclass
+class Normal_Native(_Bake_Type, tool_settings.Settings):
     """ The native Normal bake type. Use for baking from selected to active. """
 
-
-    default_color: tuple = (0.5, 0.5, 1.0)
+    _default_color = (0.5, 0.5, 1.0)
 
     _socket_type = _Socket_Type.VECTOR
     _identifier = 'Normal'
 
     _requires_principled_bsdf = False
 
-
-    @property
-    def _default_color(self) -> float:
-        return self.default_color
+    use_denoise: bool = False
+    use_remove_inward_normals: bool = False
+    denoise_mix_factor: float = 1.0
 
 
     def _get_setup_context(self):
@@ -832,4 +851,10 @@ class Normal_Native(_Bake_Type):
         else:
             image = images[0]
 
-        return bpy_context.Composer_Input_Normal(input_socket, image)
+        return bpy_context.Composer_Input_Normal(
+            input_socket,
+            image,
+            use_denoise = self.use_denoise,
+            use_remove_inward_normals = self.use_remove_inward_normals,
+            denoise_mix_factor = self.denoise_mix_factor,
+        )

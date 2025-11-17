@@ -1243,8 +1243,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
                 bake_types.append(tool_settings_bake.Emission(use_denoise=denoise_all))
 
             if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
-                # TODO: denoising the normals destroys details
-                bake_types.append(tool_settings_bake.Normal(uv_layer=bake_settings.uv_layer_name))
+                bake_types.append(tool_settings_bake.Normal(uv_layer=bake_settings.uv_layer_name, use_denoise=denoise_all, denoise_mix_factor=0.75))
 
             if material_key == alpha_material_key:
                 bake_types.append([tool_settings_bake.Base_Color(use_denoise=denoise_all), tool_settings_bake.Alpha(use_denoise=denoise_all)])
@@ -1820,8 +1819,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
                 bake_types.append(tool_settings_bake.Emission(use_denoise=settings.denoise_all))
 
             if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
-                # TODO: denoising the normals destroys details
-                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name))
+                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name, use_denoise=settings.denoise_all, denoise_mix_factor=0.75))
 
             if material_key == alpha_material_key:
                 bake_types.append([tool_settings_bake.Base_Color(use_denoise=settings.denoise_all), tool_settings_bake.Alpha(use_denoise=settings.denoise_all)])
@@ -2042,8 +2040,7 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
                 bake_types.append(tool_settings_bake.Emission(use_denoise=settings.denoise_all))
 
             if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
-                # TODO: denoising the normals destroys the details
-                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name))
+                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name, use_denoise=settings.denoise_all, denoise_mix_factor=0.75))
 
             if material_key == alpha_material_key:
                 bake_types.append([tool_settings_bake.Base_Color(use_denoise=settings.denoise_all), tool_settings_bake.Alpha(use_denoise=settings.denoise_all)])

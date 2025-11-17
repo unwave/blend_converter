@@ -197,10 +197,7 @@ def _get_specs(cls):
 class Settings():
 
 
-    if typing.TYPE_CHECKING:
-        ignore_default_settings: bool = dataclasses.field(init=False)
-
-    ignore_default_settings: bool = False
+    ignore_default_settings = False
     """
     If `True` replacing a default value with a default value will be ignored.
 
@@ -213,10 +210,8 @@ class Settings():
     #### Default: `False`
     """
 
-    if typing.TYPE_CHECKING:
-        allow_non_default_settings: bool = dataclasses.field(init=False)
 
-    allow_non_default_settings: bool = False
+    allow_non_default_settings = False
     """
     If `True` non-existent settings or settings with no default value will be allowed.
 
@@ -1850,8 +1845,6 @@ class Bake_Materials(Settings):
     denoise_all: bool = False
     """
     Use denoise for all types of maps.
-
-    #### Currently excluding normal maps.
 
     #### Default: `False`
     """

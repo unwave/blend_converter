@@ -1676,79 +1676,84 @@ class Composer_Input_Factor:
         self.tree.delete_new_nodes()
 
 
+def insert_normalize(node: 'bpy_node._Shader_Node_Wrapper'):
+
+    normalize_normal = node.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Normalize_Vector'))
+
+    map_range_1 = normalize_normal.inputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Map_Range_Image'))
+    map_range_1[1] = 0
+    map_range_1[2] = 1
+    map_range_1[3] = -1
+    map_range_1[4] = 1
+
+    map_range_2 = normalize_normal.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Map_Range_Image'))
+    map_range_2[1] = -1
+    map_range_2[2] = 1
+    map_range_2[3] = 0
+    map_range_2[4] = 1
+
 class Composer_Input_Normal:
 
 
-    def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, use_denoise = False):
+    def __init__(self,
+                 input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'],
+                 image: bpy.types.Image,
+                 use_denoise = False,
+                 use_remove_inward_normals = False,
+                 denoise_mix_factor = 1.0,
+            ):
 
         self.tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
         self.input_socket = self.tree.get_socket_wrapper(input_socket)
         self.image = image
 
         self.use_denoise = use_denoise
+        self.use_remove_inward_normals = use_remove_inward_normals
+        self.denoise_mix_factor = denoise_mix_factor
 
 
     def __enter__(self):
 
         image_node = self.input_socket.new('CompositorNodeImage', image = self.image)
 
-
-        set_alpha_node = image_node.outputs[0].insert_new('CompositorNodeSetAlpha')
-
-        math_node = image_node.outputs[1].new(bpy_node.Compositor_Node_Type.MATH, operation = 'GREATER_THAN')
-        math_node.inputs[1].default_value = 0.9999
-
-        math_node.outputs[0].join(set_alpha_node.inputs[1])
-
-        distance = max(self.image.generated_height, self.image.generated_width)
-        distance = min(distance, 512)
+        inpaint_distance = max(self.image.generated_height, self.image.generated_width)
+        inpaint_distance = min(inpaint_distance, 512)
 
         if self.use_denoise:
-            denoise_node = set_alpha_node.outputs[0].insert_new('CompositorNodeDenoise')
 
-            if bpy.app.version >= (5, 0):
-                denoise_node.inputs[3].default_value = False
-                denoise_node.inputs[4].default_value = 'None'
-            else:
-                denoise_node.prefilter = 'NONE'
-                denoise_node.use_hdr = False
+            denoise_tree = bpy_data.load_compositor_node_tree('BC_C_Denoise_Normal')
+            set_denoise_tree_settings(denoise_tree, inpaint_distance)
 
-            denoise_node.inputs['Albedo'].join(image_node.outputs['Alpha'], move=False)
+            denoise_group = image_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = denoise_tree)
 
+            image_node.outputs[1].join(denoise_group.inputs[1])  # connect Alpha
 
-            denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=1)
-            denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=1)
+            denoise_group.inputs[3].set_default_value(self.denoise_mix_factor)
 
-            erode_node = math_node.outputs[0].new('CompositorNodeDilateErode', mode = 'DISTANCE', distance = -1 if bpy.context.scene.render.bake.margin > 1 else 0)
-            set_alpha_node_2 = denoise_node.outputs[0].insert_new('CompositorNodeSetAlpha')
-            erode_node.outputs[0].join(set_alpha_node_2.inputs[1])
-
-            inpaint = set_alpha_node_2.outputs[0].insert_new('CompositorNodeInpaint', distance = distance)
+            if self.use_remove_inward_normals:
+                use_remove_inward_normals = image_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Remove_Inward_Normal'))
+                insert_normalize(use_remove_inward_normals)
 
         else:
-            inpaint = set_alpha_node.outputs[0].insert_new('CompositorNodeInpaint', distance = distance)
 
+            set_alpha_node = image_node.outputs[0].insert_new('CompositorNodeSetAlpha')
 
-        filter_inward_normals = set_alpha_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Remove_Inward_Normal'))
+            math_node = image_node.outputs[1].new(bpy_node.Compositor_Node_Type.MATH, operation = 'GREATER_THAN')
+            math_node.inputs[1].default_value = 0.9999
+            math_node.outputs[0].join(set_alpha_node.inputs[1])
 
-        def insert_normalize(node: bpy_node._Shader_Node_Wrapper):
+            inpaint_node = set_alpha_node.outputs[0].insert_new('CompositorNodeInpaint')
 
-            normalize_normal = node.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Normalize_Vector'))
+            if bpy.app.version >= (5, 0):
+                inpaint_node.inputs[1].default_value = inpaint_distance
+            else:
+                inpaint_node.distance = inpaint_distance
 
-            map_range_1 = normalize_normal.inputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Map_Range_Image'))
-            map_range_1[1] = 0
-            map_range_1[2] = 1
-            map_range_1[3] = -1
-            map_range_1[4] = 1
+            if self.use_remove_inward_normals:
+                use_remove_inward_normals = set_alpha_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Remove_Inward_Normal'))
+                insert_normalize(use_remove_inward_normals)
 
-            map_range_2 = normalize_normal.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Map_Range_Image'))
-            map_range_2[1] = -1
-            map_range_2[2] = 1
-            map_range_2[3] = 0
-            map_range_2[4] = 1
-
-        insert_normalize(filter_inward_normals)
-        insert_normalize(inpaint)
+            insert_normalize(inpaint_node)
 
 
 
