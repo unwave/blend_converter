@@ -637,11 +637,13 @@ def _Output_Socket_AOV(material: 'bpy.types.Material', aov_name: str, aov_type: 
 @dataclass
 class AOV(_Bake_Type, tool_settings.Settings):
 
-
     _default_color = (0.0, 0.0, 0.0)
     _requires_principled_bsdf = False
-    name: str
-    type: str
+
+    name: str = ''
+    type: str = 'COLOR'
+
+    use_denoise: bool = False
 
 
     @property
@@ -666,7 +668,13 @@ class AOV(_Bake_Type, tool_settings.Settings):
 
 
     def _get_composer_context(self, input_socket, images):
-        return contextlib.nullcontext()
+
+        if isinstance(images, bpy.types.Image):
+            image = images
+        else:
+            image = images[0]
+
+        return bpy_context.Composer_Input_Simple(input_socket, image, use_denoise = self.use_denoise)
 
 
 
@@ -858,3 +866,107 @@ class Normal_Native(_Bake_Type, tool_settings.Settings):
             use_remove_inward_normals = self.use_remove_inward_normals,
             denoise_mix_factor = self.denoise_mix_factor,
         )
+
+
+@dataclass
+class Combined(_Bake_Type, tool_settings.Settings):
+
+
+    _socket_type = _Socket_Type.SHADER
+    _identifier = 'Combined'
+    _default_color = (0.5, 0.5, 0.5)
+    _requires_principled_bsdf = False
+
+
+    use_pass_direct: bool = True
+    use_pass_indirect: bool = True
+    use_pass_diffuse: bool = True
+    use_pass_glossy: bool = True
+    use_pass_transmission: bool = True
+    use_pass_emit: bool = True
+
+    use_denoise: bool = True
+
+
+    samples: int = 16
+    """
+    A number of render samples.
+
+    #### Default: `16`
+    """
+
+
+    def _get_setup_context(self):
+
+        settings = [(bpy.context.scene.cycles, 'bake_type', 'COMBINED')]
+
+        for name in ['use_pass_direct', 'use_pass_indirect', 'use_pass_diffuse', 'use_pass_glossy', 'use_pass_transmission', 'use_pass_emit']:
+            if name in self._has_been_set:
+                settings.append((bpy.context.scene.render.bake, name, getattr(self, name)))
+
+        if 'samples' in self._has_been_set:
+            settings.append((bpy.context.scene.cycles, 'samples', self.samples))
+
+        if self.use_denoise:
+            settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
+
+        return bpy_context.Bpy_State(settings)
+
+
+    def _get_material_context(self, material):
+        return contextlib.nullcontext(_get_shader_output_socket(material))
+
+
+    def _get_composer_context(self, input_socket, images):
+
+        if isinstance(images, bpy.types.Image):
+            image = images
+        else:
+            image = images[0]
+
+        return bpy_context.Composer_Input_Simple(input_socket, image, use_denoise=self.use_denoise)
+
+
+@dataclass
+class AO_Native(_Bake_Type, tool_settings.Settings):
+
+    _socket_type = _Socket_Type.SHADER
+
+    _identifier = 'Ambient Occlusion'
+    _default_color = (1.0, 1.0, 1.0)
+    _requires_principled_bsdf = False
+
+    use_denoise: bool = True
+
+    samples: int = 16
+    """
+    A number of render samples.
+
+    #### Default: `16`
+    """
+
+    def _get_setup_context(self):
+
+        settings = [(bpy.context.scene.cycles, 'bake_type', 'AO')]
+
+        if 'samples' in self._has_been_set:
+            settings.append((bpy.context.scene.cycles, 'samples', self.samples))
+
+        if self.use_denoise:
+            settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
+
+        return bpy_context.Bpy_State(settings)
+
+
+    def _get_material_context(self, material):
+        return contextlib.nullcontext(_get_shader_output_socket(material))
+
+
+    def _get_composer_context(self, input_socket, images):
+
+        if isinstance(images, bpy.types.Image):
+            image = images
+        else:
+            image = images[0]
+
+        return bpy_context.Composer_Input_Simple(input_socket, image, use_denoise=self.use_denoise)

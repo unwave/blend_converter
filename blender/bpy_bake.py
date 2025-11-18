@@ -749,10 +749,8 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                         type = bpy.context.scene.cycles.bake_type,
                         pass_filter = get_conformed_pass_filter(),
                     )
-                elif bpy.context.scene.cycles.bake_type == 'NORMAL':
-                    kwargs = dict(type='NORMAL')
                 else:
-                    kwargs = dict()
+                    kwargs = dict(type=bpy.context.scene.cycles.bake_type)
 
 
                 if not settings.fake_bake:
@@ -1137,7 +1135,12 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
 
     active_object = bpy.context.view_layer.objects.active
 
-    with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), bpy_context.Isolate_Focus(objects), bpy_context.Bpy_State() as bpy_state:
+    if settings.isolate_objects:
+        Focus = bpy_context.Isolate_Focus
+    else:
+        Focus = bpy_context.Focus_Objects
+
+    with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), Focus(objects), bpy_context.Bpy_State() as bpy_state:
 
 
         if settings.use_selected_to_active:
@@ -1172,7 +1175,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
 
         else:
             for object in objects:
-                with bpy_context.Focus_Objects(object):
+                with Focus(object):
                     bake_objects([object], settings)
 
 

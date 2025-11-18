@@ -224,6 +224,7 @@ for index, arg in enumerate(ARGS):
         var_name, var_value = ARGS[index][len('set:'):].split('=')
         color_print([255, 255, 255], [48, 88, 138], f'{var_name} = {var_value}')
         _inspect_values[var_name] = var_value
+        blend_inspector.add_value(**{var_name: var_value})
         continue
 
     error(f"Invalid option: {ARGS[index]}")  # Using index to print the original, possible shortened version of the command
