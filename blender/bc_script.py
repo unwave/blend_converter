@@ -37,6 +37,7 @@ if 'bpy' in sys.modules:
     from blend_converter.blender import bpy_uv
     from blend_converter.blender import blend_inspector
     from blend_converter.blender import bpy_mesh
+    from blend_converter.blender import bpy_modifier
 
 
 
@@ -455,3 +456,32 @@ def bisect_by_mirror_modifiers(objects: Objects_Like):
 @wraps(bpy_uv.scale_uv_to_world_per_uv_island if typing.TYPE_CHECKING else object)
 def scale_uv_to_world_per_uv_island(objects: Objects_Like, uv_layer_name: str = ''):
     bpy_uv.scale_uv_to_world_per_uv_island(get_objects(objects), uv_layer_name = uv_layer_name)
+
+
+def clean_up_topology_and_triangulate_ngons(objects: Objects_Like = None, split_concave_faces = True, tris_to_quads = True):
+    """ The Ministry of Flat unwrapping can produce bad results if ngons or loose geometry is present. """
+
+    objects = get_objects_fallback(objects)
+
+    for object in bpy_utils.get_unique_data_objects(objects):
+
+        with bpy_context.Focus_Objects(object):
+
+            with bpy_context.Focus_Objects(object, mode = 'EDIT'):
+                bpy.ops.mesh.reveal()
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.mesh.delete_loose()
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.mesh.dissolve_degenerate()
+
+            bpy_modifier.apply_triangulate(object, keep_custom_normals = True, min_vertices = 5)
+
+            if split_concave_faces or tris_to_quads:
+                with bpy_context.Focus_Objects(object, mode = 'EDIT'):
+                    bpy.ops.mesh.select_all(action='SELECT')
+                    if tris_to_quads:
+                        # TODO: ideally should be applied only to the former ngons
+                        bpy.ops.mesh.tris_convert_to_quads(uvs=True, vcols=True, seam=True, sharp=True, materials=True)
+                    if split_concave_faces:
+                        # might not be necessary but just in case
+                        bpy.ops.mesh.vert_connect_concave()
