@@ -1952,7 +1952,8 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
         # TODO: it might be possible to convert the materials on the bake proxy and leave the original intact
         # but to sort them into alpha and non-alpha they should be converter first
 
-        convert_materials_to_principled(objects, remove_unused=False)
+        if settings.convert_materials:
+            convert_materials_to_principled(objects, remove_unused=False)
 
         set_out_of_range_material_indexes_to_zero(objects)
         merge_material_slots_with_the_same_materials(objects)
@@ -2071,7 +2072,8 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         objects_copy = deep_copy_objects(objects)
 
-        texture_coordinates_collection = make_material_independent_from_object(objects_copy)
+        if settings.convert_materials:
+            texture_coordinates_collection = make_material_independent_from_object(objects_copy)
 
         convert_to_mesh(objects_copy)
 
@@ -2102,9 +2104,12 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
 
         ## delete temporal objects
+
         bpy.data.objects.remove(bake_proxy)
-        bpy.data.batch_remove(set(texture_coordinates_collection.objects))
-        bpy.data.collections.remove(texture_coordinates_collection)
+
+        if settings.convert_materials:
+            bpy.data.batch_remove(set(texture_coordinates_collection.objects))
+            bpy.data.collections.remove(texture_coordinates_collection)
 
 
         return objects

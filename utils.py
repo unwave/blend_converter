@@ -536,10 +536,18 @@ def get_same_drive_tmp_dir(path: typing.Union[str, os.PathLike]):
     return tmp_dir
 
 
+def is_not_comment_line(line):
+    return not bool(re.match(r'^\s*#.*$', line))
+
+
+@functools.lru_cache(None)
+def get_minimal_source_code(func: typing.Callable):
+    return '\n'.join(filter(is_not_comment_line, filter(None, (line.rstrip() for line in textwrap.dedent(inspect.getsource(func)).splitlines()))))
+
+
 @functools.lru_cache(None)
 def get_function_sha256(func: typing.Callable):
-    code = '\n'.join(filter(None, (line.rstrip() for line in textwrap.dedent(inspect.getsource(func)).splitlines())))
-    return hashlib.sha256(code.encode()).hexdigest()
+    return hashlib.sha256(get_minimal_source_code(func).encode()).hexdigest()
 
 
 def get_temp_dir(filename: os.PathLike):

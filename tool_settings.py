@@ -1885,7 +1885,13 @@ class Bake_Materials(Settings):
 
     convert_materials: bool = True
     """
-    Convert materials to use a single Principled BSDF shader.
+    Convert materials to use a single Principled BSDF shader and make them independent from objects.
+
+    #### Disable only if it was done prior.
+
+    `bpy_utils.convert_materials_to_principled(objects)`
+
+    `bpy_utils.make_material_independent_from_object(objects)`
 
     #### Default: `True`
     """
