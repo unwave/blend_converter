@@ -34,44 +34,59 @@ class _Socket_Type:
     VECTOR = 'vector'
     SHADER = 'shader'
 
-@typing.runtime_checkable
-class _Bake_Type(typing.Protocol):
 
-    @property
-    def _requires_principled_bsdf(self) -> bool:
-        """ Whether or not a Principled BSDF is assumed. """
+class _Bake_Type:
 
 
-    @property
-    def _default_color(self) -> typing.Tuple[float, float, float]:
-        """ Returns a default fill color. """
+    _requires_principled_bsdf = False
+    """ Whether or not a Principled BSDF is assumed. """
+
+
+    _default_color = (0.0, 0.0, 0.0)
+    """ A default fill color. """
+
+
+    _socket_type = _Socket_Type.COLOR
+    """ A string identifier of the shader socket type. See `Socket_Type`. """
+
+
+    _identifier = ''
+    """ A name of the texture type. """
+
+
+    _is_srgb = False
+    """ True if the baked image must be saved as sRGB. """
+
+
+    use_denoise: bool = False
+    """ Denoise the image in the compositor. """
 
 
     @property
     def _default_value(self) -> float:
-        """ Returns a default fill value. """
-
-
-    @property
-    def _socket_type(self) -> float:
-        """ Returns a string identifier of the shader socket type. See `Socket_Type`. """
-
-
-    @property
-    def _identifier(self) -> str:
-        """ Returns a name of the texture type. """
+        """ A default fill value. """
+        return _get_value_from_color(self._default_color)
 
 
     def _get_setup_context(self) -> typing.ContextManager:
         """ Returns a context that will be entered once before the baking process. """
+        return contextlib.nullcontext()
 
 
     def _get_material_context(self, material: 'bpy.types.Material') -> typing.ContextManager:
         """ Returns a context that will be entered for each material. The `__enter__` method should return an output socket that will be baked. """
+        return contextlib.nullcontext(_get_shader_output_socket(material))
 
 
     def _get_composer_context(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], images: typing.Union['bpy.types.Image', typing.List['bpy.types.Image']]) -> typing.ContextManager:
         """ Returns a context that will be entered when composing and saving the image. """
+
+        if isinstance(images, bpy.types.Image):
+            image = images
+        else:
+            image = images[0]
+
+        return bpy_context.Composer_Input_Default(input_socket, image, use_denoise = self.use_denoise)
 
 
 def get_margin():
@@ -140,21 +155,9 @@ class Fill_Color(_Bake_Type, tool_settings.Settings):
     _socket_type = _Socket_Type.COLOR
     _identifier = 'None'
 
-    _requires_principled_bsdf = False
-
-
     @property
     def _default_color(self) -> float:
         return self.default_color
-
-
-    @property
-    def _default_value(self) -> float:
-        return _get_value_from_color(self._default_color)
-
-
-    def _get_setup_context(self):
-        return contextlib.nullcontext()
 
 
     def _get_material_context(self, material):
@@ -177,14 +180,7 @@ class _Principled_Input(_Bake_Type, tool_settings.Settings):
     if typing.TYPE_CHECKING:
         _not_versioned_socket_identifier = ''
 
-    use_denoise: bool = False
-
     _requires_principled_bsdf = True
-
-
-    @property
-    def _default_value(self) -> float:
-        return _get_value_from_color(self._default_color)
 
 
     @property
@@ -207,16 +203,6 @@ class _Principled_Input(_Bake_Type, tool_settings.Settings):
 
     def _get_material_context(self, material: 'bpy.types.Material'):
         return _Output_Socket_Principled(material, self._socket_identifier)
-
-
-    def _get_composer_context(self, input_socket, images):
-
-        if isinstance(images, bpy.types.Image):
-            image = images
-        else:
-            image = images[0]
-
-        return bpy_context.Composer_Input_Simple(input_socket, image, use_denoise=self.use_denoise)
 
 
     @property
@@ -287,13 +273,17 @@ class Normal(_Principled_Input):
 
 @dataclass
 class Base_Color(_Principled_Input):
+
     _not_versioned_socket_identifier = 'Base Color'
     _socket_type = _Socket_Type.COLOR
     _default_color = (0.8, 0.8, 0.8)
 
+    _is_srgb = True
+
 
 @dataclass
 class Roughness(_Principled_Input):
+
     _not_versioned_socket_identifier = 'Roughness'
     _socket_type = _Socket_Type.VALUE
     _default_color = ( 0.5, 0.5, 0.5)
@@ -301,6 +291,7 @@ class Roughness(_Principled_Input):
 
 @dataclass
 class Metallic(_Principled_Input):
+
     _not_versioned_socket_identifier = 'Metallic'
     _socket_type = _Socket_Type.VALUE
     _default_color = (0.0, 0.0, 0.0)
@@ -308,6 +299,7 @@ class Metallic(_Principled_Input):
 
 @dataclass
 class Alpha(_Principled_Input):
+
     _not_versioned_socket_identifier = 'Alpha'
     _socket_type = _Socket_Type.VALUE
     _default_color = (1.0, 1.0, 1.0)
@@ -336,10 +328,12 @@ def _Output_Socket_Emission(material: 'bpy.types.Material') -> 'bpy.types.NodeSo
 
 @dataclass
 class Emission(_Principled_Input):
+
     _not_versioned_socket_identifier = 'Emission'
     _socket_type = _Socket_Type.COLOR
     _default_color = (0.0, 0.0, 0.0)
 
+    _is_srgb = True
 
     def _get_material_context(self, material: 'bpy.types.Material'):
         return _Output_Socket_Emission(material)
@@ -353,17 +347,13 @@ class _AO(_Bake_Type, tool_settings.Settings):
     _default_color = (1.0, 1.0, 1.0)
     _requires_principled_bsdf = True
 
-    @property
-    def _default_value(self) -> float:
-        return _get_value_from_color(self._default_color)
-
 
 
 @dataclass
 class AO_Node(_AO):
     """ Uses the Ambient Occlusion shader node: `ShaderNodeAmbientOcclusion`. """
 
-    _socket_type = _Socket_Type.COLOR
+    _socket_type = _Socket_Type.VALUE
 
 
     use_denoise: bool = True
@@ -400,15 +390,6 @@ class AO_Node(_AO):
     def _get_material_context(self, material: 'bpy.types.Material'):
         return bpy_context.Output_Socket_Ambient_Occlusion(material, _get_principled_socket(material, 'Normal'), self.only_local, self.samples)
 
-
-    def _get_composer_context(self, input_socket, images):
-
-        if isinstance(images, bpy.types.Image):
-            image = images
-        else:
-            image = images[0]
-
-        return bpy_context.Composer_Input_Simple(input_socket, image, use_denoise=self.use_denoise)
 
 
 @dataclass
@@ -475,8 +456,8 @@ class Diffuse(_Bake_Type, tool_settings.Settings):
     _socket_type = _Socket_Type.SHADER
     _identifier = 'Diffuse'
     _default_color = (0.5, 0.5, 0.5)
-    _requires_principled_bsdf = False
 
+    _is_srgb = True
 
     use_pass_direct: bool = True
     use_pass_indirect: bool = True
@@ -514,19 +495,6 @@ class Diffuse(_Bake_Type, tool_settings.Settings):
         return bpy_context.Bpy_State(settings)
 
 
-    def _get_material_context(self, material):
-        return contextlib.nullcontext(_get_shader_output_socket(material))
-
-
-    def _get_composer_context(self, input_socket, images):
-
-        if isinstance(images, bpy.types.Image):
-            image = images
-        else:
-            image = images[0]
-
-        return bpy_context.Composer_Input_Simple(input_socket, image, use_denoise=self.use_denoise)
-
 
 @dataclass
 class Glossy(_Bake_Type, tool_settings.Settings):
@@ -535,8 +503,8 @@ class Glossy(_Bake_Type, tool_settings.Settings):
     _socket_type = _Socket_Type.SHADER
     _identifier = 'Glossy'
     _default_color = (0.5, 0.5, 0.5)
-    _requires_principled_bsdf = False
 
+    _is_srgb = True
 
     use_pass_direct: bool = True
     use_pass_indirect: bool = True
@@ -574,19 +542,6 @@ class Glossy(_Bake_Type, tool_settings.Settings):
 
         return bpy_context.Bpy_State(settings)
 
-
-    def _get_material_context(self, material):
-        return contextlib.nullcontext(_get_shader_output_socket(material))
-
-
-    def _get_composer_context(self, input_socket, images):
-
-        if isinstance(images, bpy.types.Image):
-            image = images
-        else:
-            image = images[0]
-
-        return bpy_context.Composer_Input_Simple(input_socket, image, use_denoise=self.use_denoise)
 
 
 
@@ -637,9 +592,6 @@ def _Output_Socket_AOV(material: 'bpy.types.Material', aov_name: str, aov_type: 
 @dataclass
 class AOV(_Bake_Type, tool_settings.Settings):
 
-    _default_color = (0.0, 0.0, 0.0)
-    _requires_principled_bsdf = False
-
     name: str = ''
     type: str = 'COLOR'
 
@@ -659,22 +611,8 @@ class AOV(_Bake_Type, tool_settings.Settings):
             return _Socket_Type.VALUE
 
 
-    def _get_setup_context(self):
-        return contextlib.nullcontext()
-
-
     def _get_material_context(self, material):
         return _Output_Socket_AOV(material, self.name, self.type, default_color = self._default_color)
-
-
-    def _get_composer_context(self, input_socket, images):
-
-        if isinstance(images, bpy.types.Image):
-            image = images
-        else:
-            image = images[0]
-
-        return bpy_context.Composer_Input_Simple(input_socket, image, use_denoise = self.use_denoise)
 
 
 
@@ -715,16 +653,6 @@ class View_Space_Normal(_Bake_Type, tool_settings.Settings):
 
     def _get_material_context(self, material):
         return _Output_Socket_View_Space_Normals(material)
-
-
-    def _get_composer_context(self, input_socket, images):
-
-        if isinstance(images, bpy.types.Image):
-            image = images
-        else:
-            image = images[0]
-
-        return bpy_context.Composer_Input_Simple(input_socket, image, use_denoise=False)
 
 
 
@@ -792,10 +720,6 @@ def _Output_Label(material: 'bpy.types.Material', node_label: str, socket: typin
 @dataclass
 class Buffer_Factor(_Bake_Type, tool_settings.Settings):
 
-        _requires_principled_bsdf = False
-
-        _default_color: tuple = (0.0, 0.0, 0.0)
-
         _socket_type = _Socket_Type.VALUE
 
         _identifier = 'buffer_factor'
@@ -834,10 +758,8 @@ class Normal_Native(_Bake_Type, tool_settings.Settings):
 
     _default_color = (0.5, 0.5, 1.0)
 
-    _socket_type = _Socket_Type.VECTOR
+    _socket_type = _Socket_Type.SHADER
     _identifier = 'Normal'
-
-    _requires_principled_bsdf = False
 
     use_denoise: bool = False
     use_remove_inward_normals: bool = False
@@ -846,10 +768,6 @@ class Normal_Native(_Bake_Type, tool_settings.Settings):
 
     def _get_setup_context(self):
         return bpy_context.Bpy_State([(bpy.context.scene.cycles, 'bake_type', 'NORMAL')])
-
-
-    def _get_material_context(self, material):
-        return contextlib.nullcontext()
 
 
     def _get_composer_context(self, input_socket, images):
@@ -875,8 +793,8 @@ class Combined(_Bake_Type, tool_settings.Settings):
     _socket_type = _Socket_Type.SHADER
     _identifier = 'Combined'
     _default_color = (0.5, 0.5, 0.5)
-    _requires_principled_bsdf = False
 
+    _is_srgb = True
 
     use_pass_direct: bool = True
     use_pass_indirect: bool = True
@@ -913,20 +831,6 @@ class Combined(_Bake_Type, tool_settings.Settings):
         return bpy_context.Bpy_State(settings)
 
 
-    def _get_material_context(self, material):
-        return contextlib.nullcontext(_get_shader_output_socket(material))
-
-
-    def _get_composer_context(self, input_socket, images):
-
-        if isinstance(images, bpy.types.Image):
-            image = images
-        else:
-            image = images[0]
-
-        return bpy_context.Composer_Input_Simple(input_socket, image, use_denoise=self.use_denoise)
-
-
 @dataclass
 class AO_Native(_Bake_Type, tool_settings.Settings):
 
@@ -934,7 +838,6 @@ class AO_Native(_Bake_Type, tool_settings.Settings):
 
     _identifier = 'Ambient Occlusion'
     _default_color = (1.0, 1.0, 1.0)
-    _requires_principled_bsdf = False
 
     use_denoise: bool = True
 
@@ -956,17 +859,3 @@ class AO_Native(_Bake_Type, tool_settings.Settings):
             settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
 
         return bpy_context.Bpy_State(settings)
-
-
-    def _get_material_context(self, material):
-        return contextlib.nullcontext(_get_shader_output_socket(material))
-
-
-    def _get_composer_context(self, input_socket, images):
-
-        if isinstance(images, bpy.types.Image):
-            image = images
-        else:
-            image = images[0]
-
-        return bpy_context.Composer_Input_Simple(input_socket, image, use_denoise=self.use_denoise)

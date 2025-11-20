@@ -173,7 +173,7 @@ class Baked_Image:
             ]
 
         elif len(self.bake_types) == 2:
-            if self.bake_types[0]._socket_type in (bake_settings._Socket_Type.COLOR, bake_settings._Socket_Type.VALUE):
+            if self.bake_types[0]._socket_type in (bake_settings._Socket_Type.COLOR, bake_settings._Socket_Type.VECTOR):
                 return [
                     [self.bake_types[0]],
                     [self.bake_types[1]],
@@ -247,7 +247,7 @@ class Baked_Image:
 
     @property
     def is_srgb_image(self):
-        return any(bake_type._socket_type == bake_settings._Socket_Type.COLOR for bake_type in self.bake_types)
+        return any(bake_type._is_srgb for bake_type in self.bake_types)
 
 
     default_map_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '8', compression = 15, color_mode = 'RGB')
@@ -279,6 +279,7 @@ class Baked_Image:
         with bpy_context.State() as state, bpy_context.Bpy_State() as bpy_state:
 
             ## set color space
+            # this does not affect .exr files
             state.set(bpy.context.scene.display_settings, 'display_device', 'sRGB')
             if self.is_srgb_image:
                 state.set(bpy.context.scene.view_settings, 'view_transform', 'Standard')
@@ -397,7 +398,7 @@ class Baked_Image:
                     context_stack.enter_context(self.bake_types[0]._get_composer_context(target_input, self.sub_images[0]))
 
                 elif len(self.bake_types) == 2:
-                    if self.bake_types[0]._socket_type in (bake_settings._Socket_Type.COLOR, bake_settings._Socket_Type.VALUE):
+                    if self.bake_types[0]._socket_type in (bake_settings._Socket_Type.COLOR, bake_settings._Socket_Type.VECTOR):
                         print('[RGB] + [A]')
 
                         file_node.format.color_mode = 'RGBA'
@@ -686,8 +687,7 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                 def enter_output_context(material: bpy.types.Material, bake_task: typing.List[bake_settings._Bake_Type]):
                     if len(bake_task) == 1:
                         output_socket = context_stack.enter_context(bake_task[0]._get_material_context(material))
-                        if output_socket:
-                            context_stack.enter_context(bpy_context.Output_Override(material, output_socket))
+                        context_stack.enter_context(bpy_context.Output_Override(material, output_socket))
                     else:
                         r_g_b = [context_stack.enter_context(bake_task[i]._get_material_context(material)) for i in range(3)]
                         context_stack.enter_context(bpy_context.Output_Override_Combine_RGB(material, *r_g_b))

@@ -1048,7 +1048,7 @@ class Diffuse_AO_Bake_Settings(Bpy_State):
 
 
 
-class Composer_Input_Simple:
+class Composer_Input_Default:
 
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, use_denoise = False):
@@ -1630,45 +1630,14 @@ class Composer_Input_Factor:
 
         image_node = self.input_socket.new('CompositorNodeImage', image = self.image)
 
-        init_alpha_node = image_node.outputs[0].insert_new('CompositorNodeSetAlpha')
-        math_node = image_node.outputs[1].new(bpy_node.Compositor_Node_Type.MATH, operation = 'GREATER_THAN')
-        math_node.inputs[1].default_value = 0.9999
-        math_node.outputs[0].join(init_alpha_node.inputs[1])
-
         if self.use_denoise:
-            denoise_node = init_alpha_node.outputs[0].insert_new('CompositorNodeDenoise')
-
-            if bpy.app.version >= (5, 0):
-                denoise_node.inputs[3].default_value = False
-                denoise_node.inputs[4].default_value = 'None'
-            else:
-                denoise_node.prefilter = 'NONE'
-                denoise_node.use_hdr = False
-
-            denoise_node.inputs['Albedo'].join(image_node.outputs['Alpha'], move=False)
-
-            denoise_node.inputs[0].insert_new('CompositorNodeInpaint', distance=2)
-
-            pre_set_alpha = denoise_node.inputs[0].insert_new('CompositorNodeSetAlpha')
-            math_node.outputs[0].join(pre_set_alpha.inputs[1], move=False)
-            pre_set_alpha.inputs[1].insert_new('CompositorNodeDilateErode', mode='DISTANCE', distance=1)
-
-
-            post_set_alpha = denoise_node.outputs[0].insert_new('CompositorNodeSetAlpha')
-            math_node.outputs[0].join(post_set_alpha.inputs[1], move=False)
-
-            post_set_alpha.outputs[0].insert_new('CompositorNodeInpaint', distance = 16)
-
-            pre_map_range = denoise_node.inputs[0].insert_new('CompositorNodeMapRange')
-            pre_map_range['To Min'] = 0.4
-            pre_map_range['To Max'] = 0.6
-            pre_map_range.use_clamp = True
-
-            post_map_range = denoise_node.outputs[0].insert_new('CompositorNodeMapRange')
-            post_map_range['From Min'] = 0.4
-            post_map_range['From Max'] = 0.6
-
+            denoise_group = image_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Denoise_Factor'))
+            image_node.outputs['Alpha'].join(denoise_group.inputs[1])
         else:
+            init_alpha_node = image_node.outputs[0].insert_new('CompositorNodeSetAlpha')
+            math_node = image_node.outputs['Alpha'].new(bpy_node.Compositor_Node_Type.MATH, operation = 'GREATER_THAN')
+            math_node.inputs[1].default_value = 0.9999
+            math_node.outputs[0].join(init_alpha_node.inputs[1])
             init_alpha_node.outputs[0].insert_new('CompositorNodeInpaint', distance = 16)
 
 
