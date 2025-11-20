@@ -1835,11 +1835,18 @@ class Bake_Materials(Settings):
     #### Default: `''`
     """
 
-    faster_ao_bake: bool = False
+    faster_ao_bake: bool = True
     """
     Optimizations to make the AO baking faster sacrificing quality.
 
-    #### Default: `False`
+    #### Default: `True`
+    """
+
+    ao_bake_use_normals: bool = True
+    """
+    When baking the AO use the material normals. Will be slower.
+
+    #### Default: `True`
     """
 
     denoise_all: bool = False
@@ -1895,6 +1902,14 @@ class Bake_Materials(Settings):
 
     #### Default: `True`
     """
+
+    pre_bake_labels: list = []
+    """
+    Bakes and replaces the nodes with the labels specified. See `label_mix_shader_nodes` and `bake_by_label`.
+
+    #### Default: `[]`
+    """
+
 
 @dataclasses.dataclass
 class Future_Bake_Materials(Settings):

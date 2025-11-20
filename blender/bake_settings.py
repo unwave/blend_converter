@@ -406,13 +406,13 @@ class AO_Diffuse(_AO):
     #### Default: `16`
     """
 
-    faster: bool = False
+    faster: bool = True
     """
     A faster AO bake, sacrificing quality.
 
     `samples` will set to a square root of the value.
 
-    #### Default: `False`
+    #### Default: `True`
     """
 
     environment_has_transparent_materials: bool = False
@@ -430,12 +430,20 @@ class AO_Diffuse(_AO):
     """
 
 
+    use_normals: bool = True
+    """
+    Use the material normals.
+
+    #### Default: `True`
+    """
+
+
     def _get_setup_context(self):
         return bpy_context.Diffuse_AO_Bake_Settings(self.samples, self.faster)
 
 
     def _get_material_context(self, material: 'bpy.types.Material'):
-        return bpy_context.Output_Socket_Diffuse_AO(material, self.ignore_backface, self.faster, self.environment_has_transparent_materials)
+        return bpy_context.Output_Socket_Diffuse_AO(material, self.ignore_backface, self.faster, self.environment_has_transparent_materials, self.use_normals)
 
 
     def _get_compositor_context(self, input_socket, images):

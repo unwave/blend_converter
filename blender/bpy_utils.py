@@ -4,14 +4,14 @@ import sys
 import traceback
 import math
 import collections
-import tempfile
-import subprocess
 import random
 import uuid
 import operator
 import hashlib
 import re
 import itertools
+import contextlib
+
 
 import bpy
 from bpy import utils as b_utils
@@ -1077,21 +1077,27 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
 
 def merge_material_slots_with_the_same_materials(objects: typing.List[bpy.types.Object]):
 
-    for mesh in get_unique_meshes(objects):
+    for object in get_unique_data_objects(objects):
 
-        index_to_polygons = utils.list_by_key(mesh.polygons.values(), operator.attrgetter('material_index'))
-        material_to_indexes = utils.list_by_key(index_to_polygons, lambda i: mesh.materials[i])
+        index_to_polygons = utils.list_by_key(object.data.polygons.values(), operator.attrgetter('material_index'))
+        material_to_indexes = utils.list_by_key(index_to_polygons, lambda i: object.material_slots[i].material)
 
-        index_to_new_index = {}
-        mesh.materials.clear()
-        for new_index, (material, indexes) in enumerate(material_to_indexes.items()):
-            mesh.materials.append(material)
-            for index in indexes:
-                index_to_new_index[index] = new_index
 
-        for index, polygons in index_to_polygons.items():
-            for polygon in polygons:
-                polygon.material_index = index_to_new_index[index]
+        with bpy_context.Focus_Objects(object):
+            bpy.ops.object.material_slot_remove_all()
+
+            index_to_new_index = {}
+            for new_index, (material, indexes) in enumerate(material_to_indexes.items()):
+
+                bpy.ops.object.material_slot_add()
+                object.material_slots[object.active_material_index].material = material
+
+                for index in indexes:
+                    index_to_new_index[index] = new_index
+
+            for index, polygons in index_to_polygons.items():
+                for polygon in polygons:
+                    polygon.material_index = index_to_new_index[index]
 
 
 def bake_object_by_material_key(objects: typing.List[bpy.types.Object], alpha_material_key: str, opaque_material_key: str, bake_settings: 'tool_settings.Bake'):
@@ -1123,7 +1129,7 @@ def bake_object_by_material_key(objects: typing.List[bpy.types.Object], alpha_ma
 def set_out_of_range_material_indexes_to_zero(objects: typing.List[bpy.types.Object]):
 
     for object in get_unique_mesh_objects(objects):
-        max_index = len(object.data.materials) - 1
+        max_index = len(object.material_slots) - 1
         for polygon in object.data.polygons:
             if polygon.material_index > max_index:
                 polygon.material_index = 0
@@ -2085,7 +2091,11 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         ## bake
         for bake_settings in bake_settings_tasks:
-            bpy_bake.bake([bake_proxy], bake_settings)
+            if settings.pre_bake_labels:
+                with Pre_Baked([bake_proxy], settings.pre_bake_labels, bake_settings):
+                    bpy_bake.bake([bake_proxy], bake_settings)
+            else:
+                bpy_bake.bake([bake_proxy], bake_settings)
 
 
         ## assign the baked materials
@@ -2185,7 +2195,7 @@ def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '',
 
 def get_unique_materials(objects: typing.List[bpy.types.Object]):
 
-    materials = []
+    materials: typing.List[bpy.types.Material] = []
 
     for object in objects:
         for slot in object.material_slots:
@@ -2193,3 +2203,125 @@ def get_unique_materials(objects: typing.List[bpy.types.Object]):
                 materials.append(slot.material)
 
     return utils.deduplicate(materials)
+
+
+def label_mix_shader_nodes(objects: typing.List[bpy.types.Object]):
+
+    prebake_labels: typing.List[str] = []
+    prebake_uuid = uuid.uuid1().hex
+
+
+    def get_pre_bake_label(index: int):
+        return 'prebake_' + str(index) + '_' + prebake_uuid
+
+
+    for material in get_unique_materials(objects):
+
+        if not material.node_tree:
+            continue
+
+        tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+
+        prebake_index = 0
+
+        for node in reversed(tree.output.inputs[0].descendants):
+
+            if not node.be('ShaderNodeVectorMath'):
+                continue
+
+            if not node.inputs[0].connections:
+                continue
+
+            if node.label != 'BC_PRE_BAKE_TARGET':
+                continue
+
+            factor_input_marker = node
+
+            prebake_label = get_pre_bake_label(prebake_index)
+
+            factor_input_marker.label = prebake_label
+
+            if not prebake_label in prebake_labels:
+                prebake_labels.append(prebake_label)
+
+            material[prebake_label] = True
+
+            prebake_index += 1
+
+
+    return prebake_labels
+
+
+@contextlib.contextmanager
+def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.List[str], settings: tool_settings.Bake = None):
+
+    original_material_key = settings.material_key
+
+    settings = tool_settings.Bake()._update(settings)
+    settings.create_materials = False
+
+    affected_materials: typing.Set[bpy.types.Material] = set()
+
+    for prebake_label in prebake_labels:
+
+        materials = [m for m in get_unique_materials(objects) if m.get(prebake_label) and m.get(original_material_key)]
+
+        _materials: typing.List[bpy.types.Material] = []
+        for material in materials:
+            tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+            if any(node.label == prebake_label for node in tree.output.inputs[0].descendants):
+                _materials.append(material)
+
+        materials = _materials
+
+        map_id = uuid.uuid1().hex
+
+        for material in materials:
+            material[map_id] = True
+
+        settings.bake_types = [tool_settings_bake.Buffer_Factor(node_label=prebake_label, _identifier = 'buffer' + map_id)]
+
+        settings.material_key = map_id
+
+        pre_baked_images = bpy_bake.bake(objects, settings)
+
+
+        # replace nodes with baked images
+        for material in materials:
+
+            tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+
+            image_texture = tree.new('ShaderNodeTexImage', image = pre_baked_images[0])
+
+            image_texture.inputs[0].new('ShaderNodeUVMap', uv_map = settings.uv_layer_name)
+
+            image_texture.label = 'BAKED' + prebake_label
+
+            for node in tree:
+                if node.label == prebake_label:
+                    for other in node.outputs[0].connections:
+                        image_texture.outputs[0].join(other)
+
+            affected_materials.add(material)
+
+    try:
+        yield None
+
+    finally:
+
+        for prebake_label in prebake_labels:
+
+            # revert the node replacement
+            for material in affected_materials:
+
+                tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+
+                def get_baked_image_node():
+                    for node in tree:
+                        if node.label == 'BAKED' + prebake_label:
+                            return node
+
+                for node in tree:
+                    if node.label == prebake_label:
+                        for other in get_baked_image_node().outputs[0].connections:
+                            node.outputs[0].join(other)

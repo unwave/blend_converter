@@ -441,7 +441,7 @@ def obj_only_ministry_of_flat(operator: bpy.types.Operator, context: bpy.types.C
     poll = edit_mode_poll,
     __annotations__ = dict(
         use_selected = bpy.props.BoolProperty(default=True),
-        divide_by_mean = bpy.props.BoolProperty(default=False),
+        divide_by_mean = bpy.props.BoolProperty(default=True),
     ),
     bl_options = {'REGISTER', 'UNDO'},
 )

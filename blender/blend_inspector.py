@@ -142,6 +142,8 @@ def _inspect_blend(name = 'DEBUG', blender_executable: typing.Optional[str] = No
 @functools.wraps(_inspect_blend)
 def inspect_blend(*args, **kwargs):
 
+    print = lambda *x: utils.print_in_color(utils.get_color_code(202, 99, 13, 0,0,0), *x)
+
     if get_value('confirm_inspect', False):
 
         print("Pending inspect", *args, **kwargs)
@@ -152,7 +154,7 @@ def inspect_blend(*args, **kwargs):
         print("To disable the confirmation enter: disable")
         print("To ignore all inspections enter: noinspect")
 
-        value = input("y/n?:").lower()
+        value = input("Enter 'y' to confirm:").lower()
         if value == 'disable':
             add_value(confirm_inspect=False)
         elif value == 'noinspect':

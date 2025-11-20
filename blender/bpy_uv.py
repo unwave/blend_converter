@@ -652,7 +652,7 @@ def scale_uv_to_world_per_uv_island(objects: typing.List[bpy.types.Object], uv_l
             bm_copy.free()
 
 
-def scale_uv_to_world_per_uv_layout(objects: typing.List[bpy.types.Object]):
+def scale_uv_to_world_per_uv_layout(objects: typing.List[bpy.types.Object], uv_layer_name = ''):
     """ Works on the active uv layer. """
     print(f"{scale_uv_to_world_per_uv_layout.__name__}...")
 
@@ -667,8 +667,13 @@ def scale_uv_to_world_per_uv_layout(objects: typing.List[bpy.types.Object]):
             bm_copy = bm.copy()
             bm_copy.transform(object.matrix_world)
 
+            if uv_layer_name:
+                bm_copy_uv_layout = bm_copy.loops.layers.uv[uv_layer_name]
+            else:
+                bm_copy_uv_layout = bm_copy.loops.layers.uv.verify()
+
             bm_copy.faces.ensure_lookup_table()
-            face_to_uv_triangles = get_uv_triangles(bm_copy, bm_copy.loops.layers.uv.verify())
+            face_to_uv_triangles = get_uv_triangles(bm_copy, bm_copy_uv_layout)
 
             ratios = []
 
@@ -690,7 +695,11 @@ def scale_uv_to_world_per_uv_layout(objects: typing.List[bpy.types.Object]):
 
             multiplier = math.sqrt(statistics.median(ratios))
 
-            uv_layer = bm.loops.layers.uv.verify()
+            if uv_layer_name:
+                uv_layer = bm.loops.layers.uv[uv_layer_name]
+            else:
+                uv_layer = bm.loops.layers.uv.verify()
+
             islands = get_linked_uv_islands(bm, uv_layer)
             for island in islands:
 
@@ -1677,15 +1686,15 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
         if collapsed_loops_count:
             bpy.ops.uv.hide(unselected=False)  # hiding because invalid anyway
 
-        bm = bmesh.from_edit_mesh(object.data)
-        bm.faces.ensure_lookup_table()
-        uv_layer = bm.loops.layers.uv.verify()
-
-        linked_uv_islands = get_linked_uv_islands(bm, uv_layer)
-
         bpy.ops.uv.select_all(action='DESELECT')
         print('bpy.ops.uv.select_overlap...', '[ can be long for badly overlapped uvs ]')
         bpy.ops.uv.select_overlap()
+
+        bm = bmesh.from_edit_mesh(object.data)
+        bm.faces.ensure_lookup_table()
+        uv_layer = bm.loops.layers.uv.verify()
+        linked_uv_islands = get_linked_uv_islands(bm, uv_layer)
+
         overlapping_loops = get_selected_uvs_count(linked_uv_islands, uv_layer) + collapsed_loops_count
 
         bpy.ops.uv.reveal()
@@ -1703,19 +1712,19 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
             face_areas = []
             face_uv_areas = []
 
-            for face in bm.faces:
-
+            for face in island:
                 face_areas.append(face.calc_area())
                 face_uv_areas.append(sum(area_tri(*loop) for loop in face_to_uv_triangles[face]))
 
-            island_mesh_area = sum(face_areas)
-            island_uv_area = sum(face_uv_areas)
+            island_mesh_area = sum(itertools.filterfalse(math.isnan, face_areas))
+            island_uv_area = sum(itertools.filterfalse(math.isnan, face_uv_areas))
 
-            if island_uv_area == 0:
-                continue
-
-            number_of_faces_in_island.append(len(island))
-            weights.append(island_mesh_area/island_uv_area)
+            try:
+                weight = island_mesh_area/island_uv_area
+                number_of_faces_in_island.append(len(island))
+                weights.append(weight)
+            except ZeroDivisionError:
+                pass
 
 
         faces_per_island_weighted_mean = sum(map(operator.mul, number_of_faces_in_island, weights))/sum(weights)
@@ -2011,7 +2020,7 @@ def brute_force_unwrap(
 
 
         def rescale():
-            scale_uv_to_world_per_uv_layout([object_copy])
+            scale_uv_to_world_per_uv_island([object_copy])
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.uv.select_all(action='SELECT')
             aabb_pack()

@@ -458,12 +458,17 @@ def scale_uv_to_world_per_uv_island(objects: Objects_Like, uv_layer_name: str = 
     bpy_uv.scale_uv_to_world_per_uv_island(get_objects(objects), uv_layer_name = uv_layer_name)
 
 
+@wraps(bpy_uv.scale_uv_to_world_per_uv_layout if typing.TYPE_CHECKING else object)
+def scale_uv_to_world_per_uv_layout(objects: Objects_Like, uv_layer_name: str = ''):
+    bpy_uv.scale_uv_to_world_per_uv_layout(get_objects(objects), uv_layer_name = uv_layer_name)
+
+
 def clean_up_topology_and_triangulate_ngons(objects: Objects_Like = None, split_concave_faces = True, tris_to_quads = True):
     """ The Ministry of Flat unwrapping can produce bad results if ngons or loose geometry is present. """
 
     objects = get_objects_fallback(objects)
 
-    for object in bpy_utils.get_unique_data_objects(objects):
+    for object in bpy_utils.get_unique_mesh_objects(objects):
 
         with bpy_context.Focus_Objects(object):
 
@@ -485,3 +490,8 @@ def clean_up_topology_and_triangulate_ngons(objects: Objects_Like = None, split_
                     if split_concave_faces:
                         # might not be necessary but just in case
                         bpy.ops.mesh.vert_connect_concave()
+
+
+@wraps(bpy_utils.label_mix_shader_nodes if typing.TYPE_CHECKING else object)
+def label_mix_shader_nodes(objects: Objects_Like):
+    return bpy_utils.label_mix_shader_nodes(get_objects(objects))

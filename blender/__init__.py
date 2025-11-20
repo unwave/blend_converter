@@ -9,6 +9,23 @@ from .. import common
 BLENDER_SCRIPT_RUNNER = os.path.join(common.ROOT_DIR, 'blender', 'scripts', 'process_scripts.py')
 
 
+def remove_code(value):
+    """ FileNotFoundError: [WinError 206] The filename or extension is too long """
+
+    if isinstance(value, list):
+
+        for sub_value in value:
+            remove_code(sub_value)
+
+    elif isinstance(value, dict):
+
+        if value.get('_type') == 'Instruction':
+            value['code'] = ''
+
+        for sub_value in value.values():
+            remove_code(sub_value)
+
+
 class Blender:
 
 
@@ -27,19 +44,26 @@ class Blender:
             profile: bool,
         ):
 
-        command = [
-            '--python',
-            BLENDER_SCRIPT_RUNNER,
-            '--',
-            '-json_args',
-            json.dumps(dict(
+        args = json.dumps(dict(
                 instructions = instructions,
                 return_values_file = return_values_file,
                 inspect_identifiers = list(inspect_identifiers),
                 inspect_values = dict(inspect_values),
                 debug = debug,
                 profile = profile,
-            ), default = lambda x: x._to_dict()),
+        ), default = lambda x: x._to_dict())
+
+
+        args = json.loads(args)
+
+        remove_code(args)
+
+        command = [
+            '--python',
+            BLENDER_SCRIPT_RUNNER,
+            '--',
+            '-json_args',
+            json.dumps(args),
         ]
 
         utils.run_blender(self.binary_path, command, stdout = self.stdout)

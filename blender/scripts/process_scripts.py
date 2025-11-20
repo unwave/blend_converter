@@ -115,35 +115,39 @@ def append_sys_path(path: str):
         sys.path.append(path)
 
 
-def replace_return_values(args):
+def replace_return_values(value):
     """ Substitute previous function return values. """
 
-    if isinstance(args, list):
+    if isinstance(value, list):
 
-        _args = []
+        new_value = []
 
-        for arg in args:
-            if arg in ARGS['instructions']:
-                _args.append(return_values[ARGS['instructions'].index(arg)])
+        for sub_value in value:
+            if sub_value in ARGS['instructions']:
+                new_value.append(return_values[ARGS['instructions'].index(sub_value)])
+            elif type(sub_value) in (list, dict):
+                new_value.append(replace_return_values(sub_value))
             else:
-                _args.append(arg)
+                new_value.append(sub_value)
 
-        return _args
+        return new_value
 
-    elif isinstance(args, dict):
+    elif isinstance(value, dict):
 
-        _kwargs = {}
+        new_value = {}
 
-        for key, arg in args.items():
-            if arg in ARGS['instructions']:
-                _kwargs[key] = return_values[ARGS['instructions'].index(arg)]
+        for key, sub_value in value.items():
+            if sub_value in ARGS['instructions']:
+                new_value[key] = return_values[ARGS['instructions'].index(sub_value)]
+            elif type(sub_value) in (list, dict):
+                new_value[key] = replace_return_values(sub_value)
             else:
-                _kwargs[key] = arg
+                new_value[key] = sub_value
 
-        return _kwargs
+        return new_value
 
     else:
-        raise Exception(f"Unexpected args type: {args}")
+        raise Exception(f"Unexpected args type: {value}")
 
 
 

@@ -871,7 +871,7 @@ class Output_Socket_Diffuse_AO:
     node_tree_name = '__blend_converter_diffuse_ao_bake'
 
 
-    def __init__(self, material: bpy.types.Material, ignore_backface = False, faster = False, environment_has_alpha = True):
+    def __init__(self, material: bpy.types.Material, ignore_backface = False, faster = True, environment_has_alpha = True, use_normals = True):
         """ Assumes a Principled BSDF material. """
 
         self.tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
@@ -880,6 +880,8 @@ class Output_Socket_Diffuse_AO:
 
         self.faster = faster
         self.environment_has_alpha = environment_has_alpha
+
+        self.use_normals = use_normals
 
 
     def get_diffuse_mixin_node_tree(self, has_alpha: bool):
@@ -902,13 +904,15 @@ class Output_Socket_Diffuse_AO:
         output = tree.new('NodeGroupOutput')
         mix_shader = output.inputs[0].new('ShaderNodeMixShader')
 
+        # TODO: instead of using the full shader, make a simple one using only the material's transparency for a faster bake
+
         mix_shader.inputs[0].new('ShaderNodeLightPath', 'Is Camera Ray')
         diffuse_node = mix_shader.inputs[2].new('ShaderNodeBsdfDiffuse')
         diffuse_node.set_input('Color', (1,1,1,1))
 
         node_group_input = mix_shader.inputs[1].new('NodeGroupInput')  # this is expensive
 
-        if not self.faster:
+        if self.use_normals:
             diffuse_node.inputs['Normal'].join(node_group_input.outputs[1], move = False)
 
         if self.faster and not (self.environment_has_alpha or has_alpha):

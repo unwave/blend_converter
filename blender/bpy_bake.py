@@ -943,7 +943,15 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
                     break
 
         if not objects_in_group:
-            do_warning(f"No objects found for specified materials to be baked:\n\tmaterials_to_bake={materials_to_bake}\n\tobjects={objects}", do_raise=settings.raise_warnings)
+            do_warning(
+                f"No objects found for specified materials to be baked:"
+                "\n\t"
+                f"material_key={settings.material_key}"
+                "\n\t"
+                f"materials_to_bake={materials_to_bake}"
+                "\n\t"
+                f"objects={objects}",
+                do_raise=settings.raise_warnings)
             return
 
         print_bold('\nMaterial Baking: ', [m.name_full for m in materials_to_bake], '\nfor objects:', [o.name_full for o in objects_in_group])

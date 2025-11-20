@@ -1414,6 +1414,15 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
 
         self.delete_nodes_with_reconnect(mute_nodes)
 
+
+        # leave mix shader factor markers
+        # see label_mix_shader_nodes
+        for node in self.surface_input.descendants:
+            if node.be('ShaderNodeMixShader'):
+                marker = node.inputs[0].connections[0].insert_new('ShaderNodeVectorMath')
+                marker.label = 'BC_PRE_BAKE_TARGET'
+
+
         surface_input = self.surface_input
 
         # empty shader input to zero value

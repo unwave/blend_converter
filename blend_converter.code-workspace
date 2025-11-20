@@ -39,6 +39,7 @@
 			"backfacing",
 			"bakeable",
 			"binormal",
+			"binspect",
 			"bitflags",
 			"blackpoint",
 			"blendfile",
