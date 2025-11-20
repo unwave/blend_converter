@@ -78,7 +78,7 @@ class _Bake_Type:
         return contextlib.nullcontext(_get_shader_output_socket(material))
 
 
-    def _get_composer_context(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], images: typing.Union['bpy.types.Image', typing.List['bpy.types.Image']]) -> typing.ContextManager:
+    def _get_compositor_context(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], images: typing.Union['bpy.types.Image', typing.List['bpy.types.Image']]) -> typing.ContextManager:
         """ Returns a context that will be entered when composing and saving the image. """
 
         if isinstance(images, bpy.types.Image):
@@ -86,7 +86,7 @@ class _Bake_Type:
         else:
             image = images[0]
 
-        return bpy_context.Composer_Input_Default(input_socket, image, use_denoise = self.use_denoise)
+        return bpy_context.Compositor_Input_Default(input_socket, image, use_denoise = self.use_denoise)
 
 
 def get_margin():
@@ -164,14 +164,14 @@ class Fill_Color(_Bake_Type, tool_settings.Settings):
         return _Output_Socket_Fill_Color(material, self.default_color)
 
 
-    def _get_composer_context(self, input_socket, images):
+    def _get_compositor_context(self, input_socket, images):
 
         if isinstance(images, bpy.types.Image):
             image = images
         else:
             image = images[0]
 
-        return bpy_context.Composer_Input_Fill_Color(input_socket, image)
+        return bpy_context.Compositor_Input_Fill_Color(input_socket, image)
 
 
 @dataclass
@@ -234,14 +234,14 @@ class Normal(_Principled_Input):
     denoise_mix_factor: float = 1.0
 
 
-    def _get_composer_context(self, input_socket, images):
+    def _get_compositor_context(self, input_socket, images):
 
         if isinstance(images, bpy.types.Image):
             image = images
         else:
             image = images[0]
 
-        return bpy_context.Composer_Input_Normal(
+        return bpy_context.Compositor_Input_Normal(
             input_socket,
             image,
             use_denoise = self.use_denoise,
@@ -438,14 +438,14 @@ class AO_Diffuse(_AO):
         return bpy_context.Output_Socket_Diffuse_AO(material, self.ignore_backface, self.faster, self.environment_has_transparent_materials)
 
 
-    def _get_composer_context(self, input_socket, images):
+    def _get_compositor_context(self, input_socket, images):
 
         if isinstance(images, bpy.types.Image):
             image = images
         else:
             image = images[0]
 
-        return bpy_context.Composer_Input_AO_Diffuse(input_socket, image)
+        return bpy_context.Compositor_Input_AO_Diffuse(input_socket, image)
 
 
 
@@ -688,14 +688,14 @@ class Lightmap(_Bake_Type, tool_settings.Settings):
             return bpy_context.Output_Lightmap(material)
 
 
-        def _get_composer_context(self, input_socket, images):
+        def _get_compositor_context(self, input_socket, images):
 
             if isinstance(images, bpy.types.Image):
                 image = images
             else:
                 image = images[0]
 
-            return bpy_context.Composer_Input_Lightmap(input_socket, image)
+            return bpy_context.Compositor_Input_Lightmap(input_socket, image)
 
 
 
@@ -743,14 +743,14 @@ class Buffer_Factor(_Bake_Type, tool_settings.Settings):
             return _Output_Label(material, self.node_label)
 
 
-        def _get_composer_context(self, input_socket, images):
+        def _get_compositor_context(self, input_socket, images):
 
             if isinstance(images, bpy.types.Image):
                 image = images
             else:
                 image = images[0]
 
-            return bpy_context.Composer_Input_Factor(input_socket, image, use_denoise=self.use_denoise)
+            return bpy_context.Compositor_Input_Factor(input_socket, image, use_denoise=self.use_denoise)
 
 @dataclass
 class Normal_Native(_Bake_Type, tool_settings.Settings):
@@ -770,14 +770,14 @@ class Normal_Native(_Bake_Type, tool_settings.Settings):
         return bpy_context.Bpy_State([(bpy.context.scene.cycles, 'bake_type', 'NORMAL')])
 
 
-    def _get_composer_context(self, input_socket, images):
+    def _get_compositor_context(self, input_socket, images):
 
         if isinstance(images, bpy.types.Image):
             image = images
         else:
             image = images[0]
 
-        return bpy_context.Composer_Input_Normal(
+        return bpy_context.Compositor_Input_Normal(
             input_socket,
             image,
             use_denoise = self.use_denoise,

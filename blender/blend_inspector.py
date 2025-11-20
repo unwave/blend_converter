@@ -54,8 +54,8 @@ class COMMON:
     INSPECT_BAKE_AFTER = 'inspect:bake:after'
     """ inspect after baking a texture """
 
-    INSPECT_BAKE_COMPOSER = 'inspect:bake:comp'
-    """ inspect composer """
+    INSPECT_BAKE_COMPOSITOR = 'inspect:bake:comp'
+    """ inspect compositor """
 
 
     INSPECT_UV_UNWRAP = 'inspect:uv:unwrap'

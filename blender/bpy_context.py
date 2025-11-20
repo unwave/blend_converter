@@ -1048,7 +1048,7 @@ class Diffuse_AO_Bake_Settings(Bpy_State):
 
 
 
-class Composer_Input_Default:
+class Compositor_Input_Default:
 
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, use_denoise = False):
@@ -1097,8 +1097,8 @@ class Composer_Input_Default:
         self.tree.delete_new_nodes()
 
 
-class Composer_Input_Fill_Color:
-    """ TODO: The composer render is not triggered if the first image is not an image file. A bug? """
+class Compositor_Input_Fill_Color:
+    """ TODO: The compositor render is not triggered if the first image is not an image file. A bug? """
 
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image):
@@ -1116,7 +1116,7 @@ class Composer_Input_Fill_Color:
         self.tree.delete_new_nodes()
 
 
-class Composer_Input_AO_Diffuse:
+class Compositor_Input_AO_Diffuse:
 
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image):
@@ -1479,7 +1479,7 @@ class Output_Lightmap:
         self.tree.delete_new_nodes()
 
 
-class Composer_Input_Lightmap:
+class Compositor_Input_Lightmap:
 
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image):
@@ -1614,7 +1614,7 @@ class Isolate_Focus:
 
 
 
-class Composer_Input_Factor:
+class Compositor_Input_Factor:
 
 
     def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, use_denoise = False):
@@ -1661,7 +1661,7 @@ def insert_normalize(node: 'bpy_node._Shader_Node_Wrapper'):
     map_range_2[3] = 0
     map_range_2[4] = 1
 
-class Composer_Input_Normal:
+class Compositor_Input_Normal:
 
 
     def __init__(self,

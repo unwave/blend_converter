@@ -395,7 +395,7 @@ class Baked_Image:
                 if len(self.bake_types) == 1:
                     print('[RGB]')
 
-                    context_stack.enter_context(self.bake_types[0]._get_composer_context(target_input, self.sub_images[0]))
+                    context_stack.enter_context(self.bake_types[0]._get_compositor_context(target_input, self.sub_images[0]))
 
                 elif len(self.bake_types) == 2:
                     if self.bake_types[0]._socket_type in (bake_settings._Socket_Type.COLOR, bake_settings._Socket_Type.VECTOR):
@@ -409,8 +409,8 @@ class Baked_Image:
                         split_rgba.outputs[G].join(combine_rgba.inputs[G], move=False)
                         split_rgba.outputs[B].join(combine_rgba.inputs[B], move=False)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(split_rgba.inputs[0], self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs[A], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[0]._get_compositor_context(split_rgba.inputs[0], self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_compositor_context(combine_rgba.inputs[A], self.sub_images[1]))
 
 
                     elif any(type._socket_type == bake_settings._Socket_Type.SHADER for type in self.bake_types):
@@ -418,16 +418,16 @@ class Baked_Image:
 
                         combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs[R], self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs[G], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[0]._get_compositor_context(combine_rgba.inputs[R], self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_compositor_context(combine_rgba.inputs[G], self.sub_images[1]))
 
                     else:
                         print('[R + G + None]')
 
                         combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input(R), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input(G), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[0]._get_compositor_context(get_combined_input(R), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_compositor_context(get_combined_input(G), self.sub_images[0]))
 
 
                 elif len(self.bake_types) in (3, 4):
@@ -437,9 +437,9 @@ class Baked_Image:
                         combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
                         # TODO: this is inefficient
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input(R), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input(G), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input(B), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[0]._get_compositor_context(get_combined_input(R), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_compositor_context(get_combined_input(G), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[2]._get_compositor_context(get_combined_input(B), self.sub_images[0]))
 
 
                     elif self.bake_types[0]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[1:3]):
@@ -447,9 +447,9 @@ class Baked_Image:
 
                         combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs[R], self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input(G), self.sub_images[1]))
-                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input(B), self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[0]._get_compositor_context(combine_rgba.inputs[R], self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_compositor_context(get_combined_input(G), self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[2]._get_compositor_context(get_combined_input(B), self.sub_images[1]))
 
 
                     elif self.bake_types[1]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:3:2]):
@@ -457,9 +457,9 @@ class Baked_Image:
 
                         combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input(R), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs[G], self.sub_images[1]))
-                        context_stack.enter_context(self.bake_types[2]._get_composer_context(get_combined_input(B), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[0]._get_compositor_context(get_combined_input(R), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_compositor_context(combine_rgba.inputs[G], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[2]._get_compositor_context(get_combined_input(B), self.sub_images[0]))
 
 
                     elif self.bake_types[2]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:2]):
@@ -467,25 +467,25 @@ class Baked_Image:
 
                         combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(get_combined_input(R), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(get_combined_input(G), self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[2]._get_composer_context(combine_rgba.inputs[B], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[0]._get_compositor_context(get_combined_input(R), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_compositor_context(get_combined_input(G), self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[2]._get_compositor_context(combine_rgba.inputs[B], self.sub_images[1]))
 
                     else:
                         print('[R] + [G] + [B]')
 
                         combine_rgba = target_input.new(bpy_node.Compositor_Node_Type.COMBINE_RGBA)
 
-                        context_stack.enter_context(self.bake_types[0]._get_composer_context(combine_rgba.inputs[R], self.sub_images[0]))
-                        context_stack.enter_context(self.bake_types[1]._get_composer_context(combine_rgba.inputs[G], self.sub_images[1]))
-                        context_stack.enter_context(self.bake_types[2]._get_composer_context(combine_rgba.inputs[B], self.sub_images[2]))
+                        context_stack.enter_context(self.bake_types[0]._get_compositor_context(combine_rgba.inputs[R], self.sub_images[0]))
+                        context_stack.enter_context(self.bake_types[1]._get_compositor_context(combine_rgba.inputs[G], self.sub_images[1]))
+                        context_stack.enter_context(self.bake_types[2]._get_compositor_context(combine_rgba.inputs[B], self.sub_images[2]))
 
                     if len(self.bake_types) == 4:
                         print('_ + [A]')
 
                         file_node.format.color_mode = 'RGBA'
 
-                        context_stack.enter_context(self.bake_types[3]._get_composer_context(combine_rgba.inputs[A], self.sub_images[3]))
+                        context_stack.enter_context(self.bake_types[3]._get_compositor_context(combine_rgba.inputs[A], self.sub_images[3]))
 
                 else:
                     raise ValueError(f"Unexpected identifier length: {self.bake_types}")
@@ -496,7 +496,7 @@ class Baked_Image:
                 bpy_state.set(bpy.context.scene.render, 'resolution_percentage', 100)
 
 
-                blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BAKE_COMPOSER)
+                blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BAKE_COMPOSITOR)
 
                 if not self.settings.fake_bake:
                     with utils.Capture_Stdout() as capture:
