@@ -62,10 +62,17 @@ def is_blend_file(file: os.DirEntry):
     return file.is_file() and file.name.endswith('.blend') and not file.name.startswith('_')
 
 
-def get_last_blend(dir) -> str:
+def get_last_blend(dir):
     """ Get a last modified `.blend` file that does not start with underscore. """
+
     files = get_files(dir, recursively=False, filter_func=is_blend_file)
-    return max(files, key=lambda x: (os.path.getmtime(x), os.path.getctime(x), x)).path
+
+    file = max(files, key=lambda x: (os.path.getmtime(x), os.path.getctime(x), x), default = None)
+
+    if file is None:
+        return None
+    else:
+        return file.path
 
 
 def get_expr(func: typing.Callable):

@@ -554,14 +554,17 @@ class Glossy(_Bake_Type, tool_settings.Settings):
 
 
 @contextlib.contextmanager
-def _Output_Socket_AOV(material: 'bpy.types.Material', aov_name: str, aov_type: str, default_color: typing.Union[float, typing.Collection[float]]) -> 'bpy.types.NodeSocketShader':
+def _Output_Socket_AOV(material: 'bpy.types.Material', aov_name: str, is_color: bool, default_color: typing.Union[float, typing.Collection[float]]) -> 'bpy.types.NodeSocketShader':
 
     try:
         tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
 
         prev_output = None
 
-        input_index = 0 if aov_type == 'COLOR' else 1
+        if is_color:
+            input_index = 0
+        else:
+            input_index = 1
 
         for node in tree.get_by_bl_idname('ShaderNodeOutputAOV'):
 
@@ -601,7 +604,7 @@ def _Output_Socket_AOV(material: 'bpy.types.Material', aov_name: str, aov_type: 
 class AOV(_Bake_Type, tool_settings.Settings):
 
     name: str = ''
-    type: str = 'COLOR'
+    is_color: bool = True
 
     use_denoise: bool = False
 
@@ -613,14 +616,14 @@ class AOV(_Bake_Type, tool_settings.Settings):
 
     @property
     def _socket_type(self):
-        if self.type == 'COLOR':
+        if self.is_color:
             return _Socket_Type.COLOR
         else:
             return _Socket_Type.VALUE
 
 
     def _get_material_context(self, material):
-        return _Output_Socket_AOV(material, self.name, self.type, default_color = self._default_color)
+        return _Output_Socket_AOV(material, self.name, self.is_color, default_color = self._default_color)
 
 
 

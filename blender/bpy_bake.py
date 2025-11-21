@@ -1158,7 +1158,9 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
             if settings.cage_object_name:
                 # Cage object "CAGE" not found in evaluated scene, it may be hidden
                 # TODO: check if it can fail in other ways
-                bpy.context.scene.collection.objects.link(bpy.data.objects[settings.cage_object_name])
+                cage_object = bpy.data.objects[settings.cage_object_name]
+                if not bpy.context.scene.collection in cage_object.users_collection:
+                    bpy.context.scene.collection.objects.link(cage_object)
 
 
         # ensure object render visibility
