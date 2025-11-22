@@ -257,26 +257,29 @@ class Baked_Image:
         return any(bake_type._is_srgb for bake_type in self.bake_types)
 
 
-    default_map_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '8', compression = 15, color_mode = 'RGB')
+    default_file_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '8', compression = 15, color_mode = 'RGB')
     """ Default: PNG 8-bit RGB """
 
-    normal_map_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '16', compression = 15, color_mode = 'RGB')
+    normal_file_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '16', compression = 15, color_mode = 'RGB')
     """ Default: PNG 16-bit RGB """
 
-    displacement_map_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '16', compression = 15, color_mode = 'BW')
+    displacement_file_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '16', compression = 15, color_mode = 'BW')
     """ Default: PNG 16-bit BW """
 
-    bake_buffer_map_settings = tool_settings.Image_File_Settings(file_format = 'OPEN_EXR', color_depth = '32', exr_codec = 'ZIP', color_mode = 'RGB')
+    buffer_file_settings = tool_settings.Image_File_Settings(file_format = 'OPEN_EXR', color_depth = '32', exr_codec = 'ZIP', color_mode = 'RGB')
+    """ For intermediate data. """
 
 
     @property
     def image_file_settings(self):
         if self.bake_types[0]._identifier in NORMAL_SOCKETS:
-            return self.normal_map_settings
-        elif self.bake_types[0]._identifier.startswith('buffer'):
-            return self.bake_buffer_map_settings
+            return self.normal_file_settings
+        elif any(isinstance(type, bake_settings.Buffer_Factor) for type in self.bake_types):
+            return self.buffer_file_settings
+        elif any(isinstance(type, bake_settings.View_Space_Normal) for type in self.bake_types):
+            return self.buffer_file_settings
         else:
-            return self.default_map_settings
+            return self.default_file_settings
 
 
     def compose_and_save(self):
@@ -371,14 +374,14 @@ class Baked_Image:
                 blur_node.filter_type = 'FLAT'
                 blur_node.inputs[1].default_value = self.settings.resolution_multiplier - 1
 
-                if bpy.app.version >= (2, 93):
+                if False and bpy.app.version >= (2, 93):
                     anti_aliasing = blur_node.inputs[0].insert_new('CompositorNodeAntiAliasing')
                     anti_aliasing.inputs[1].default_value = 0.5
                     target_input = anti_aliasing.inputs[0]
                 else:
                     target_input = blur_node.inputs[0]
             else:
-                if bpy.app.version >= (2, 93):
+                if False and bpy.app.version >= (2, 93):
                     anti_aliasing = file_node_input.insert_new('CompositorNodeAntiAliasing')
                     anti_aliasing.inputs[1].default_value = 0.5
                     target_input = anti_aliasing.inputs[0]
@@ -503,6 +506,28 @@ class Baked_Image:
                 bpy_state.set(bpy.context.scene.render, 'resolution_percentage', 100)
 
 
+                if self.settings.view_space_normals_id and not any(self.settings.view_space_normals_id == bake_type._uuid for bake_type in self.bake_types):
+
+                    tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
+
+                    for image in bpy.data.images:
+                        if self.settings.view_space_normals_id in image.get(self.settings._BAKE_TYPES_IDS, ()):
+                            view_space_normals_image = image
+                            break
+                    else:
+                        raise Exception(f"View space normals are expected but not found: {self.settings.view_space_normals_id}")
+
+                    view_space_normals_node = tree.new('CompositorNodeImage', image = view_space_normals_image)
+
+                    for node in tree:
+
+                        if node.be('CompositorNodeDenoise'):
+                            view_space_normals_node.outputs[0].join(node.inputs['Normal'])
+                        elif node.be('CompositorNodeGroup') and node.node_tree and node.node_tree.name.startswith('BC_C_'):
+                            view_space_normals_node.outputs[0].join(node.get_input_by_name('Normal'))
+
+
+
                 blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BAKE_COMPOSITOR)
 
                 if not self.settings.fake_bake:
@@ -525,6 +550,7 @@ class Baked_Image:
                     image = bpy.data.images.load(final_path, check_existing=True)
 
                 image[self.settings._MAP_IDENTIFIER_KEY] = {bake_type._identifier: bool(bake_type) for bake_type in self.bake_types}
+                image[self.settings._BAKE_TYPES_IDS] = [bake_type._uuid for bake_type in self.bake_types]
                 image.name = self.image_name
 
                 image.colorspace_settings.name = 'sRGB' if self.is_srgb_image else 'Non-Color'
@@ -961,7 +987,13 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
                 do_raise=settings.raise_warnings)
             return
 
-        print_bold('\nMaterial Baking: ', [m.name_full for m in materials_to_bake], '\nfor objects:', [o.name_full for o in objects_in_group])
+        print_bold(
+            "\n"
+            f"Material Baking: {[m.name_full for m in bpy_utils.get_unique_materials(objects_in_group) if m in materials_to_bake]}"
+            "\n"
+            f"For objects: {[o.name_full for o in objects_in_group]}"
+        )
+
         images = bake_images(objects_in_group, uv_layer_name, settings)
         settings._images.extend(images)
 

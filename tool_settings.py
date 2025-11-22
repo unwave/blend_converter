@@ -7,6 +7,8 @@ import tempfile
 import json
 import typing
 import traceback
+import uuid
+
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -211,7 +213,7 @@ class Settings():
     """
 
 
-    allow_non_default_settings = False
+    allow_missing_settings = False
     """
     If `True` non-existent settings or settings with no default value will be allowed.
 
@@ -219,9 +221,16 @@ class Settings():
     """
 
 
+    _uuid = ''
+    """
+    A unique ID per Settings instance created.
+    """
+
+
     def __init__(self, **kwargs):
 
         self.__dict__['_has_been_set'] = set()
+        self.__dict__['_uuid'] = uuid.uuid1().hex
         self._has_been_set: set
 
         for key, value in kwargs.items():
@@ -236,8 +245,14 @@ class Settings():
         if self.ignore_default_settings and current == default == value:
             return
 
-        if not self.allow_non_default_settings and default is SENTINEL:
-            raise Exception(f"Unexpected setting for {type(self).__name__}: {name} = {repr(value)}\nUse allow_non_default_settings=True.")
+        if not self.allow_missing_settings and default is SENTINEL:
+            raise Exception(
+                f"Unexpected setting for {type(self).__name__}: {name} = {repr(value)}"
+                "\n"
+                "If it should be valid use allow_missing_settings=True."
+                "\n"
+                "So non-existent settings or settings with no default value will be allowed."
+            )
 
         self._has_been_set.add(name)
         super().__setattr__(name, value)
@@ -972,6 +987,11 @@ class Bake(Settings):
     #### Default: `True`
     """
 
+    _BAKE_TYPES_IDS = '__bc_bake_types'
+    """
+    A key for a list of UUIDs of the bake types.
+    """
+
     _MAP_IDENTIFIER_KEY = '__bc_map_identifier'
     """
     The key for an `bpy.types.Image` ID property that contains the type of the image.
@@ -1027,6 +1047,12 @@ class Bake(Settings):
     #### Default: `0`
     """
 
+    view_space_normals_id: str = ''
+    """
+    View space normals for denoising.
+
+    #### Default: `''`
+    """
 
 @dataclasses.dataclass
 class Unwrap_UVs(Settings):

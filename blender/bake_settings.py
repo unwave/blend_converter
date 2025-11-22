@@ -35,7 +35,8 @@ class _Socket_Type:
     SHADER = 'shader'
 
 
-class _Bake_Type:
+@dataclass
+class _Bake_Type(tool_settings.Settings):
 
 
     _requires_principled_bsdf = False
@@ -259,7 +260,7 @@ class Normal(_Principled_Input):
         settings = []
 
         if self.use_denoise:
-            settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
+            settings.append((bpy.context.scene.render.bake, 'margin', 1))
 
         if hasattr(bpy.context.scene.render.bake, 'margin_type'):
             settings.append((bpy.context.scene.render.bake, 'margin_type', 'EXTEND'))
@@ -649,22 +650,34 @@ def _Output_Socket_View_Space_Normals(material: 'bpy.types.Material') -> 'bpy.ty
 class View_Space_Normal(_Bake_Type, tool_settings.Settings):
 
 
-    _default_color = (0.0, 0.0, 1.0)
+    _default_color = (0.0, 0.0, 0.0)
     _identifier = 'View Space Normal'
     _socket_type = _Socket_Type.VECTOR
     _requires_principled_bsdf = True
 
 
     def _get_setup_context(self):
+
+        settings = [(bpy.context.scene.render.bake, 'margin', 1)]
+
         if hasattr(bpy.context.scene.render.bake, 'margin_type'):
-            return bpy_context.Bpy_State([(bpy.context.scene.render.bake, 'margin_type', 'EXTEND')])
-        else:
-            return contextlib.nullcontext()
+            settings.append((bpy.context.scene.render.bake, 'margin_type', 'EXTEND'))
+
+        return bpy_context.Bpy_State(settings)
 
 
     def _get_material_context(self, material):
         return _Output_Socket_View_Space_Normals(material)
 
+
+    def _get_compositor_context(self, input_socket, images, channel):
+
+        if isinstance(images, bpy.types.Image):
+            image = images
+        else:
+            image = images[0]
+
+        return bpy_context.Compositor_Input_Raw(input_socket, image, channel)
 
 
 @dataclass

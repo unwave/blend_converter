@@ -26,7 +26,7 @@ class Settings_GLTF(tool_settings.Settings):
     """
 
 
-    allow_non_default_settings = True
+    allow_missing_settings = True
 
 
     check_existing: bool

@@ -1249,7 +1249,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
                 bake_types.append(tool_settings_bake.Emission(use_denoise=denoise_all))
 
             if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
-                bake_types.append(tool_settings_bake.Normal(uv_layer=bake_settings.uv_layer_name, use_denoise=denoise_all, denoise_mix_factor=0.75))
+                bake_types.append(tool_settings_bake.Normal(uv_layer=bake_settings.uv_layer_name, use_denoise=denoise_all))
 
             if material_key == alpha_material_key:
                 bake_types.append([tool_settings_bake.Base_Color(use_denoise=denoise_all), tool_settings_bake.Alpha(use_denoise=denoise_all)])
@@ -1825,7 +1825,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
                 bake_types.append(tool_settings_bake.Emission(use_denoise=settings.denoise_all))
 
             if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
-                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name, use_denoise=settings.denoise_all, denoise_mix_factor=0.75))
+                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name, use_denoise=settings.denoise_all))
 
             if material_key == alpha_material_key:
                 bake_types.append([tool_settings_bake.Base_Color(use_denoise=settings.denoise_all), tool_settings_bake.Alpha(use_denoise=settings.denoise_all)])
@@ -2005,7 +2005,8 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         ## collect bake settings
 
-        bake_settings_tasks = []
+        pre_bake_tasks = []
+        bake_tasks = []
 
         # TODO: this only works for the materials that has been processed, not others in the scene
         environment_has_transparent_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))
@@ -2034,20 +2035,37 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
                 pack_uvs(_bake_settings.resolution)
 
 
-            ## bake
-            bake_types = [
-                [
-                    tool_settings_bake.AO_Diffuse(faster=settings.faster_ao_bake, environment_has_transparent_materials = environment_has_transparent_materials),
-                    tool_settings_bake.Roughness(use_denoise=settings.denoise_all),
-                    tool_settings_bake.Metallic(use_denoise=settings.denoise_all)
-                ]
-            ]
+            if settings.denoise_all:
+
+                view_space_normals_bake_type = tool_settings_bake.View_Space_Normal()
+
+                pre_bake_settings = _bake_settings._get_copy()
+
+                pre_bake_settings.image_dir = os.path.join(bpy.app.tempdir, '__bc_pre_baked')
+                pre_bake_settings.create_materials = False
+                pre_bake_settings.material_key = material_key
+                pre_bake_settings.bake_types = [view_space_normals_bake_type]
+
+                pre_bake_tasks.append(pre_bake_settings)
+
+                _bake_settings.view_space_normals_id = view_space_normals_bake_type._uuid
+
+
+            bake_types = []
+
+
+            bake_types.append([
+                tool_settings_bake.AO_Diffuse(faster=settings.faster_ao_bake, environment_has_transparent_materials = environment_has_transparent_materials),
+                tool_settings_bake.Roughness(use_denoise=settings.denoise_all),
+                tool_settings_bake.Metallic(use_denoise=settings.denoise_all)
+            ])
+
 
             if any(material[Material_Bake_Type.HAS_EMISSION] for material in material_group):
                 bake_types.append(tool_settings_bake.Emission(use_denoise=settings.denoise_all))
 
             if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
-                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name, use_denoise=settings.denoise_all, denoise_mix_factor=0.75))
+                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name, use_denoise=settings.denoise_all))
 
             if material_key == alpha_material_key:
                 bake_types.append([tool_settings_bake.Base_Color(use_denoise=settings.denoise_all), tool_settings_bake.Alpha(use_denoise=settings.denoise_all)])
@@ -2069,7 +2087,7 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
                     _bake_settings.texture_name_prefix = get_common_name(objects, 'mesh')
 
 
-            bake_settings_tasks.append(_bake_settings)
+            bake_tasks.append(_bake_settings)
 
 
         ## merge the bake proxy object
@@ -2090,7 +2108,10 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
 
         ## bake
-        for bake_settings in bake_settings_tasks:
+        for pre_bake_settings in pre_bake_tasks:
+            bpy_bake.bake([bake_proxy], pre_bake_settings)
+
+        for bake_settings in bake_tasks:
             if settings.pre_bake_labels:
                 with Pre_Baked([bake_proxy], settings.pre_bake_labels, bake_settings):
                     bpy_bake.bake([bake_proxy], bake_settings)
@@ -2259,6 +2280,7 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
 
     settings = tool_settings.Bake()._update(settings)
     settings.create_materials = False
+    settings.image_dir = os.path.join(bpy.app.tempdir, '__bc_pre_baked')
 
     affected_materials: typing.Set[bpy.types.Material] = set()
 

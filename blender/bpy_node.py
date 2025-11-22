@@ -777,6 +777,13 @@ class _Node_Wrapper(bpy.types.Node if typing.TYPE_CHECKING else _No_Type, typing
             return isinstance(self.bl_node, value)
 
 
+    def get_input_by_name(self, name: str):
+        for socket in self.inputs:
+            if socket.name == name:
+                return socket
+        else:
+            return None
+
 
 class _Tree_Wrapper(bpy.types.NodeTree if typing.TYPE_CHECKING else _No_Type, typing.Generic[_T_NODE, _T_SOCKET, _BL_TREE, _BL_NODE], typing.Dict[_BL_NODE, _T_NODE]):
 
@@ -1418,7 +1425,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
         # leave mix shader factor markers
         # see label_mix_shader_nodes
         for node in self.surface_input.descendants:
-            if node.be('ShaderNodeMixShader'):
+            if node.be('ShaderNodeMixShader') and node.inputs[0].connections:
                 marker = node.inputs[0].connections[0].insert_new('ShaderNodeVectorMath')
                 marker.label = 'BC_PRE_BAKE_TARGET'
 
