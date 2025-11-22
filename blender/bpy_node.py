@@ -831,7 +831,7 @@ class _Tree_Wrapper(bpy.types.NodeTree if typing.TYPE_CHECKING else _No_Type, ty
 
     def delete_new_nodes(self):
         """ Delete nodes created with the wrapper. """
-        for node in self._new_nodes:
+        for node in list(self._new_nodes):
             node.delete()
         self._new_nodes.clear()
 

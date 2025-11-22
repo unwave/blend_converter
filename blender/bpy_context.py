@@ -1055,13 +1055,14 @@ class Diffuse_AO_Bake_Settings(Bpy_State):
 class Compositor_Input_Default:
 
 
-    def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, use_denoise = False):
+    def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, channel: int, use_denoise = False):
 
         self.tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
         self.input_socket = self.tree.get_socket_wrapper(input_socket)
         self.image = image
 
         self.use_denoise = use_denoise
+        self.channel = channel
 
 
     def __enter__(self):
@@ -1095,6 +1096,13 @@ class Compositor_Input_Default:
                 inpaint_node.inputs[1].default_value = inpaint_distance
             else:
                 inpaint_node.distance = inpaint_distance
+
+        if self.channel == -1:
+            pass
+        elif self.channel in (0, 1, 2):
+            image_node.outputs[0].insert_new(bpy_node.Compositor_Node_Type.SEPARATE_RGBA, new_node_identifier = self.channel)
+        else:
+            raise Exception(f"Unexpected image channel: {self.channel}")
 
 
     def __exit__(self, type, value, traceback):
@@ -1621,13 +1629,15 @@ class Isolate_Focus:
 class Compositor_Input_Factor:
 
 
-    def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, use_denoise = False):
+    def __init__(self, input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'], image: bpy.types.Image, channel: int, use_denoise = False):
 
         self.tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
         self.input_socket = self.tree.get_socket_wrapper(input_socket)
         self.image = image
 
         self.use_denoise = use_denoise
+
+        self.channel = channel
 
 
     def __enter__(self):
@@ -1643,6 +1653,13 @@ class Compositor_Input_Factor:
             math_node.inputs[1].default_value = 0.9999
             math_node.outputs[0].join(init_alpha_node.inputs[1])
             init_alpha_node.outputs[0].insert_new('CompositorNodeInpaint', distance = 16)
+
+        if self.channel == -1:
+            pass
+        elif self.channel in (0, 1, 2):
+            image_node.outputs[0].insert_new(bpy_node.Compositor_Node_Type.SEPARATE_RGBA, new_node_identifier = self.channel)
+        else:
+            raise Exception(f"Unexpected image channel: {self.channel}")
 
 
     def __exit__(self, type, value, traceback):
