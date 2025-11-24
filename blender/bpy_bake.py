@@ -609,12 +609,24 @@ def get_conformed_pass_filter():
 
 
 def set_all_image_nodes_interpolation_to_smart(bl_tree: bpy.types.ShaderNodeTree, bpy_state: bpy_context.Bpy_State):
-    for node in bl_tree.nodes:
-        if node.bl_idname == 'ShaderNodeTexImage':
-            bpy_state.set(node, 'interpolation', 'Smart')
-        elif node.bl_idname == 'ShaderNodeGroup':
-            if node.node_tree:  # type: ignore
-                set_all_image_nodes_interpolation_to_smart(node.node_tree, bpy_state)  # type: ignore
+
+    pool = [bl_tree]
+    processed = set()
+
+    while pool:
+
+        tree = pool.pop()
+
+        if tree in processed:
+            continue
+
+        processed.add(tree)
+
+        for node in tree.nodes:
+            if node.bl_idname == 'ShaderNodeTexImage':
+                bpy_state.set(node, 'interpolation', 'Smart')
+            elif node.bl_idname == 'ShaderNodeGroup' and node.node_tree:
+                pool.append(node.node_tree)
 
 
 def ensure_unique_name(name, taken_names = set()):
@@ -693,29 +705,8 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
 
             with contextlib.ExitStack() as context_stack:
 
-                bpy_state = context_stack.enter_context(bpy_context.Bpy_State())
-
-                for object in objects:
-
-                    if settings.use_selected_to_active and bpy.context.view_layer.objects.active != object:
-                        continue
-
-                    try:
-                        uv_map = object.data.uv_layers[uv_layer]
-                    except KeyError as e:
-                        raise Exception(f"UV map '{uv_layer}' for baking is missing in object: {object.name_full}") from e
-
-                    bpy_state.set(object.data.uv_layers, 'active', uv_map)
-
-
-                if settings.use_smart_texture_interpolation:
-                    for material in materials_to_bake:
-                            set_all_image_nodes_interpolation_to_smart(material.node_tree, bpy_state)
-
-
                 for sub_task in bake_task:
                     context_stack.enter_context(sub_task._get_setup_context())
-
 
                 def enter_output_context(material: bpy.types.Material, bake_task: typing.List[bake_settings._Bake_Type]):
                     if len(bake_task) == 1:
@@ -1211,6 +1202,27 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
                     bpy_state.set(driver, 'mute', True)
 
             bpy_state.set(object, 'hide_render', False)
+
+
+        # set smart interpolation
+        if settings.use_smart_texture_interpolation:
+            for material in bpy_utils.get_unique_materials(objects):
+                set_all_image_nodes_interpolation_to_smart(material.node_tree, bpy_state)
+
+
+        # set active uv layer
+        for object in objects:
+
+            if settings.use_selected_to_active and bpy.context.view_layer.objects.active != object:
+                continue
+
+            try:
+                uv_map = object.data.uv_layers[settings.uv_layer_name]
+            except KeyError as e:
+                raise Exception(f"UV map '{settings.uv_layer_name}' for baking is missing in object: {object.name_full}") from e
+
+            bpy_state.set(object.data.uv_layers, 'active', uv_map)
+
 
         # bake objects
         if settings.merge_materials_between_objects:

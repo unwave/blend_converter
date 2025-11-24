@@ -505,12 +505,17 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
 
 class _Sockets_Wrapper(typing.Generic[_S_SOCKET, _S_NODE], typing.Dict[str, _S_SOCKET]):
 
-    __slots__ = ('identifiers')
+    __slots__ = ('identifiers', )
 
 
     def __init__(self, node: _S_NODE, socket_class: _Socket_Wrapper, is_output: bool):
-        dict.__init__(self, ((bl_socket.identifier, socket_class(bl_socket, node)) for bl_socket in (node.bl_node.outputs if is_output else node.bl_node.inputs)))
-        self.identifiers = tuple(self.keys())
+
+        if is_output:
+            dict.__init__(self, ((bl_socket.identifier, socket_class(bl_socket, node)) for bl_socket in node.bl_node.outputs))
+        else:
+            dict.__init__(self, ((bl_socket.identifier, socket_class(bl_socket, node)) for bl_socket in node.bl_node.inputs))
+
+        object.__setattr__(self, 'identifiers', tuple(self.keys()))
 
 
     def __getitem__(self, key: typing.Union[int, str]) -> _S_SOCKET:

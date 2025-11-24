@@ -8,6 +8,7 @@ import operator
 import json
 import re
 import math
+import collections
 
 import bpy
 from bpy import utils as b_utils
@@ -179,6 +180,13 @@ def del_scene_prop(key: str):
         if key in scene.keys():
             del scene[key]
 
+
+def delete_scene_collection(name: str):
+    getattr(bpy.context.scene, name).clear()
+    delattr(bpy.types.Scene, name)
+    for scene in bpy.data.scenes:
+        if name in scene.keys():
+            del scene[name]
 
 
 def get_embedded_id_data_and_path(object: bpy.types.bpy_struct):
@@ -367,14 +375,12 @@ class Bpy_State:
             for pointer in reversed(self.items.values()):
                 setattr(pointer.target, pointer.attr_name, pointer.init_value)
 
-        del_scene_prop(self.collection_name)
-        delattr(bpy.types.Scene, self.collection_name)
+        delete_scene_collection(self.collection_name)
 
 
 class Bpy_Reference_Base:
 
     def __init__(self):
-        import uuid
         self._collection_name = 'Bpy_Reference_collection_' + uuid.uuid1().hex
         setattr(bpy.types.Scene, self._collection_name, bpy.props.CollectionProperty(type = Bpy_State_Item))
 
@@ -386,8 +392,7 @@ class Bpy_Reference_Base:
         return self
 
     def __exit__(self, type, value, traceback):
-        del_scene_prop(self._collection_name)
-        delattr(bpy.types.Scene, self._collection_name)
+        delete_scene_collection(self._collection_name)
 
 
 class Bpy_Reference_Dict(Bpy_Reference_Base):
@@ -436,6 +441,63 @@ class Bpy_Reference_List(Bpy_Reference_Base):
         for item in self.items:
             yield item.target
 
+
+class Bpy_ID_Pointer(bpy.types.PropertyGroup):
+    target: bpy.props.PointerProperty(type = bpy.types.ID)
+
+
+try:
+    bpy.utils.unregister_class(Bpy_ID_Pointer)
+except RuntimeError:
+    pass
+finally:
+    bpy.utils.register_class(Bpy_ID_Pointer)
+
+
+class Bpy_Reference_Collection:
+
+
+    def __init__(self):
+        self._collection_name = 'Bpy_Reference_collection_' + uuid.uuid1().hex
+        setattr(bpy.types.Scene, self._collection_name, bpy.props.CollectionProperty(type = Bpy_ID_Pointer))
+        self._index = 0
+
+
+    @property
+    def items(self) -> typing.Union[bpy.types.CollectionProperty, typing.List[Bpy_ID_Pointer]]:
+        return getattr(bpy.context.scene, self._collection_name)
+
+
+    def __enter__(self):
+        return self
+
+
+    def __exit__(self, type, value, traceback):
+        delete_scene_collection(self._collection_name)
+
+
+    def append(self, value: bpy.types.bpy_struct):
+        pointer: Bpy_ID_Pointer = self.items.add()  # type: ignore
+        pointer.name = str(self._index)
+        pointer.target = value
+
+        self._index += 1
+
+        return self._index - 1
+
+
+    def extend(self, values: typing.Iterable):
+        for value in values:
+            self.append(value)
+
+
+    def __getitem__(self, index: int):
+        return self.items[index].target
+
+
+    def __iter__(self):
+        for item in self.items:
+            yield item.target
 
 
 class Bake_Settings(Bpy_State):
@@ -1186,13 +1248,6 @@ class Compositor_Input_AO_Diffuse:
 class Focus_Objects:
 
 
-    SELECT_KEY = '__bc_init_select_'
-    HIDE_KEY = '__bc_init_hide_'
-    MODE_KEY = '__bc_init_mode_'
-    VISIBLE_KEY = '__bc_visible_'
-    HIDE_VIEWPORT_KEY = '__bc_init_hide_viewport_'
-
-
     def __init__(self, objects: typing.Union[bpy.types.Object, typing.List[bpy.types.Object]], mode = 'OBJECT', view_layer: bpy.types.ViewLayer = None):
 
         if view_layer is None:
@@ -1209,34 +1264,27 @@ class Focus_Objects:
 
         self.context_id = uuid.uuid1().hex
 
-        self.SELECT_KEY += self.context_id
-        self.HIDE_KEY += self.context_id
-        self.MODE_KEY += self.context_id
-        self.HIDE_VIEWPORT_KEY += self.context_id
-        self.VISIBLE_KEY += self.context_id
-
-        self.init_object_indexes = set()
+        self.visibility_states = []
 
 
     @property
     def view_layer(self) -> bpy.types.ViewLayer:
-        return self.ref_list[0]
+        return self.references[0].path_resolve(self._view_layer_path_from_id)
+
 
     @property
     def hidden_by_hierarchy_collection(self) -> bpy.types.Collection:
-        return self.ref_list[1]
+        return self.references[1]
+
 
     @property
     def init_active_object(self) -> bpy.types.Object:
-        return self.ref_list[2]
+        return self.references[2]
+
 
     @property
     def affected_objects(self) -> typing.List[bpy.types.Object]:
-        return list(filter(None, list(self.ref_list)[3:]))
-
-    @property
-    def init_objects(self) -> typing.List[bpy.types.Object]:
-        return list(filter(None, (ref for index, ref in enumerate(self.ref_list) if index in self.init_object_indexes)))
+        return list(self.references)[3:]
 
 
     @staticmethod
@@ -1258,6 +1306,10 @@ class Focus_Objects:
 
         88051 - Context override of bpy.ops.object.mode_set does not work
         https://projects.blender.org/blender/blender/issues/88051
+
+        If there are multiple objects in EDIT mode bpy.ops.object.mode_set(mode='OBJECT') will set the OBJECT mode for all of them.
+        Even if they are not active and not selected.
+        Practically means that first you have to set the OBJECT mode and then the EDIT mode.
         """
 
         for object_type, objects_of_type in utils.list_by_key(objects, operator.attrgetter('type')).items():
@@ -1306,40 +1358,38 @@ class Focus_Objects:
 
     def __enter__(self):
 
-        view_layer = self._view_layer
+        self.references = Bpy_Reference_Collection().__enter__()
+
+        self._view_layer_path_from_id = self._view_layer.path_from_id()
+        self.references.append(self._view_layer.id_data)
+
+        view_layer = self.view_layer
+
         affected_objects = [object for object in bpy_utils.get_view_layer_objects(view_layer) if object.visible_get(view_layer=view_layer)] + self._objects
         affected_objects = list(dict.fromkeys(affected_objects))
 
-        self.ref_list = Bpy_Reference_List().__enter__()
-
-        self.ref_list.append(view_layer)
-        self.ref_list.append(bpy.data.collections.new('__bc_hidden_by_hierarchy' + self.context_id))
-        self.ref_list.append(view_layer.objects.active)
+        self.references.append(bpy.data.collections.new('__bc_hidden_by_hierarchy' + self.context_id))
+        self.references.append(view_layer.objects.active)
 
         view_layer.layer_collection.collection.children.link(self.hidden_by_hierarchy_collection)
 
-
         for object in affected_objects:
 
-            object[self.MODE_KEY] = object.mode
+            self.visibility_states.append((
+                object.mode,
+                object.visible_get(view_layer = view_layer),
+                object.select_get(view_layer = view_layer),
+                object.hide_get(view_layer = view_layer),
+                object.hide_viewport,
+            ))
 
-            object[self.VISIBLE_KEY] = object.visible_get(view_layer = view_layer)
-
-            object[self.SELECT_KEY] = object.select_get(view_layer = view_layer)
-            object[self.HIDE_KEY] = object.hide_get(view_layer = view_layer)
-            object[self.HIDE_VIEWPORT_KEY] = object.hide_viewport
-
-            index = self.ref_list.append(object)
-
-            if object in  self._objects:
-                self.init_object_indexes.add(index)
-
+            self.references.append(object)
 
         if self.mode == 'OBJECT':
-            self.set_mode(affected_objects, 'OBJECT', self.hidden_by_hierarchy_collection, self.view_layer)
+            self.set_mode(affected_objects, 'OBJECT', self.hidden_by_hierarchy_collection, view_layer)
         else:
-            self.set_mode(tuple(object for object in affected_objects if object not in self._objects), 'OBJECT', self.hidden_by_hierarchy_collection, self.view_layer)
-            self.set_mode(self._objects, self.mode, self.hidden_by_hierarchy_collection, self.view_layer)
+            self.set_mode(tuple(object for object in affected_objects if object not in self._objects), 'OBJECT', self.hidden_by_hierarchy_collection, view_layer)
+            self.set_mode(self._objects, self.mode, self.hidden_by_hierarchy_collection, view_layer)
 
         bpy_utils.focus(self._objects)
 
@@ -1355,29 +1405,32 @@ class Focus_Objects:
     def __exit__(self, type, value, traceback):
 
         view_layer = self.view_layer
-        objects = self.affected_objects
 
-        # Is there a multiple objects in EDIT mode bpy.ops.object.mode_set(mode='OBJECT') will set the OBJECT mode for all of them
-        # even if they are not active and not selected
-        # practically means that first you have to set the OBJECT mode and then the EDIT mode
-        self.set_mode(self.affected_objects, 'OBJECT', self.hidden_by_hierarchy_collection, self.view_layer)
+        self.set_mode(list(filter(None, self.affected_objects)), 'OBJECT', self.hidden_by_hierarchy_collection, view_layer)
 
-        for mode, objects_in_mode in utils.list_by_key(objects, operator.itemgetter(self.MODE_KEY)).items():
-            self.set_mode(objects_in_mode, mode, self.hidden_by_hierarchy_collection, self.view_layer)
+        mode_to_objects = collections.defaultdict(list)
+        for object, state in zip(self.affected_objects, self.visibility_states):
 
-        for object in objects:
+            if not object:
+                continue
 
-            if object.mode != object[self.MODE_KEY]:
-                raise Exception(f"Fail to reset '{object[self.MODE_KEY]}' mode: '{object.name_full}' in mode '{object.mode}'")
+            mode_to_objects[state[0]].append(object)
 
-            object.select_set(object[self.SELECT_KEY], view_layer = view_layer)
-            object.hide_viewport = object[self.HIDE_VIEWPORT_KEY]
-            object.hide_set(object[self.HIDE_KEY], view_layer = view_layer)
+        for mode, objects_in_mode in mode_to_objects.items():
+            self.set_mode(objects_in_mode, mode, self.hidden_by_hierarchy_collection, view_layer)
 
-            del object[self.SELECT_KEY]
-            del object[self.HIDE_KEY]
-            del object[self.HIDE_VIEWPORT_KEY]
-            del object[self.MODE_KEY]
+
+        for object, state in zip(self.affected_objects, self.visibility_states):
+
+            if not object:
+                continue
+
+            if object.mode != state[0]:
+                raise Exception(f"Fail to reset '{state[0]}' mode: '{object.name_full}' in mode '{object.mode}'")
+
+            object.select_set(state[2], view_layer = view_layer)
+            object.hide_viewport = state[3]
+            object.hide_set(state[4], view_layer = view_layer)
 
         bpy.data.collections.remove(self.hidden_by_hierarchy_collection)
 
@@ -1385,16 +1438,18 @@ class Focus_Objects:
         scene_objects = set(bpy_utils.get_view_layer_objects(view_layer))
         # scene_objects = list(filter(None, view_layer.layer_collection.collection.all_objects))
 
-        for object in objects:
-            if object in scene_objects and object.visible_get(view_layer=view_layer) != object[self.VISIBLE_KEY]:
-                raise Exception(f"Fail to revert visibility to {object[self.VISIBLE_KEY]}: {object.name_full}")
+        for object, state in zip(self.affected_objects, self.visibility_states):
 
-            del object[self.VISIBLE_KEY]
+            if not object:
+                continue
+
+            if object in scene_objects and object.visible_get(view_layer=view_layer) != state[1]:
+                raise Exception(f"Fail to revert visibility to {state[1]}: {object.name_full}")
 
         if self.init_active_object in scene_objects:
             view_layer.objects.active = self.init_active_object
 
-        self.ref_list.__exit__(type, value, traceback)
+        self.references.__exit__(type, value, traceback)
 
 
 class Light_Map_Bake_Settings(Bpy_State):
