@@ -324,18 +324,31 @@ class Bpy_State:
 
 
     @property
-    def items(self) -> bpy.types.CollectionProperty:
+    def id_blocks_collection(self) -> bpy.types.CollectionProperty:
         return getattr(bpy.context.scene, self.collection_name)
 
 
-    def __init__(self, settings: typing.Optional[typing.List[typing.Tuple[bpy.types.bpy_struct, str, typing.Any]]] = None, except_exit_errors = False, print = PRINT_CONTEXT_CHANGES):
+    def __init__(self,
+                settings: typing.Optional[typing.List[typing.Tuple[bpy.types.bpy_struct, str, typing.Any]]] = None,
+                except_exit_errors = False,
+                print = PRINT_CONTEXT_CHANGES
+            ):
+
         self.collection_name = 'Bpy_Struct_State_collection_' + uuid.uuid1().hex
-        setattr(bpy.types.Scene, self.collection_name, bpy.props.CollectionProperty(type = Bpy_State_Item))
+        setattr(bpy.types.Scene, self.collection_name, bpy.props.CollectionProperty(type = Bpy_ID_Pointer))
+
         self.except_exit_errors = except_exit_errors
-
         self.pre_settings = settings
-
         self.print = print
+
+        self._index_id_blocks = 0
+        self._index_bpy_structs = 0
+        self._index_python_values = 0
+
+        self.bpy_structs = []
+        self.python_values = []
+
+        self.states = []
 
 
     def __enter__(self):
@@ -347,14 +360,75 @@ class Bpy_State:
         return self
 
 
+    def add_id_block(self, id_block: bpy.types.ID):
+
+        pointer: Bpy_ID_Pointer
+
+        for block_index, pointer in enumerate(self.id_blocks_collection):
+            if id_block is pointer.target:
+                return block_index
+        else:
+            pointer = self.id_blocks_collection.add()  # type: ignore
+            pointer.target = id_block
+
+            self._index_id_blocks += 1
+            return self._index_id_blocks - 1
+
+
+    def add_bpy_struct(self, bpy_struct: bpy.types.bpy_struct):
+
+        id_data, path_from_id = get_id_data_and_path(bpy_struct)
+
+        self.bpy_structs.append(
+            (
+                self.add_id_block(id_data),
+                path_from_id,
+                repr(bpy_struct),
+            )
+        )
+
+        self._index_bpy_structs += 1
+        return self._index_bpy_structs - 1
+
+
+    def add_python_value(self, value: object):
+
+        self.python_values.append(value)
+
+        self._index_python_values += 1
+        return self._index_python_values - 1
+
+
     def set(self, object: bpy.types.bpy_struct, name: str, value):
 
         init_value = getattr(object, name)
 
-        pointer: Bpy_State_Item = self.items.add()  # type: ignore
-        pointer.target = object
-        pointer.attr_name = name
-        pointer.init_value = init_value
+
+        object_is_bpy_struct = isinstance(object, (bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection))
+
+        if object_is_bpy_struct:
+            object_index = self.add_bpy_struct(object)
+        else:
+            object_index = self.add_python_value(object)
+
+
+        value_is_bpy_struct = isinstance(init_value, (bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection))
+
+        if value_is_bpy_struct:
+            value_index = self.add_bpy_struct(init_value)
+        else:
+            value_index = self.add_python_value(init_value)
+
+
+        self.states.append(
+            (
+                object_index,
+                object_is_bpy_struct,
+                name,
+                value_index,
+                value_is_bpy_struct,
+            )
+        )
 
         setattr(object, name, value)
 
@@ -362,18 +436,35 @@ class Bpy_State:
             utils.print_in_color(self.print_color, f"{repr(object)}.{name} = {repr(value)}")
 
 
+    def get_data(self, index: int, is_bpy_struct: bool):
+
+        if is_bpy_struct:
+
+            id_block_index, path_from_id, representation = self.bpy_structs[index]
+
+            pointer = self.id_blocks_collection[id_block_index]
+
+            if pointer.target is None:
+                Exception(f"The underling ID data block has been removed: {representation}")
+            elif path_from_id:
+                return pointer.target.path_resolve(path_from_id)
+            else:
+                return pointer.target
+        else:
+            return self.python_values[index]
+
+
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        pointer: Bpy_State_Item
 
         if self.except_exit_errors or exc_type:
-            for pointer in reversed(self.items.values()):
+            for object_index, object_is_bpy_struct, name, value_index, value_is_bpy_struct in reversed(self.states):
                 try:
-                    setattr(pointer.target, pointer.attr_name, pointer.init_value)
+                    setattr(self.get_data(object_index, object_is_bpy_struct), name, self.get_data(value_index, value_is_bpy_struct))
                 except Exception:
                     utils.print_in_color(self.error_color, traceback.format_exc())
         else:
-            for pointer in reversed(self.items.values()):
-                setattr(pointer.target, pointer.attr_name, pointer.init_value)
+            for object_index, object_is_bpy_struct, name, value_index, value_is_bpy_struct in reversed(self.states):
+                setattr(self.get_data(object_index, object_is_bpy_struct), name, self.get_data(value_index, value_is_bpy_struct))
 
         delete_scene_collection(self.collection_name)
 
@@ -639,7 +730,7 @@ class Armature_Disabled(Bpy_State):
 
         pointer: Bpy_State_Item
 
-        for pointer in reversed(self.items.values()):  # type: ignore
+        for pointer in reversed(self.id_blocks_collection.values()):  # type: ignore
             setattr(pointer.target, pointer.attr_name, pointer.init_value)
 
             if isinstance(pointer.target, bpy.types.Object) and self.matrix_parent_inverse:

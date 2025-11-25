@@ -2136,7 +2136,7 @@ def brute_force_unwrap(
             for line in capture.lines.queue:
                 print(line)
                 match = re.search(r'(\d+) of (\d+)', line)
-                if int(match.group(1)) == int(match.group(2)):
+                if match and int(match.group(1)) == int(match.group(2)):
                     raise Exception(line)
 
 
@@ -2158,7 +2158,7 @@ def brute_force_unwrap(
             for line in capture.lines.queue:
                 print(line)
                 match = re.search(r'(\d+) of (\d+)', line)
-                if int(match.group(1)) == int(match.group(2)):
+                if match and int(match.group(1)) == int(match.group(2)):
                     raise Exception(line)
 
 
@@ -2225,6 +2225,7 @@ def brute_force_unwrap(
             reunwrap_with_minimal_stretch()
             measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         except Exception:
+            traceback.print_exc(file=sys.stderr)
             is_minimal_stretch_failed = True
             measure = None
 
@@ -2238,6 +2239,7 @@ def brute_force_unwrap(
             reunwrap_conformal()
             measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         except Exception:
+            traceback.print_exc(file=sys.stderr)
             measure = None
 
         just_minimal_stretch_measures['just_conformal'] = measure
@@ -2261,6 +2263,7 @@ def brute_force_unwrap(
             rescale()
             measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         except Exception:
+            traceback.print_exc(file=sys.stderr)
             measure = None
 
         smart_and_cube_measures['smart_project_reunwrap'] = measure
@@ -2271,6 +2274,7 @@ def brute_force_unwrap(
             rescale()
             measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         except Exception:
+            traceback.print_exc(file=sys.stderr)
             measure = None
 
         smart_and_cube_measures['smart_project_conformal'] = measure
@@ -2291,6 +2295,7 @@ def brute_force_unwrap(
             rescale()
             measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         except Exception:
+            traceback.print_exc(file=sys.stderr)
             measure = None
 
         smart_and_cube_measures['cube_project_reunwrap'] = measure
@@ -2301,6 +2306,7 @@ def brute_force_unwrap(
             rescale()
             measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
         except Exception:
+            traceback.print_exc(file=sys.stderr)
             measure = None
 
         smart_and_cube_measures['cube_project_conformal'] = measure

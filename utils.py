@@ -604,11 +604,12 @@ class Capture_Output:
     _std_output_name: str
 
 
-    def __init__(self, is_dummy = False, use_set_other = True):
+    def __init__(self, is_dummy = False, use_set_other = True, line_buffering: typing.Optional[bool] = None):
         self.lines = queue.Queue()
         self.is_dummy = is_dummy
         self.use_set_other = use_set_other
 
+        self.line_buffering = line_buffering
 
     def __enter__(self):
 
@@ -634,12 +635,10 @@ class Capture_Output:
 
         os.dup2(self.pipe_write_fileno, self.file_descriptor)
 
-        write_pipe_binary = os.fdopen(self.pipe_write_fileno, 'wb', buffering= 0)
-        self.write_pipe_textwrapper = io.TextIOWrapper(
-            write_pipe_binary,
-            encoding='utf-8',
-            write_through=True,
-        )
+        self.write_pipe_textwrapper = os.fdopen(self.pipe_write_fileno, 'w', encoding='utf-8')
+
+        if self.line_buffering is not None:
+            self.write_pipe_textwrapper.reconfigure(line_buffering = self.line_buffering)
 
         setattr(sys, self._std_output_name, self.write_pipe_textwrapper)
 

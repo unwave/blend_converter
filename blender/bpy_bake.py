@@ -623,7 +623,7 @@ def set_all_image_nodes_interpolation_to_smart(bl_tree: bpy.types.ShaderNodeTree
         processed.add(tree)
 
         for node in tree.nodes:
-            if node.bl_idname == 'ShaderNodeTexImage':
+            if node.bl_idname == 'ShaderNodeTexImage' and node.image:
                 bpy_state.set(node, 'interpolation', 'Smart')
             elif node.bl_idname == 'ShaderNodeGroup' and node.node_tree:
                 pool.append(node.node_tree)
