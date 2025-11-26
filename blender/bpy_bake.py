@@ -372,7 +372,7 @@ class Baked_Image:
                     blur_node.size_y = 1/aspect_ratio
 
                 blur_node.filter_type = 'FLAT'
-                blur_node.inputs[1].default_value = self.settings.resolution_multiplier - 1
+                blur_node.inputs[1].set_default_value(self.settings.resolution_multiplier - 1)
 
                 if False and bpy.app.version >= (2, 93):
                     anti_aliasing = blur_node.inputs[0].insert_new('CompositorNodeAntiAliasing')

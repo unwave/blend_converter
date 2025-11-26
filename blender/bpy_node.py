@@ -425,11 +425,11 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
                 self.bl_socket.default_value = value
         elif type == 'VECTOR':
             if value_len == 1:  # VALUE
-                self.bl_socket.default_value = (value, value, value)
+                self.bl_socket.default_value = (value, value, value)[:len(self.bl_socket.default_value)]
             elif value_len == 3:  # VECTOR
-                self.bl_socket.default_value = value
+                self.bl_socket.default_value = value[:len(self.bl_socket.default_value)]
             else:  # RGBA
-                self.bl_socket.default_value = value[:3]
+                self.bl_socket.default_value = value[:3][:len(self.bl_socket.default_value)]
         else:
             raise ValueError(f"Unexpected socket type: {type}")
 
