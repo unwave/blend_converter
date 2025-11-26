@@ -505,6 +505,10 @@ else:
     print_in_color = dummy_print_in_color
 
 
+def debug_print(*args):
+    print_in_color(get_color_code(0,0,0, 255, 128, 0), *args, file=sys.stderr, flush=True)
+
+
 def get_terminal_width(fallback = 80):
 
     try:

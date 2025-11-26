@@ -172,23 +172,21 @@ def convert_to_mesh(objects: T_Objects) -> T_Objects:
         return _convert_to_mesh([objects])[0]
 
 
-def make_materials_unique(objects: typing.List[bpy.types.Object], filter_func: typing.Optional[typing.Callable[[bpy.types.Material], bool]] = None):
+def make_materials_unique(object: bpy.types.Object, filter_func: typing.Optional[typing.Callable[[bpy.types.MaterialSlot], bool]] = None):
     """ Make a unique copy of a material for each material slot of an object. """
 
-    for object in objects:
-        for slot in object.material_slots:
+    for slot in object.material_slots:
 
-            if not slot.material:
-                continue
+        if not slot.material:
+            continue
 
-            if slot.material.users - slot.material.use_fake_user == 1:
-                continue
+        if slot.material.users - slot.material.use_fake_user == 1:
+            continue
 
-            if filter_func is not None:
-                if not filter_func(slot.material):
-                    continue
+        if filter_func and not filter_func(slot):
+            continue
 
-            slot.material = slot.material.copy()
+        slot.material = slot.material.copy()
 
 
 def make_object_data_unique(objects: bpy.types.Object):
@@ -814,30 +812,23 @@ def unify_color_attributes_format(objects: typing.List[bpy.types.Object]):
                 bpy_context.call_for_object(object, bpy.ops.geometry.color_attribute_convert, domain='POINT', data_type='FLOAT_COLOR')
 
 
-def make_material_independent_from_object(objects: typing.List[bpy.types.Object]):
-    """
-    Try to modify materials so when the objects are joined the materials look the same.
+def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: bpy.types.ShaderNodeTree, texture_coordinates_collection: bpy.types.Collection, check_only = False):
+    """ Make a shader node tree independent from its object. """
 
-    The main use case is speedup texture baking.
-    """
-    print(f"{make_material_independent_from_object.__name__}...")
+    tree = bpy_node.Shader_Tree_Wrapper(node_tree)
 
-    texture_coordinates_collection = bpy.data.collections.new(f'__bc_temp_texture_coordinates_{uuid.uuid1().hex}')
-    bpy.context.view_layer.layer_collection.collection.children.link(texture_coordinates_collection)
-    bpy.context.view_layer.layer_collection.children.get(texture_coordinates_collection.name).exclude = True
 
-    objects = get_meshable_objects(objects)
-
-    objects_with_materials = [object for object in objects if hasattr(object, 'material_slots') and any(slot.material for slot in object.material_slots)]
-    make_materials_unique(objects_with_materials)
+    if not check_only:
+        if tree.is_material:
+            name_full = bpy_context.get_embedded_id_data_and_path(node_tree)[0].name_full
+        else:
+            name_full = node_tree.name_full
+        print(f"Making node tree unique: {name_full}")
 
     warning_color = utils.get_color_code(217, 69, 143, 0,0,0)
 
     def warn(*args):
-         utils.print_in_color(warning_color, 'WARNING:', *args)
-
-
-    unify_color_attributes_format(objects_with_materials)
+        utils.print_in_color(warning_color, 'WARNING:', *args)
 
 
     def get_active_render_uv_layer(object: bpy.types.Object):
@@ -852,6 +843,7 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
             if layer.active_render:
                 return layer
 
+
     def is_valid_uv_map(uv_map: str, object: bpy.types.Object):
 
         # TODO: handle non mesh objects
@@ -865,212 +857,359 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
         return uv_map in object.data.uv_layers.keys()
 
 
+    if get_active_render_uv_layer(object):
+
+        # Joining objects deletes UV map #64245
+        # https://projects.blender.org/blender/blender/issues/64245
+
+        render_uv_layer = get_active_render_uv_layer(object).name
+
+        for node in reversed(tree.root.descendants):
+            if node.be('ShaderNodeTexImage') and not node.inputs['Vector'].connections:
+
+                if check_only:
+                    return True
+
+                node.inputs['Vector'].new('ShaderNodeUVMap', uv_map=render_uv_layer)
+
+
+    for node in reversed(tree.root.descendants):
+        if node.be(GENERATED_COORDINATES_TEXTURE_NODE) and not node.inputs['Vector'].connections and node.inputs['Vector'].enabled:
+
+            if check_only:
+                return True
+
+            node.inputs['Vector'].new('ShaderNodeTexCoord', 'Generated')
+
+
+    for node in reversed(tree.root.descendants):
+
+        if node.be('ShaderNodeAttribute') and node.attribute_type in ('OBJECT', 'INSTANCER'):
+
+            if node.attribute_type == 'INSTANCER':
+                warn("ShaderNodeAttribute.attribute_type == 'INSTANCER' handled as 'OBJECT'")
+
+            rgba = find_attribute_rgba(object, node.attribute_name)
+
+            for output in node.outputs:
+
+                if not output.connections:
+                    continue
+
+                if check_only:
+                    return True
+
+                if output.identifier in ('Color', 'Vector'):
+                    replacement_node = tree.new('ShaderNodeCombineXYZ')
+                    for i in range(3):
+                        replacement_node.inputs[i].set_default_value(rgba[i])
+                elif output.identifier == 'Fac':
+                    replacement_node = tree.new('ShaderNodeValue')
+                    replacement_node.outputs[0].set_default_value(rgba[:3])
+                elif output.identifier == 'Alpha':
+                    replacement_node = tree.new('ShaderNodeValue')
+                    replacement_node.outputs[0].set_default_value(rgba[3])
+                else:
+                    raise Exception(f"Unexpected identifier: {output.identifier}")
+
+                for other_socket in output.connections:
+                    replacement_node.outputs[0].join(other_socket, move=False)
+
+        elif node.be('ShaderNodeObjectInfo'):
+
+            for output in node.outputs:
+
+                if not output.connections:
+                    continue
+
+                if output.identifier == 'Material Index':
+                    continue
+
+                if check_only:
+                    return True
+
+                if output.identifier == 'Location':
+                    replacement_node = tree.new('ShaderNodeCombineXYZ')
+                    location = object.matrix_world.translation
+                    for i in range(3):
+                        replacement_node.inputs[i].set_default_value(location[i])
+                elif output.identifier == 'Color':
+                    replacement_node = tree.new('ShaderNodeCombineXYZ')
+                    for i in range(3):
+                        replacement_node.inputs[i].set_default_value(object.color[i])
+                elif output.identifier == 'Alpha':
+                    replacement_node = tree.new('ShaderNodeValue')
+                    replacement_node.outputs[0].set_default_value(object.color[3])
+                elif output.identifier == 'Object Index':
+                    replacement_node = tree.new('ShaderNodeValue')
+                    replacement_node.outputs[0].set_default_value(object.pass_index)
+                elif output.identifier == 'Random':
+                    # TODO: this is not the same random value
+                    replacement_node = tree.new('ShaderNodeValue')
+                    replacement_node.outputs[0].set_default_value(random.random())
+                else:
+                    raise Exception(f"Unexpected identifier: {output.identifier}")
+
+                for other_socket in output.connections:
+                    replacement_node.outputs[0].join(other_socket, move=False)
+
+        elif node.be('ShaderNodeUVMap'):
+
+            if get_active_render_uv_layer(object):
+                if node.uv_map and is_valid_uv_map(node.uv_map, object):
+                    pass
+                else:
+
+                    if check_only:
+                        return True
+
+                    node.uv_map = get_active_render_uv_layer(object).name
+
+            elif object.type == 'MESH':
+
+                if check_only:
+                    return True
+
+                warn(f"A mesh does not have any uv layers the output of the UV socket is (0, 0, 0): {object.data.name_full}")
+                replacement_node = tree.new('ShaderNodeCombineXYZ')
+                for other_socket in node.outputs[0].connections.copy():
+                    replacement_node.outputs[0].join(other_socket, move=False)
+
+            else:
+
+                if check_only:
+                    return True
+
+                # TODO: to test, this should work for curves
+                node.uv_map = 'UVMap'
+
+        elif node.be('ShaderNodeNormalMap') and node.space == 'TANGENT':
+
+            if get_active_render_uv_layer(object):
+                if node.uv_map and is_valid_uv_map(node.uv_map, object):
+                    pass
+                else:
+
+                    if check_only:
+                        return True
+
+                    node.uv_map = get_active_render_uv_layer(object).name
+
+            elif object.type == 'MESH':
+                # TODO: undefined behavior
+                warn(f"A mesh does not have any uv layers for tangent space: {object.data.name_full}")
+
+            else:
+
+                if check_only:
+                    return True
+
+                # TODO: to test, this should work for curves
+                node.uv_map = 'UVMap'
+
+        elif node.be('ShaderNodeTexCoord') and node.object is None:
+
+            if node.from_instancer:
+                warn("ShaderNodeTexCoord.from_instancer not handled.")
+
+            for output in node.outputs:
+
+                if not output.connections:
+                    continue
+
+                if output.identifier == 'Generated':
+
+                    if check_only:
+                        return True
+
+                    replacement_node = tree.new('ShaderNodeTexCoord')
+                    replacement_node.object = get_texture_coordinates_generated_empty(object)
+                    texture_coordinates_collection.objects.link(replacement_node.object)
+
+                    if object.data and hasattr(object.data, 'texture_mesh') and object.data.texture_mesh:
+                        warn("texture_mesh is not handled.")
+
+                    for other_socket in output.connections:
+                        replacement_node.outputs['Object'].join(other_socket, move=False)
+
+                elif output.identifier == 'Object':
+
+                    if check_only:
+                        return True
+
+                    replacement_node = tree.new('ShaderNodeNewGeometry').outputs['Position'].new('ShaderNodeMapping', vector_type='TEXTURE')
+
+                    location, rotation, scale = object.matrix_world.decompose()
+
+                    replacement_node['Location'] = location
+                    replacement_node['Rotation'] = rotation.to_euler()
+                    replacement_node['Scale'] = scale
+
+                    for other_socket in output.connections:
+                        replacement_node.outputs[0].join(other_socket, move=False)
+
+                elif output.identifier == 'UV':
+
+                    if check_only:
+                        return True
+
+                    if get_active_render_uv_layer(object):
+                        replacement_node = tree.new('ShaderNodeUVMap')
+                        replacement_node.uv_map = get_active_render_uv_layer(object).name
+                    elif object.type == 'MESH':
+                        warn(f"A mesh does not have any uv layers the output of the UV socket is (0, 0, 0): {object.data.name_full}")
+                        replacement_node = tree.new('ShaderNodeCombineXYZ')
+                    else:
+                        # TODO: to test, this should work for curves
+                        replacement_node = tree.new('ShaderNodeUVMap')
+                        replacement_node.uv_map = 'UVMap'
+
+                    for other_socket in output.connections:
+                        replacement_node.outputs[0].join(other_socket, move=False)
+
+
+        elif node.be('ShaderNodeAmbientOcclusion') and node.only_local == True:
+            # TODO: as the node ignores all the shader context a way is to explode the mesh
+            # separating all the parts belonging to other meshes
+            # but in this case you cannot have nodes with and without this option
+            # TODO: possible solution is to pre-bake all the Ambient Occlusion nodes
+            # the pre-baking can be a general solution to all problems
+            warn("No handling for only_local Ambient Occlusion node.")
+
+        elif node.be('ShaderNodeTexImage') and node.projection == 'BOX':
+
+            if check_only:
+                return True
+
+            # TODO: to preserve the projection is to recreate the node using 3 texture nodes
+            # it uses the object's matrix to convert normals to object space to drive the projection
+            # so when the rotation is applied — the projection changes to be world oriented
+            # https://github.com/blender/blender/blob/af4974dfaa165ff1be0819c52afc99217d3627ba/source/blender/nodes/shader/nodes/node_shader_tex_image.cc#L115
+            # https://github.com/blender/blender/blob/af4974dfaa165ff1be0819c52afc99217d3627ba/source/blender/gpu/shaders/material/gpu_shader_material_tex_image.glsl#L77
+            mapping = node.inputs['Vector'].insert_new('ShaderNodeMapping')
+            mapping.inputs['Rotation'].set_default_value(object.matrix_world.to_euler())
+
+
+    if check_only:
+        return False
+
+
+def make_node_trees_unique(node_tree: bpy.types.ShaderNodeTree, filter_func: typing.Optional[typing.Callable[[bpy.types.ShaderNodeTree], bool]] = None):
+    """ Recursively make `ShaderNodeGroup` node trees unique. """
+
+    pool = [node_tree]
+    processed = set()
+
+    while pool:
+
+        tree = pool.pop()
+
+        if tree in processed:
+            continue
+        processed.add(tree)
+
+        for node in tree.nodes:
+
+            if node.bl_idname != 'ShaderNodeGroup':
+                continue
+
+            if not node.node_tree:
+                continue
+
+            if is_single_user(node.node_tree):
+                continue
+
+            if filter_func and not filter_func(node.node_tree):
+                continue
+
+            node.node_tree = node.node_tree.copy()
+            pool.append(node.node_tree)
+
+
+def is_node_tree_object_dependent(object: bpy.types.Object, node_tree: bpy.types.ShaderNodeTree):
+    """ Recursively checks if a shader node tree is object dependent. """
+
+    if make_node_tree_independent_from_object(object, node_tree, None, check_only = True):
+        return True
+
+    for node in node_tree.nodes:
+
+        if node.bl_idname != 'ShaderNodeGroup':
+            continue
+
+        if not node.node_tree:
+            continue
+
+        if is_node_tree_object_dependent(object, node.node_tree):
+            return True
+
+    return False
+
+
+def make_node_tree_independent_recursive(object: bpy.types.Object, node_tree: bpy.types.ShaderNodeTree, texture_coordinates_collection: bpy.types.Collection):
+    """ Recursively call `make_node_tree_independent_from_object`. """
+
+    make_node_tree_independent_from_object(object, node_tree, texture_coordinates_collection)
+
+    for node in node_tree.nodes:
+
+        if node.bl_idname != 'ShaderNodeGroup':
+            continue
+
+        if not node.node_tree:
+            continue
+
+        make_node_tree_independent_from_object(object, node.node_tree, texture_coordinates_collection)
+
+
+def make_material_independent_from_object(objects: typing.List[bpy.types.Object]):
+    """
+    Try to modify materials so when the objects are joined the materials look the same.
+
+    The main use case is speedup texture baking.
+    """
+
+    print(f"{make_material_independent_from_object.__name__}...")
+
+    texture_coordinates_collection = bpy.data.collections.new(f'__bc_temp_texture_coordinates_{uuid.uuid1().hex}')
+    bpy.context.view_layer.layer_collection.collection.children.link(texture_coordinates_collection)
+    bpy.context.view_layer.layer_collection.children.get(texture_coordinates_collection.name).exclude = True
+
+    objects = get_meshable_objects(objects)
+
+    objects_with_materials = [object for object in objects if hasattr(object, 'material_slots') and any(slot.material for slot in object.material_slots)]
+
+
+    def is_slot_object_dependent(slot: bpy.types.MaterialSlot):
+
+        if not slot.material:
+            return False
+
+        if not slot.material.node_tree:
+            return False
+
+        return is_node_tree_object_dependent(slot.id_data, slot.material.node_tree)
+
+
+    unify_color_attributes_format(objects_with_materials)
+
     depsgraph = bpy.context.evaluated_depsgraph_get()
 
     for object in objects_with_materials:
 
-        evaluated_object = object.evaluated_get(depsgraph)
-
         for slot in object.material_slots:
 
-            if not slot.material:
+            if not is_slot_object_dependent(slot):
                 continue
 
-            if not slot.material.node_tree:
-                continue
+            slot.material = slot.material.copy()
 
-            tree = bpy_node.Shader_Tree_Wrapper(slot.material.node_tree)
+            make_node_trees_unique(slot.material.node_tree, filter_func = lambda tree: is_node_tree_object_dependent(object, tree))
 
-            if tree.output is None:
-                continue
+            evaluated_object = object.evaluated_get(depsgraph)  # for the world matrix to be correct
 
-            def get_groups():
-                return [node for node in tree.surface_input.descendants if node.be('ShaderNodeGroup')]
+            make_node_tree_independent_recursive(evaluated_object, slot.material.node_tree, texture_coordinates_collection)
 
-            groups = get_groups()
-            while groups:
-                tree.ungroup(groups)
-                groups = get_groups()
-
-
-            if get_active_render_uv_layer(object):
-
-                # Joining objects deletes UV map #64245
-                # https://projects.blender.org/blender/blender/issues/64245
-
-                render_uv_layer = get_active_render_uv_layer(object).name
-
-                for node in reversed(tree.surface_input.descendants):
-                    if node.be('ShaderNodeTexImage') and not node.inputs['Vector'].connections:
-                        node.inputs['Vector'].new('ShaderNodeUVMap', uv_map=render_uv_layer)
-
-
-            for node in reversed(tree.surface_input.descendants):
-                if node.be(GENERATED_COORDINATES_TEXTURE_NODE) and not node.inputs['Vector'].connections and node.inputs['Vector'].enabled:
-                    node.inputs['Vector'].new('ShaderNodeTexCoord', 'Generated')
-
-
-            for node in reversed(tree.surface_input.descendants):
-
-                if node.be('ShaderNodeAttribute') and node.attribute_type in ('OBJECT', 'INSTANCER'):
-
-                    if node.attribute_type == 'INSTANCER':
-                        warn("ShaderNodeAttribute.attribute_type == 'INSTANCER' handled as 'OBJECT'")
-
-                    rgba = find_attribute_rgba(object, node.attribute_name)
-
-                    for output in node.outputs:
-
-                        if not output.connections:
-                            continue
-
-                        if output.identifier in ('Color', 'Vector'):
-                            replacement_node = tree.new('ShaderNodeCombineXYZ')
-                            for i in range(3):
-                                replacement_node.inputs[i].set_default_value(rgba[i])
-                        elif output.identifier == 'Fac':
-                            replacement_node = tree.new('ShaderNodeValue')
-                            replacement_node.outputs[0].set_default_value(rgba[:3])
-                        elif output.identifier == 'Alpha':
-                            replacement_node = tree.new('ShaderNodeValue')
-                            replacement_node.outputs[0].set_default_value(rgba[3])
-                        else:
-                            raise Exception(f"Unexpected identifier: {output.identifier}")
-
-                        for other_socket in output.connections:
-                            replacement_node.outputs[0].join(other_socket, move=False)
-
-                elif node.be('ShaderNodeObjectInfo'):
-
-                    for output in node.outputs:
-
-                        if not output.connections:
-                            continue
-
-                        if output.identifier == 'Location':
-                            replacement_node = tree.new('ShaderNodeCombineXYZ')
-                            location = evaluated_object.matrix_world.translation
-                            for i in range(3):
-                                replacement_node.inputs[i].set_default_value(location[i])
-                        elif output.identifier == 'Color':
-                            replacement_node = tree.new('ShaderNodeCombineXYZ')
-                            for i in range(3):
-                                replacement_node.inputs[i].set_default_value(object.color[i])
-                        elif output.identifier == 'Alpha':
-                            replacement_node = tree.new('ShaderNodeValue')
-                            replacement_node.outputs[0].set_default_value(object.color[3])
-                        elif output.identifier == 'Object Index':
-                            replacement_node = tree.new('ShaderNodeValue')
-                            replacement_node.outputs[0].set_default_value(object.pass_index)
-                        elif output.identifier == 'Material Index':
-                            continue
-                        elif output.identifier == 'Random':
-                            # TODO: this is not the same random value
-                            replacement_node = tree.new('ShaderNodeValue')
-                            replacement_node.outputs[0].set_default_value(random.random())
-                        else:
-                            raise Exception(f"Unexpected identifier: {output.identifier}")
-
-                        for other_socket in output.connections:
-                            replacement_node.outputs[0].join(other_socket, move=False)
-
-                elif node.be('ShaderNodeUVMap'):
-
-                    if get_active_render_uv_layer(object):
-                        if node.uv_map and is_valid_uv_map(node.uv_map, object):
-                            pass
-                        else:
-                            node.uv_map = get_active_render_uv_layer(object).name
-                    elif object.type == 'MESH':
-                        warn(f"A mesh does not have any uv layers the output of the UV socket is (0, 0, 0): {object.data.name_full}")
-                        replacement_node = tree.new('ShaderNodeCombineXYZ')
-                        for other_socket in node.outputs[0].connections.copy():
-                            replacement_node.outputs[0].join(other_socket, move=False)
-                    else:
-                        # TODO: to test, this should work for curves
-                        node.uv_map = 'UVMap'
-
-                elif node.be('ShaderNodeNormalMap') and node.space == 'TANGENT':
-
-                    if get_active_render_uv_layer(object):
-                        if node.uv_map and is_valid_uv_map(node.uv_map, object):
-                            pass
-                        else:
-                            node.uv_map = get_active_render_uv_layer(object).name
-                    elif object.type == 'MESH':
-                        # TODO: undefined behavior
-                        warn(f"A mesh does not have any uv layers for tangent space: {object.data.name_full}")
-                    else:
-                        # TODO: to test, this should work for curves
-                        node.uv_map = 'UVMap'
-
-                elif node.be('ShaderNodeTexCoord') and node.object is None:
-
-                    if node.from_instancer:
-                        warn("ShaderNodeTexCoord.from_instancer not handled.")
-
-                    for output in node.outputs:
-
-                        if not output.connections:
-                            continue
-
-                        if output.identifier == 'Generated':
-                            replacement_node = tree.new('ShaderNodeTexCoord')
-                            replacement_node.object = get_texture_coordinates_generated_empty(evaluated_object)
-                            texture_coordinates_collection.objects.link(replacement_node.object)
-
-                            if object.data and hasattr(object.data, 'texture_mesh') and object.data.texture_mesh:
-                                warn("texture_mesh is not handled.")
-
-                            for other_socket in output.connections:
-                                replacement_node.outputs['Object'].join(other_socket, move=False)
-
-                        elif output.identifier == 'Object':
-
-                            replacement_node = tree.new('ShaderNodeNewGeometry').outputs['Position'].new('ShaderNodeMapping', vector_type='TEXTURE')
-
-                            location, rotation, scale = evaluated_object.matrix_world.decompose()
-
-                            replacement_node['Location'] = location
-                            replacement_node['Rotation'] = rotation.to_euler()
-                            replacement_node['Scale'] = scale
-
-                            for other_socket in output.connections:
-                                replacement_node.outputs[0].join(other_socket, move=False)
-
-                        elif output.identifier == 'UV':
-
-                            if get_active_render_uv_layer(object):
-                                replacement_node = tree.new('ShaderNodeUVMap')
-                                replacement_node.uv_map = get_active_render_uv_layer(object).name
-                            elif object.type == 'MESH':
-                                warn(f"A mesh does not have any uv layers the output of the UV socket is (0, 0, 0): {object.data.name_full}")
-                                replacement_node = tree.new('ShaderNodeCombineXYZ')
-                            else:
-                                # TODO: to test, this should work for curves
-                                replacement_node = tree.new('ShaderNodeUVMap')
-                                replacement_node.uv_map = 'UVMap'
-
-                            for other_socket in output.connections:
-                                replacement_node.outputs[0].join(other_socket, move=False)
-
-
-                elif node.be('Ambient Occlusion') and node.only_local == True:
-                   # TODO: as the node ignores all the shader context a way is to explode the mesh
-                   # separating all the parts belonging to other meshes
-                   # but in this case you cannot have nodes with and without this option
-                   # TODO: possible solution is to pre-bake all the Ambient Occlusion nodes
-                   # the pre-baking can be a general solution to all problems
-                   warn("No handling for only_local Ambient Occlusion node.")
-
-                elif node.be('ShaderNodeTexImage') and node.projection == 'BOX':
-                    # TODO: to preserve the projection is to recreate the node using 3 texture nodes
-                    # it uses the object's matrix to convert normals to object space to drive the projection
-                    # so when the rotation is applied — the projection changes to be world oriented
-                    # https://github.com/blender/blender/blob/af4974dfaa165ff1be0819c52afc99217d3627ba/source/blender/nodes/shader/nodes/node_shader_tex_image.cc#L115
-                    # https://github.com/blender/blender/blob/af4974dfaa165ff1be0819c52afc99217d3627ba/source/blender/gpu/shaders/material/gpu_shader_material_tex_image.glsl#L77
-                    mapping = node.inputs['Vector'].insert_new('ShaderNodeMapping')
-                    mapping.inputs['Rotation'].set_default_value(evaluated_object.matrix_world.to_euler())
 
     return texture_coordinates_collection
 

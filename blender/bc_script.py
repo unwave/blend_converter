@@ -254,7 +254,8 @@ def convert_to_mesh(objects: Objects_Like):
 
 def make_materials_unique(objects: Objects_Like):
     """ Make a unique copy of a material for each material slot of an object. """
-    bpy_utils.make_materials_unique(get_objects(objects))
+    for object in get_objects(objects):
+        bpy_utils.make_materials_unique(object)
 
 
 def make_meshes_unique(objects: Objects_Like = None):
