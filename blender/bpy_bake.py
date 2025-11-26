@@ -8,6 +8,7 @@ import uuid
 import threading
 import sys
 import re
+import math
 
 import bpy
 
@@ -354,8 +355,9 @@ class Baked_Image:
             file_node_input = file_node.inputs[0]
             file_node.format.color_mode = 'RGB'
 
-            ## downsample
-            if self.settings.resolution_multiplier != 1:
+
+            ## downscale
+            if self.settings.do_downscale and not math.isclose(self.settings.resolution_multiplier, 1, rel_tol=1e-5):
 
                 scale_node = file_node_input.insert_new('CompositorNodeScale')
                 scale_node.space = 'RENDER_SIZE'
@@ -371,17 +373,22 @@ class Baked_Image:
                 elif aspect_ratio < 1:
                     blur_node.size_y = 1/aspect_ratio
 
-                blur_node.filter_type = 'FLAT'
-                blur_node.inputs[1].set_default_value(self.settings.resolution_multiplier - 1)
+                blur_node.filter_type = 'CUBIC'
+                blur_node.inputs[1].set_default_value(self.settings.resolution_multiplier)
 
-                if False and bpy.app.version >= (2, 93):
+                if self.settings.use_anti_aliasing and bpy.app.version >= (2, 93):
                     anti_aliasing = blur_node.inputs[0].insert_new('CompositorNodeAntiAliasing')
                     anti_aliasing.inputs[1].default_value = 0.5
                     target_input = anti_aliasing.inputs[0]
                 else:
                     target_input = blur_node.inputs[0]
+
+                if isinstance(self.bake_types[0], (bake_settings.Normal, bake_settings.Normal_Native)):
+                    bpy_context.insert_normalize(scale_node)
+                elif isinstance(self.bake_types[0], bake_settings.View_Space_Normal):
+                    bpy_context.insert_normalize(scale_node, use_map_range = False)
             else:
-                if False and bpy.app.version >= (2, 93):
+                if self.settings.use_anti_aliasing and bpy.app.version >= (2, 93):
                     anti_aliasing = file_node_input.insert_new('CompositorNodeAntiAliasing')
                     anti_aliasing.inputs[1].default_value = 0.5
                     target_input = anti_aliasing.inputs[0]
@@ -523,7 +530,7 @@ class Baked_Image:
 
                         if node.be('CompositorNodeDenoise'):
                             view_space_normals_node.outputs[0].join(node.inputs['Normal'])
-                        elif node.be('CompositorNodeGroup') and node.node_tree and node.node_tree.name.startswith('BC_C_'):
+                        elif node.be('CompositorNodeGroup') and node.node_tree and node.node_tree.name.startswith('BC_C_Denoise'):
                             view_space_normals_node.outputs[0].join(node.get_input_by_name('Normal'))
 
 

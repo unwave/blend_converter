@@ -2176,12 +2176,14 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
             if settings.denoise_all:
 
-                view_space_normals_bake_type = tool_settings_bake.View_Space_Normal()
+                view_space_normals_bake_type = tool_settings_bake.View_Space_Normal(use_denoise=settings.denoise_all)
 
                 pre_bake_settings = _bake_settings._get_copy()
 
                 pre_bake_settings.image_dir = os.path.join(bpy.app.tempdir, '__bc_pre_baked')
                 pre_bake_settings.create_materials = False
+                pre_bake_settings.do_downscale = False
+                pre_bake_settings.use_anti_aliasing = False
                 pre_bake_settings.material_key = material_key
                 pre_bake_settings.bake_types = [view_space_normals_bake_type]
 
@@ -2419,6 +2421,8 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
 
     settings = tool_settings.Bake()._update(settings)
     settings.create_materials = False
+    settings.do_downscale = False
+    settings.use_anti_aliasing = False
     settings.image_dir = os.path.join(bpy.app.tempdir, '__bc_pre_baked')
 
     affected_materials: typing.Set[bpy.types.Material] = set()

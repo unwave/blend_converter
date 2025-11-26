@@ -1325,7 +1325,7 @@ class Compositor_Input_AO_Diffuse:
         inpaint_distance = min(inpaint_distance, 512)
 
         denoise_tree = bpy_data.load_compositor_node_tree('BC_C_Denoise_AO_Diffuse')
-        set_denoise_tree_settings(denoise_tree, inpaint_distance)
+        set_denoise_tree_settings(denoise_tree, inpaint_distance, quality = 'HIGH')
 
         denoise_group = image_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = denoise_tree)
 
@@ -1842,9 +1842,12 @@ class Compositor_Input_Factor:
         self.tree.delete_new_nodes()
 
 
-def insert_normalize(node: 'bpy_node._Shader_Node_Wrapper'):
+def insert_normalize(node: 'bpy_node._Shader_Node_Wrapper', use_map_range = True):
 
     normalize_normal = node.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Normalize_Vector'))
+
+    if not use_map_range:
+        return
 
     map_range_1 = normalize_normal.inputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Map_Range_Image'))
     map_range_1[1] = 0
@@ -1927,8 +1930,56 @@ class Compositor_Input_Normal:
         self.tree.delete_new_nodes()
 
 
+class Compositor_Input_View_Space_Normal:
 
-def set_denoise_tree_settings(bl_tree: bpy.types.CompositorNodeTree, inpaint_distance: int, prefilter = 'ACCURATE', use_hdr = True):
+
+    def __init__(self,
+                 input_socket: typing.Union['bpy.types.NodeSocketFloat', 'bpy.types.NodeSocketColor'],
+                 image: bpy.types.Image,
+                 use_denoise = True,
+                 use_remove_inward_normals = False,
+            ):
+
+        self.tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
+        self.input_socket = self.tree.get_socket_wrapper(input_socket)
+        self.image = image
+
+        self.use_denoise = use_denoise
+        self.use_remove_inward_normals = use_remove_inward_normals
+
+
+    def __enter__(self):
+
+        image_node = self.input_socket.new('CompositorNodeImage', image = self.image)
+
+        if self.use_denoise:
+
+            denoise_tree = bpy_data.load_compositor_node_tree('BC_C_Denoise_View_Space_Normal')
+            set_denoise_tree_settings(denoise_tree, 0, prefilter='ACCURATE')
+
+            denoise_group = image_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = denoise_tree)
+
+            image_node.outputs[1].join(denoise_group.inputs[1])  # connect Alpha
+
+            image_node.outputs[0].join(denoise_group.inputs[2])  # connect Normal
+
+            if self.use_remove_inward_normals:
+                use_remove_inward_normals = image_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Remove_Inward_Normal'))
+                insert_normalize(use_remove_inward_normals)
+
+        else:
+
+            if self.use_remove_inward_normals:
+                use_remove_inward_normals = image_node.outputs[0].insert_new('CompositorNodeGroup', node_tree = bpy_data.load_compositor_node_tree('BC_C_Remove_Inward_Normal'))
+                insert_normalize(use_remove_inward_normals)
+
+
+    def __exit__(self, type, value, traceback):
+        self.tree.delete_new_nodes()
+
+
+
+def set_denoise_tree_settings(bl_tree: bpy.types.CompositorNodeTree, inpaint_distance: int, prefilter = 'NONE', use_hdr = False, quality = 'BALANCED'):
     """
     Deprecated compositor nodes were removed. (#140355)
     Compositor: Remove deprecated compositor properties #140355
@@ -1952,8 +2003,10 @@ def set_denoise_tree_settings(bl_tree: bpy.types.CompositorNodeTree, inpaint_dis
         node.inputs[3].default_value = use_hdr
         node.inputs[4].default_value = prefilter.lower().capitalize()
 
+        node.quality = quality
 
-def set_denoise_tree_settings_pre_5_0(bl_tree: bpy.types.CompositorNodeTree, inpaint_distance: int, prefilter = 'ACCURATE', use_hdr = False):
+
+def set_denoise_tree_settings_pre_5_0(bl_tree: bpy.types.CompositorNodeTree, inpaint_distance: int, prefilter = 'NONE', use_hdr = False, quality = 'BALANCED'):
 
     tree = bpy_node.Compositor_Tree_Wrapper(bl_tree)
 
@@ -1971,6 +2024,8 @@ def set_denoise_tree_settings_pre_5_0(bl_tree: bpy.types.CompositorNodeTree, inp
 
         node.use_hdr = use_hdr
         node.prefilter = prefilter
+
+        node.quality = quality
 
 
 if bpy.app.version < (5, 0):

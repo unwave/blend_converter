@@ -885,6 +885,20 @@ class Bake(Settings):
     #### Default: `1.0`
     """
 
+    do_downscale: bool = True
+    """
+    If `resolution_multiplier` is set do the downscale in the compositor, otherwise — skip.
+
+    #### Default: `True`
+    """
+
+    use_anti_aliasing: bool = False
+    """
+    Use the Anti Aliasing node for the final image in the compositor.
+
+    #### Default: `False`
+    """
+
     use_smart_texture_interpolation: bool = True
     """
     Use `Smart` texture interpolation for all image nodes.

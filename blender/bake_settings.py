@@ -655,6 +655,9 @@ class View_Space_Normal(_Bake_Type, tool_settings.Settings):
     _socket_type = _Socket_Type.VECTOR
     _requires_principled_bsdf = True
 
+    use_denoise: bool = False
+    use_remove_inward_normals: bool = False
+
 
     def _get_setup_context(self):
 
@@ -677,7 +680,7 @@ class View_Space_Normal(_Bake_Type, tool_settings.Settings):
         else:
             image = images[0]
 
-        return bpy_context.Compositor_Input_Raw(input_socket, image, channel)
+        return bpy_context.Compositor_Input_View_Space_Normal(input_socket, image, self.use_denoise, self.use_remove_inward_normals)
 
 
 @dataclass
