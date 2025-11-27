@@ -444,9 +444,19 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         if not config:
             return
 
+        def save_without_restart(event):
+            dialog.Destroy()
+            config.from_ui_data(dialog.get_data())
+            config.save()
+
         with wxp_utils.Generic_Selector_Dialog(self, config.to_ui_data(), title = f"Config: {os.path.basename(entry.program.blend_path)}") as dialog:
 
             dialog.ok_button.SetLabel("Restart")
+
+            button = wx.Button(dialog, wx.ID_APPLY)
+            button.SetLabel('Save Without Restart')
+            button.Bind(wx.EVT_BUTTON, save_without_restart)
+            dialog.button_sizer.Insert(0, button)
 
             dialog.CenterOnScreen()
 
@@ -483,13 +493,24 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def on_set_as_updated(self, entry: updater.Program_Entry):
 
-        with wx.MessageDialog(None, f"Are you sure you want to set the '{entry.program.blend_path}' as up to date?", f"Set As Updated", wx.YES | wx.NO | wx.NO_DEFAULT | wx.ICON_WARNING) as dialog:
+        selected_entries =  self.get_selected_items()
+
+        text = (
+            f"Are you sure you want to set the entries as up to date?"
+            '\n\n'
+            +
+            '\n'.join([entry.program.blend_path for entry in selected_entries])
+        )
+
+        with wx.MessageDialog(None, text, f"Set As Updated ({len(selected_entries)})", wx.YES | wx.NO | wx.NO_DEFAULT | wx.ICON_WARNING) as dialog:
             result = dialog.ShowModal()
 
             if result != wx.ID_YES:
                 return
 
-        entry.program.write_report()
+        for entry in selected_entries:
+            entry.program.write_report()
+
         self.main_frame.updater.poke_all()
 
 

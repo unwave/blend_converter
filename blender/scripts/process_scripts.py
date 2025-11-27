@@ -174,9 +174,6 @@ if any(arg.startswith('inspect:func') for arg in ARGS['inspect_identifiers']):
 def process():
 
 
-    blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BLEND_ORIG)
-
-
     for index, instruction in enumerate(ARGS['instructions']):
 
         try:

@@ -698,16 +698,16 @@ class Generic_Selector_Dialog(wx.Dialog):
 
         self.entry_sizer.AddGrowableCol(1)
 
-        sizer = wx.StdDialogButtonSizer()
-        self.main_sizer.Add(sizer, 0, wx.EXPAND | wx.ALL, border = 5)
+        self.button_sizer = wx.StdDialogButtonSizer()
+        self.main_sizer.Add(self.button_sizer, 0, wx.EXPAND | wx.ALL, border = 5)
 
         button = wx.Button(self, wx.ID_OK)
-        sizer.AddButton(button)
+        self.button_sizer.AddButton(button)
         self.ok_button = button
 
         button = wx.Button(self, wx.ID_CANCEL)
-        sizer.AddButton(button)
-        sizer.Realize()
+        self.button_sizer.AddButton(button)
+        self.button_sizer.Realize()
 
         if ok_default:
             self.ok_button.SetDefault()
@@ -766,7 +766,7 @@ class Generic_Selector_Dialog(wx.Dialog):
 
 
     def add_title(self, string: str):
-        self.entry_sizer.Add(wx.StaticText(self, label = string), 0, wx.ALIGN_CENTRE_HORIZONTAL)
+        self.entry_sizer.Add(wx.StaticText(self, label = string), 0, wx.ALIGN_LEFT)
 
 
     def add_int_entry(self, key: str, value: int):

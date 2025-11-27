@@ -18,6 +18,12 @@ def add_identifier(*identifiers: str):
     _identifiers.update(identifiers)
 
 
+def remove_identifier(*identifiers: str):
+    for identifier in identifiers:
+        if identifier in _identifiers:
+            _identifiers.remove(identifier)
+
+
 def has_identifier(*identifiers: str) -> bool:
     return not _identifiers.isdisjoint(identifiers)
 
@@ -39,8 +45,8 @@ class COMMON:
     INSPECT_SCRIPT_ALL = 'inspect:script:all'
     """ inspect after each script """
 
-    INSPECT_BLEND_ORIG = 'inspect:blend:orig'
-    """ inspect the original blend """
+    INSPECT_BLEND_OPEN = 'inspect:blend:open'
+    """ inspect on blend_converter.blender.formats.blend.open_mainfile """
 
     INSPECT_BLEND_FINAL = 'inspect:blend:final'
     """ inspect the final blend """
@@ -67,6 +73,8 @@ class COMMON:
     # INSPECT_UV_ALL = 'inspect:uv:all'
     """ both after uv unwrapping and uv packing """
 
+    INSPECT_CONFIRM = 'inspect:confirm'
+    """ confirm the inspects """
 
     # SKIP_ALL = 'skip:all'
     """ skip everything possible """
@@ -144,7 +152,7 @@ def inspect_blend(*args, **kwargs):
 
     print = lambda *x: utils.print_in_color(utils.get_color_code(202, 99, 13, 0,0,0), *x)
 
-    if get_value('confirm_inspect', False):
+    if has_identifier(COMMON.INSPECT_CONFIRM):
 
         print("Pending inspect", *args, **kwargs)
 
@@ -152,13 +160,13 @@ def inspect_blend(*args, **kwargs):
         print('bpy.data.filepath:', bpy.data.filepath)
 
         print("To disable the confirmation enter: disable")
-        print("To ignore all inspections enter: noinspect")
+        print("To ignore all inspections enter: ignore")
 
         value = input("Enter 'y' to confirm:").lower()
         if value == 'disable':
-            add_value(confirm_inspect=False)
-        elif value == 'noinspect':
-            add_value(confirm_inspect=False)
+            remove_identifier(COMMON.INSPECT_CONFIRM)
+        elif value == 'ignore':
+            remove_identifier(COMMON.INSPECT_CONFIRM)
             add_identifier(COMMON.SKIP_INSPECT)
             return
         elif value != 'y':
