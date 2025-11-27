@@ -1120,6 +1120,19 @@ class Unwrap_UVs(Settings):
     #### Default: `1.0`
     """
 
+    use_brute_force_unwrap: bool = False
+    """
+    Use `bpy_uv.brute_force_unwrap`.
+
+    #### Default: `False`
+    """
+
+    brute_unwrap_methods: list = []
+    """
+    `bpy_uv.brute_force_unwrap` method names.
+
+    #### Default: `[]`
+    """
 
 
 @dataclasses.dataclass

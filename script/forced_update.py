@@ -305,3 +305,10 @@ for module_path, programs_getter_name, name in json.loads(programs)['programs']:
         utils.print_in_color(utils.get_color_code(180,0,0,0,0,0,), ''.join(traceback.format_tb(error_tb)), file=sys.stderr)
         utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), ''.join(traceback.format_exception_only(error_type, error_value)), file=sys.stderr)
         print()
+
+    except SystemExit as e:
+
+        if e.code == 'BLENDER':
+            continue
+        else:
+            raise e

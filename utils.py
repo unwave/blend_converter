@@ -232,7 +232,7 @@ def run_blender(executable: typing.Union[str, typing.List[str]], arguments: typi
         return subprocess.run(command, stdout = stdout, check = check, text = True, env = env)
     except subprocess.CalledProcessError as e:
         print_in_color(CONSOLE_COLOR.RED, "Blender has exited with an error.", file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit('BLENDER')
 
 
 def list_by_key(items: typing.Collection[T], key: typing.Callable[[T], T2]) -> typing.Dict[T2, typing.List[T]]:

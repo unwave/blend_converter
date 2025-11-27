@@ -495,7 +495,7 @@ def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material
 
         bpy_uv.ensure_uv_layer(objects, settings.uv_layer_name)
 
-        bpy_uv.unwrap_ministry_of_flat_with_fallback(objects)
+        bpy_uv.unwrap_with_fallback(objects)
 
         if settings.merge:
             if material_keys:
@@ -825,23 +825,14 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
             name_full = node_tree.name_full
         print(f"Making node tree unique: {name_full}")
 
+    if not tree.root:
+        print(f"Empty tree: {repr(tree.bl_tree)}")
+        return
+
     warning_color = utils.get_color_code(217, 69, 143, 0,0,0)
 
     def warn(*args):
         utils.print_in_color(warning_color, 'WARNING:', *args)
-
-
-    def get_active_render_uv_layer(object: bpy.types.Object):
-
-        if not object.data:
-            return
-
-        if not hasattr(object.data, 'uv_layers'):
-            return
-
-        for layer in object.data.uv_layers:
-            if layer.active_render:
-                return layer
 
 
     def is_valid_uv_map(uv_map: str, object: bpy.types.Object):
@@ -857,12 +848,12 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
         return uv_map in object.data.uv_layers.keys()
 
 
-    if get_active_render_uv_layer(object):
+    if bpy_uv.get_active_render_uv_layer(object):
 
         # Joining objects deletes UV map #64245
         # https://projects.blender.org/blender/blender/issues/64245
 
-        render_uv_layer = get_active_render_uv_layer(object).name
+        render_uv_layer = bpy_uv.get_active_render_uv_layer(object).name
 
         for node in reversed(tree.root.descendants):
             if node.be('ShaderNodeTexImage') and not node.inputs['Vector'].connections:
@@ -955,7 +946,7 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
 
         elif node.be('ShaderNodeUVMap'):
 
-            if get_active_render_uv_layer(object):
+            if bpy_uv.get_active_render_uv_layer(object):
                 if node.uv_map and is_valid_uv_map(node.uv_map, object):
                     pass
                 else:
@@ -963,7 +954,7 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
                     if check_only:
                         return True
 
-                    node.uv_map = get_active_render_uv_layer(object).name
+                    node.uv_map = bpy_uv.get_active_render_uv_layer(object).name
 
             elif object.type == 'MESH':
 
@@ -985,7 +976,7 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
 
         elif node.be('ShaderNodeNormalMap') and node.space == 'TANGENT':
 
-            if get_active_render_uv_layer(object):
+            if bpy_uv.get_active_render_uv_layer(object):
                 if node.uv_map and is_valid_uv_map(node.uv_map, object):
                     pass
                 else:
@@ -993,7 +984,7 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
                     if check_only:
                         return True
 
-                    node.uv_map = get_active_render_uv_layer(object).name
+                    node.uv_map = bpy_uv.get_active_render_uv_layer(object).name
 
             elif object.type == 'MESH':
                 # TODO: undefined behavior
@@ -1053,9 +1044,9 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
                     if check_only:
                         return True
 
-                    if get_active_render_uv_layer(object):
+                    if bpy_uv.get_active_render_uv_layer(object):
                         replacement_node = tree.new('ShaderNodeUVMap')
-                        replacement_node.uv_map = get_active_render_uv_layer(object).name
+                        replacement_node.uv_map = bpy_uv.get_active_render_uv_layer(object).name
                     elif object.type == 'MESH':
                         warn(f"A mesh does not have any uv layers the output of the UV socket is (0, 0, 0): {object.data.name_full}")
                         replacement_node = tree.new('ShaderNodeCombineXYZ')
@@ -1330,7 +1321,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
             for object in objects_to_unwrap:
                 bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[unwrap_uvs_settings.uv_layer_name])
 
-            bpy_uv.unwrap_ministry_of_flat_with_fallback(objects_to_unwrap, unwrap_uvs_settings)
+            bpy_uv.unwrap_with_fallback(objects_to_unwrap, unwrap_uvs_settings)
 
             bpy_uv.scale_uv_to_world_per_uv_layout(objects_to_unwrap)
 
@@ -1763,7 +1754,7 @@ def unwrap_unique_meshes(
             bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
 
         with bpy_context.Empty_Scene():
-            bpy_uv.unwrap_ministry_of_flat_with_fallback(objects, settings, ministry_of_flat_settings)
+            bpy_uv.unwrap_with_fallback(objects, settings, ministry_of_flat_settings)
 
             bpy_uv.scale_uv_to_world_per_uv_layout(objects)
 

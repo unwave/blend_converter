@@ -1195,7 +1195,7 @@ def unwrap(objects: typing.List[bpy.types.Object], *,
             bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
 
         with bpy_context.Empty_Scene():
-            unwrap_ministry_of_flat_with_fallback(objects, settings, ministry_of_flat_settings)
+            unwrap_with_fallback(objects, settings, ministry_of_flat_settings)
 
         scale_uv_to_world_per_uv_layout(objects)
 
@@ -1423,6 +1423,19 @@ def copy_uv(from_object: bpy.types.Object, to_object: bpy.types.Object, uv_layer
         to_object.data.uv_layers[uv_layer_name].data.foreach_set('uv', uvs)
 
 
+def get_active_render_uv_layer(object: bpy.types.Object):
+
+    if not object.data:
+        return
+
+    if not hasattr(object.data, 'uv_layers'):
+        return
+
+    for layer in object.data.uv_layers:
+        if layer.active_render:
+            return layer
+
+
 def unwrap_ministry_of_flat_with_fallback(
             objects: typing.List[bpy.types.Object],
             settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
@@ -1648,7 +1661,7 @@ def select_collapsed_islands(object: bpy.types.Object, uv_layer_name: str, toler
     return loop_count
 
 
-def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
+def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str, clear_seams = True):
 
     # save the uvs
     with bpy_context.Focus_Objects(object):
@@ -1741,6 +1754,10 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str):
         for edge in bm.edges:
             if edge.seam:
                 seam_length += edge.calc_length()
+
+        if clear_seams:
+            bpy.ops.uv.select_all(action='SELECT')
+            bpy.ops.uv.mark_seam(clear=True)
 
 
         if enable_uv_packer_addon():
@@ -1916,6 +1933,9 @@ class Unwrap_Quality_Score:
         if not candidates:
             return ('None', None)
 
+        if len(candidates) == 1:
+            return list(candidates.items())[0]
+
         number_of_metrics = len(list(candidates.values())[-1]._keys)
 
         for name, measure in list(candidates.items()):
@@ -1962,10 +1982,43 @@ class Unwrap_Quality_Score:
             print(prefix + key, '=', round(self[i], 2))
 
 
+class Unwrap_Methods:
+
+    ACTIVE_RENDER = 'active_render'
+    ACTIVE_RENDER_MINIMAL_STRETCH = 'active_render_minimal_stretch'
+
+    MOF_DEFAULT = 'mof_default'
+    MOF_SEPARATE_HARD_EDGES = 'mof_separate_hard_edges'
+    MOF_USE_NORMAL = 'mof_use_normal'
+
+    JUST_MINIMAL_STRETCH = 'just_minimal_stretch'
+    JUST_CONFORMAL = 'just_conformal'
+
+    SMART_PROJECT_REUNWRAP = 'smart_project_reunwrap'
+    SMART_PROJECT_CONFORMAL = 'smart_project_conformal'
+
+    CUBE_PROJECT_REUNWRAP = 'cube_project_reunwrap'
+    CUBE_PROJECT_CONFORMAL = 'cube_project_conformal'
+
+
+DEFAULT_BRUTE_FORCE_METHODS = {
+    Unwrap_Methods.MOF_DEFAULT,
+    Unwrap_Methods.MOF_SEPARATE_HARD_EDGES,
+    Unwrap_Methods.MOF_USE_NORMAL,
+    Unwrap_Methods.JUST_MINIMAL_STRETCH,
+    Unwrap_Methods.JUST_CONFORMAL,
+    Unwrap_Methods.SMART_PROJECT_REUNWRAP,
+    Unwrap_Methods.SMART_PROJECT_CONFORMAL,
+    Unwrap_Methods.CUBE_PROJECT_REUNWRAP,
+    Unwrap_Methods.CUBE_PROJECT_CONFORMAL,
+}
+
+
 def brute_force_unwrap(
             object: bpy.types.Object,
             settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
             ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None,
+            methods: typing.Set[str] = DEFAULT_BRUTE_FORCE_METHODS,
         ):
 
     settings = tool_settings.Unwrap_UVs()._update(settings)
@@ -2091,8 +2144,6 @@ def brute_force_unwrap(
             reunwrap_bad_uvs([object_copy])
             rescale()
 
-            return get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-
 
         def cube_project():
 
@@ -2108,8 +2159,6 @@ def brute_force_unwrap(
 
             reunwrap_bad_uvs([object_copy])
             rescale()
-
-            return get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
 
 
         def reunwrap_with_minimal_stretch():
@@ -2162,169 +2211,197 @@ def brute_force_unwrap(
                     raise Exception(line)
 
 
-
-        skip_inspect = not blend_inspector.get_value('inspect_brute_force_unwrap', False)
-
-
         def clear_seams():
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.uv.select_all(action='SELECT')
             bpy.ops.uv.mark_seam(clear=True)
 
 
-        if False and len(object_copy.data.uv_layers) > 1:
+        def copy_active_render_uv():
 
             with bpy_context.Focus_Objects(object_copy):
                 uvs = array.array('f', [0.0, 0.0]) * len(object_copy.data.loops)
-                object_copy.data.uv_layers[object_copy.data.uv_layers[0].name].data.foreach_get('uv', uvs)
+                get_active_render_uv_layer(object_copy).data.foreach_get('uv', uvs)
                 object_copy.data.uv_layers[object_copy.data.uv_layers.active.name].data.foreach_set('uv', uvs)
 
-            rescale()
 
-            mark_seams_from_islands(object_copy, settings.uv_layer_name)
+        def print_name(name: str):
+            utils.print_in_color(utils.get_color_code(0,0,0, 247, 102, 40), name)
 
+
+        clear_seams()
+
+
+        skip_inspect = not blend_inspector.get_value('inspect_brute_force_unwrap', False)
+        measures: typing.Dict[str, Unwrap_Quality_Score] = {}
+
+
+        name = Unwrap_Methods.ACTIVE_RENDER
+        if name in methods:
+            print_name(name)
             try:
-                _measures['current'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-                skip_inspect or binspect('current')
-
-                reunwrap_with_minimal_stretch()
-
-                _measures['current_minimal_stretch'] = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-                skip_inspect or binspect('current_minimal_stretch')
-
+                copy_active_render_uv()
+                rescale()
+                measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
             except Exception:
+                measure = None
                 traceback.print_exc(file=sys.stderr)
-                pass
+
+            measures[name] = measure
+            skip_inspect or binspect(name)
 
 
-        mof_measures: typing.Dict[str, Unwrap_Quality_Score] = {}
+        name = Unwrap_Methods.ACTIVE_RENDER_MINIMAL_STRETCH
+        if name in methods:
+            print_name(name)
+            try:
+                copy_active_render_uv()
+                mark_seams_from_islands(object_copy, settings.uv_layer_name)
+                reunwrap_with_minimal_stretch()
+                rescale()
+                measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+            except Exception:
+                measure = None
+                traceback.print_exc(file=sys.stderr)
 
-        clear_seams()
-
-        mof_measures['mof_default'] = mof_default()
-        skip_inspect or binspect('mof_default')
-
-        clear_seams()
-
-        mof_measures['mof_separate_hard_edges'] = mof_separate_hard_edges()
-        skip_inspect or binspect('mof_separate_hard_edges')
-
-        clear_seams()
-
-        mof_measures['mof_use_normals'] = mof_use_normal()
-        skip_inspect or binspect('mof_use_normals')
+            measures[name] = measure
+            skip_inspect or binspect(name)
 
 
-        clear_seams()
 
-        just_minimal_stretch_measures: typing.Dict[str, Unwrap_Quality_Score] = {}
+        name = Unwrap_Methods.MOF_DEFAULT
+        if name in methods:
+            print_name(name)
+            measures[name] = mof_default()
+            skip_inspect or binspect(name)
+
+
+        name = Unwrap_Methods.MOF_SEPARATE_HARD_EDGES
+        if name in methods:
+            print_name(name)
+            measures[name] = mof_separate_hard_edges()
+            skip_inspect or binspect(name)
+
+
+        name = Unwrap_Methods.MOF_USE_NORMAL
+        if name in methods:
+            print_name(name)
+            measures[name] = mof_use_normal()
+            skip_inspect or binspect(name)
+
+
 
         is_minimal_stretch_failed = False
 
-        try:
-            reunwrap_with_minimal_stretch()
-            measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-        except Exception:
-            traceback.print_exc(file=sys.stderr)
-            is_minimal_stretch_failed = True
-            measure = None
+        name = Unwrap_Methods.JUST_MINIMAL_STRETCH
+        if name in methods:
+            print_name(name)
+            try:
+                reunwrap_with_minimal_stretch()
+                measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+            except Exception:
+                traceback.print_exc(file=sys.stderr)
+                is_minimal_stretch_failed = True
+                measure = None
 
-        just_minimal_stretch_measures['just_minimal_stretch'] = measure
-        skip_inspect or binspect('just_minimal_stretch')
+            measures[name] = measure
+            skip_inspect or binspect(name)
 
 
-        try:
-            if is_minimal_stretch_failed:
-                raise Exception('MINIMUM_STRETCH has failed')  # this to reduce the outlier effect and save time, it most likely won't give a good result
-            reunwrap_conformal()
-            measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-        except Exception:
-            traceback.print_exc(file=sys.stderr)
-            measure = None
+        name = Unwrap_Methods.JUST_CONFORMAL
+        if name in methods:
+            print_name(name)
+            try:
+                if is_minimal_stretch_failed:
+                    raise Exception('MINIMUM_STRETCH has failed')  # this to reduce the outlier effect and save time, it most likely won't give a good result
+                reunwrap_conformal()
+                measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+            except Exception:
+                traceback.print_exc(file=sys.stderr)
+                measure = None
 
-        just_minimal_stretch_measures['just_conformal'] = measure
-        skip_inspect or binspect('just_conformal')
+            measures[name] = measure
+            skip_inspect or binspect(name)
+
 
         clear_seams()
 
 
-        smart_and_cube_measures: typing.Dict[str, Unwrap_Quality_Score] = {}
+        if any(name in (Unwrap_Methods.SMART_PROJECT_REUNWRAP, Unwrap_Methods.SMART_PROJECT_CONFORMAL) for name in methods):
 
-        smart_project(settings.smart_project_angle_limit)
+            smart_project(math.radians(settings.smart_project_angle_limit))
+            mark_seams_from_islands(object_copy, settings.uv_layer_name)
 
-        # smart_and_cube_measures['smart_project'] = smart_project(settings.smart_project_angle_limit)
-        # skip_inspect or binspect('smart_project')
-        # binspect('smart_project')
+            name = Unwrap_Methods.SMART_PROJECT_REUNWRAP
+            if name in methods:
+                print_name(name)
+                try:
+                    reunwrap_with_minimal_stretch()
+                    rescale()
+                    measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name, clear_seams = False)
+                except Exception:
+                    traceback.print_exc(file=sys.stderr)
+                    measure = None
 
-        mark_seams_from_islands(object_copy, settings.uv_layer_name)
+                measures[name] = measure
+                skip_inspect or binspect(name)
 
-        try:
-            reunwrap_with_minimal_stretch()
-            rescale()
-            measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-        except Exception:
-            traceback.print_exc(file=sys.stderr)
-            measure = None
+            name = Unwrap_Methods.SMART_PROJECT_CONFORMAL
+            if name in methods:
+                print_name(name)
+                try:
+                    reunwrap_conformal()
+                    rescale()
+                    measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+                except Exception:
+                    traceback.print_exc(file=sys.stderr)
+                    measure = None
 
-        smart_and_cube_measures['smart_project_reunwrap'] = measure
-        skip_inspect or binspect('smart_project_reunwrap')
-
-        try:
-            reunwrap_conformal()
-            rescale()
-            measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-        except Exception:
-            traceback.print_exc(file=sys.stderr)
-            measure = None
-
-        smart_and_cube_measures['smart_project_conformal'] = measure
-        skip_inspect or binspect('smart_project_conformal')
-
-        clear_seams()
-
-
-        cube_project()
-
-        # smart_and_cube_measures['cube_project'] = cube_project()
-        # skip_inspect or binspect('cube_project')
-
-        mark_seams_from_islands(object_copy, settings.uv_layer_name)
-
-        try:
-            reunwrap_with_minimal_stretch()
-            rescale()
-            measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-        except Exception:
-            traceback.print_exc(file=sys.stderr)
-            measure = None
-
-        smart_and_cube_measures['cube_project_reunwrap'] = measure
-        skip_inspect or binspect('cube_project_reunwrap')
-
-        try:
-            reunwrap_conformal()
-            rescale()
-            measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
-        except Exception:
-            traceback.print_exc(file=sys.stderr)
-            measure = None
-
-        smart_and_cube_measures['cube_project_conformal'] = measure
-        skip_inspect or binspect('cube_project_conformal')
-
-        clear_seams()
+                measures[name] = measure
+                skip_inspect or binspect(name)
 
 
-        # measures = dict([
-        #     Unwrap_Quality_Score._get_best(mof_measures),
-        #     Unwrap_Quality_Score._get_best(smart_and_cube_measures),
-        #     Unwrap_Quality_Score._get_best(just_minimal_stretch_measures),
-        # ])
+            clear_seams()
 
-        measures = {}
-        measures.update(mof_measures)
-        measures.update(smart_and_cube_measures)
-        measures.update(just_minimal_stretch_measures)
+
+
+        if any(name in (Unwrap_Methods.CUBE_PROJECT_REUNWRAP, Unwrap_Methods.CUBE_PROJECT_CONFORMAL) for name in methods):
+
+            cube_project()
+            mark_seams_from_islands(object_copy, settings.uv_layer_name)
+
+            name = Unwrap_Methods.CUBE_PROJECT_REUNWRAP
+            if name in methods:
+                print_name(name)
+                try:
+                    reunwrap_with_minimal_stretch()
+                    rescale()
+                    measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name, clear_seams = False)
+                except Exception:
+                    traceback.print_exc(file=sys.stderr)
+                    measure = None
+
+                measures[name] = measure
+                skip_inspect or binspect(name)
+
+
+            name = Unwrap_Methods.CUBE_PROJECT_CONFORMAL
+            if name in methods:
+                print_name(name)
+                try:
+                    reunwrap_conformal()
+                    rescale()
+                    measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
+                except Exception:
+                    traceback.print_exc(file=sys.stderr)
+                    measure = None
+
+                measures[name] = measure
+                skip_inspect or binspect(name)
+
+            clear_seams()
+
+
 
         the_best = Unwrap_Quality_Score._get_best(measures)[1]
 
@@ -2333,6 +2410,7 @@ def brute_force_unwrap(
             object.data.uv_layers[settings.uv_layer_name].data.foreach_set('uv', the_best._uvs)
 
         re_unwrap_overlaps(object, settings.uv_layer_name)
+
 
         if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_UV_UNWRAP):
 
@@ -2345,27 +2423,39 @@ def brute_force_unwrap(
 
             blend_inspector.inspect_blend(blend_inspector.COMMON.INSPECT_UV_UNWRAP)
 
+
         bpy.data.objects.remove(object_copy)
+
 
     if settings.mark_seams_from_islands:
         mark_seams_from_islands(object, settings.uv_layer_name)
 
 
 
-if blend_inspector.get_value('use_brute_force_unwrap', False):
+def unwrap_with_fallback(
+            objects: typing.List[bpy.types.Object],
+            settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
+            ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None,
+        ):
 
-    def unwrap_ministry_of_flat_with_fallback(
-                objects: typing.List[bpy.types.Object],
-                settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
-                ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None,
-            ):
+    settings = tool_settings.Unwrap_UVs()._update(settings)
+
+    if settings.use_brute_force_unwrap:
+
+        if settings.brute_unwrap_methods:
+            methods = set(settings.brute_unwrap_methods)
+        else:
+            methods = DEFAULT_BRUTE_FORCE_METHODS
 
         for object in objects:
-            brute_force_unwrap(object, settings, ministry_of_flat_settings)
+            brute_force_unwrap(object, settings, ministry_of_flat_settings, methods = methods)
+
+    else:
+        unwrap_ministry_of_flat_with_fallback(objects, settings, ministry_of_flat_settings)
 
 
-        if blend_inspector.get_value('brute_force_unwrap_score_only', False):
-            raise SystemExit(0)
+    if blend_inspector.get_value('unwrap_test', False):
+        raise Exception('Unwrap Test')
 
 
 
