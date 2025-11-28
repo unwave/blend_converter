@@ -1240,3 +1240,22 @@ def show_warning(parent: wx.Window, title: str, message: str):
 
 def show_info(parent: wx.Window, title: str, message: str):
     show_tip(parent, title, message, wx.ICON_INFORMATION)
+
+
+class Text_Dialog(wx.Dialog):
+
+    def __init__(self, parent, title: str, text: str):
+
+        super().__init__(parent, title=title, size=(800, 500), style= wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU)
+
+        self.main_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.SetSizer(self.main_sizer)
+
+        self.text_ctrl = wx.TextCtrl(self, wx.ID_ANY, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.VSCROLL)
+
+        self.text_ctrl.SetValue(text)
+
+        self.main_sizer.Add(self.text_ctrl, 1, wx.EXPAND | wx.ALL, border =5 )
+
+        self.Layout()
+        self.Centre()
