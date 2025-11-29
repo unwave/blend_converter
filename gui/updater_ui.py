@@ -838,6 +838,8 @@ class Main_Frame(wxp_utils.Generic_Frame):
         frame = cls(files=files, programs_getter_name = programs_getter_name, columns = columns)
         app.main_frame = frame
 
+        is_console_shown = False
+
         if '__restart__' in sys.argv:
 
             restart_info = json.loads(sys.argv[sys.argv.index('__restart__') + 1])
@@ -846,11 +848,13 @@ class Main_Frame(wxp_utils.Generic_Frame):
             frame.SetSize(wx.Size(restart_info['width'], restart_info['height']))
             wx.CallAfter(frame.result_panel.set_query, restart_info['search_query'])
 
+            is_console_shown = restart_info['is_console_shown']
+
             frame.Raise()
 
         frame.Show()
 
-        if not utils.Console_Shown.get_is_using_terminal():
+        if not (utils.Console_Shown.get_is_using_terminal() or is_console_shown):
             frame.show_console(False)
 
         return app
@@ -940,6 +944,9 @@ class Main_Frame(wxp_utils.Generic_Frame):
             self.menubar.Append(menu, '&Window')
             self.Bind(wx.EVT_MENU, self.on_show_console_on_top, menu.Append(wx.ID_ANY, "Show Console On Top"))
 
+            if utils.Console_Shown.get_is_using_terminal():
+                self.set_toggle_console_menu_item = lambda:None
+
 
     def on_show_app_scripts(self, event = None):
         utils.os_show(utils.deduplicate(self.updater.init_files))
@@ -994,8 +1001,6 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
     def on_restart(self, event = None):
 
-        self.show_console(True)
-
         for entry in self.updater.entries:
             entry.terminate()
 
@@ -1015,6 +1020,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
             width = size.width,
             height = size.height,
             search_query = self.result_panel.search.search.GetValue().strip(),
+            is_console_shown = self.is_console_shown,
         )
 
         command = [
@@ -1022,6 +1028,8 @@ class Main_Frame(wxp_utils.Generic_Frame):
             *argv,
             utils.get_command_from_list(['__restart__', json.dumps(restart_info)]),
         ]
+
+        self.show_console(True)
 
         os.execv(sys.executable, command)
 

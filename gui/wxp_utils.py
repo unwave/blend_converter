@@ -907,6 +907,8 @@ class Generic_Frame(wx.Frame):
             self.menubar.SetFont(font)
 
         self.set_menu_bar()
+
+        self.is_console_shown = True
         self.set_toggle_console_menu_item()
 
 
@@ -932,7 +934,6 @@ class Generic_Frame(wx.Frame):
             menu = self.menubar.GetMenu(index)
 
         if os.name == 'nt':
-            self.is_console_shown = True
             item = menu.Append(wx.ID_ANY, 'Toggle Console') # type: wx.MenuItem
             self.Bind(wx.EVT_MENU, self.on_toggle_console, item)
             item.SetHelp("Toggle the system console.")
