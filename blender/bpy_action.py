@@ -23,18 +23,18 @@ else:
 def assign_bendy_bone_segments_weights(armature: bpy.types.Object, mesh: bpy.types.Object, bendy_bone_to_segments: typing.Dict[str, typing.List[str]]):
     """
     Expects the armature in the rest pose.
-
-    TODO: there is an extra processing which this code does not cover
-    it will give incorrect results in corner cases
     """
 
     armature_space_matrix = armature.matrix_world.inverted() @ mesh.matrix_world
 
     for name, sub_bone_names in bendy_bone_to_segments.items():
 
+        bone_vertex_group = mesh.vertex_groups.get(name)
+        if not bone_vertex_group:
+            continue
+
         index_to_group = [mesh.vertex_groups.new(name=name) for name in sub_bone_names]
 
-        bone_vertex_group = mesh.vertex_groups[name]
         pose_bone = armature.pose.bones[name]
 
         for vert in mesh.data.vertices:
@@ -47,14 +47,11 @@ def assign_bendy_bone_segments_weights(armature: bpy.types.Object, mesh: bpy.typ
             index: int
             index, blend_next = pose_bone.bbone_segment_index(armature_space_matrix @ vert.co)
 
-            if index + 1 == len(index_to_group):
-                index_to_group[index].add([vert.index], weight, 'REPLACE')
-            else:
-                index_to_group[index].add([vert.index], weight * (1 - blend_next), 'REPLACE')
-                index_to_group[index + 1].add([vert.index], weight * blend_next, 'REPLACE')
+            index_to_group[index].add([vert.index], weight * (1 - blend_next), 'REPLACE')
+            index_to_group[index + 1].add([vert.index], weight * blend_next, 'REPLACE')
 
 
-def create_simplified_armature_and_constrain(armature: bpy.types.Object, mesh: bpy.types.Object):
+def create_simplified_armature_and_constrain(armature: bpy.types.Object, meshes: typing.Optional[typing.List[bpy.types.Object]] = None):
 
 
     new = armature.copy()
@@ -87,7 +84,9 @@ def create_simplified_armature_and_constrain(armature: bpy.types.Object, mesh: b
     bendy_bone_to_segments: typing.Dict[str, typing.List[str]] = collections.defaultdict(list)
 
 
-    with bpy_context.Focus_Objects(new, 'EDIT'):
+    with bpy_context.Focus_Objects(new, 'EDIT'), bpy_context.Bpy_State() as state:
+
+        state.set(new.data, 'pose_position','REST')
 
         for bone in new.data.edit_bones:
 
@@ -106,11 +105,11 @@ def create_simplified_armature_and_constrain(armature: bpy.types.Object, mesh: b
 
             else:
 
-                for index in range(bone.bbone_segments):
+                prev_segment = None
+
+                for index in range(bone.bbone_segments + 1):
 
                     segment = new.data.edit_bones.new(bone.name + '.BB')
-
-                    segment.matrix = bone.matrix @ new.pose.bones[bone.name].bbone_segment_matrix(index, rest=True)
 
                     segment.length = bone.length / bone.bbone_segments
                     segment.bbone_x = bone.bbone_x
@@ -119,10 +118,25 @@ def create_simplified_armature_and_constrain(armature: bpy.types.Object, mesh: b
                     bendy_bone_collection.assign(segment)
                     bendy_bone_to_segments[bone.name].append(segment.name)
 
+                    if index == 0:
+                        segment.parent = bone.parent
+                    elif index == bone.bbone_segments:
+                        for child in bone.children:
+                            child.use_connect = False
+                            child.parent = segment
+
+                    if prev_segment:
+                        segment.parent = prev_segment
+
+                    prev_segment = segment
+
+                    segment.matrix = bone.matrix @ new.pose.bones[bone.name].bbone_segment_matrix(index, rest=True)
+
 
         for bone in list(new.data.edit_bones):
             if not bone.use_deform:
                 new.data.edit_bones.remove(bone)
+
 
     bendy_bone_replacements = set(itertools.chain.from_iterable(map(operator.itemgetter(1), bendy_bone_to_segments.items())))
 
@@ -156,37 +170,21 @@ def create_simplified_armature_and_constrain(armature: bpy.types.Object, mesh: b
 
         for index, name in enumerate(segment_names):
 
-            segment = new.pose.bones[name]
-
-            constraint: bpy.types.CopyTransformsConstraint = segment.constraints.new('COPY_TRANSFORMS')
-            constraint.target = armature
-            constraint.subtarget = subtarget
-            constraint.head_tail = index / len(segment_names)
-            constraint.use_bbone_shape = True
-
-            constraint: bpy.types.DampedTrackConstraint = segment.constraints.new('DAMPED_TRACK')
-            constraint.target = armature
-            constraint.subtarget = subtarget
-            constraint.head_tail = index / (len(segment_names) - 1)
-            constraint.use_bbone_shape = True
-
-            if index == 0:
-                constraint.head_tail = 0.0001
+            copy_transforms: bpy.types.CopyTransformsConstraint = new.pose.bones[name].constraints.new('COPY_TRANSFORMS')
+            copy_transforms.target = armature
+            copy_transforms.subtarget = subtarget
+            copy_transforms.head_tail = index / (len(segment_names) - 1)
+            copy_transforms.use_bbone_shape = True
 
 
-    with bpy_context.Bpy_State() as state:
+    if meshes:
 
-        state.set(armature.data, 'pose_position','REST')
+        with bpy_context.Bpy_State() as state:
 
-        with bpy_context.Focus_Objects(new, 'POSE'):
-            bpy.ops.pose.reveal()
-            bpy.ops.pose.select_all(action='DESELECT')
-            for bone in new.data.bones:
-                bone.select = bone.name in bendy_bone_replacements
-            bpy.ops.pose.armature_apply(selected=True)
+            state.set(armature.data, 'pose_position','REST')
 
-        if mesh:
-            assign_bendy_bone_segments_weights(armature, mesh, bendy_bone_to_segments)
+            for mesh in meshes:
+                assign_bendy_bone_segments_weights(armature, mesh, bendy_bone_to_segments)
 
 
     with bpy_context.Focus_Objects(new, 'EDIT'):
