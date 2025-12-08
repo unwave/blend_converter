@@ -9,6 +9,7 @@ import bpy
 from .. import tool_settings
 
 from . import bpy_context
+from . import bpy_utils
 
 
 if typing.TYPE_CHECKING:
@@ -25,6 +26,8 @@ def assign_bendy_bone_segments_weights(armature: bpy.types.Object, mesh: bpy.typ
     Expects the armature in the rest pose.
     """
 
+    map_vertex_to_group = {vert.index: set(map(operator.attrgetter('group'), vert.groups)) for vert in mesh.data.vertices}
+
     armature_space_matrix = armature.matrix_world.inverted() @ mesh.matrix_world
 
     for name, sub_bone_names in bendy_bone_to_segments.items():
@@ -37,18 +40,20 @@ def assign_bendy_bone_segments_weights(armature: bpy.types.Object, mesh: bpy.typ
 
         pose_bone = armature.pose.bones[name]
 
+        group_index = bone_vertex_group.index
+        segment_group_index: int
+
         for vert in mesh.data.vertices:
 
-            if not any(bone_vertex_group.index == g.group for g in vert.groups):
+            if not group_index in map_vertex_to_group[vert.index]:
                 continue
 
             weight = bone_vertex_group.weight(vert.index)
 
-            index: int
-            index, blend_next = pose_bone.bbone_segment_index(armature_space_matrix @ vert.co)
+            segment_group_index, blend_next = pose_bone.bbone_segment_index(armature_space_matrix @ vert.co)
 
-            index_to_group[index].add([vert.index], weight * (1 - blend_next), 'REPLACE')
-            index_to_group[index + 1].add([vert.index], weight * blend_next, 'REPLACE')
+            index_to_group[segment_group_index].add([vert.index], weight * (1 - blend_next), 'REPLACE')
+            index_to_group[segment_group_index + 1].add([vert.index], weight * blend_next, 'REPLACE')
 
 
 def create_simplified_armature_and_constrain(armature: bpy.types.Object, meshes: typing.Optional[typing.List[bpy.types.Object]] = None):
@@ -65,7 +70,7 @@ def create_simplified_armature_and_constrain(armature: bpy.types.Object, meshes:
     new.data.id_properties_clear()
 
 
-    new.data.display_type = 'BBONE'
+    new.data.display_type = 'OCTAHEDRAL'
     new.data.show_bone_custom_shapes = False
 
 
@@ -183,7 +188,7 @@ def create_simplified_armature_and_constrain(armature: bpy.types.Object, meshes:
 
             state.set(armature.data, 'pose_position','REST')
 
-            for mesh in meshes:
+            for mesh in bpy_utils.get_unique_mesh_objects(meshes):
                 assign_bendy_bone_segments_weights(armature, mesh, bendy_bone_to_segments)
 
 
