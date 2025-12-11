@@ -348,7 +348,10 @@ def merge_objects(objects: typing.List[bpy.types.Object], *, merge_into: typing.
 
     incompatible_objects = set(objects) - set(get_joinable_objects(objects))
     if incompatible_objects:
-        raise ValueError(f"Specified objects cannot be merged: {[o.name_full for o in objects]}\nIncompatible: {[o.name_full for o in incompatible_objects]}")
+        raise ValueError(
+            f"Specified objects cannot be merged: {[o.name_full for o in objects]}"
+            "\n\t" f"Incompatible: {[o.name_full for o in incompatible_objects]}"
+        )
 
 
     if generate_merged_objects_info:
@@ -2224,7 +2227,6 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         ## merge the bake proxy object
 
-        bpy.context.view_layer.update()
 
         objects_copy = deep_copy_objects(objects)
 
