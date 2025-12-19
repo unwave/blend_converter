@@ -261,6 +261,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         menu_item = menu.append_item(f"Show Difference VSCode (Single Entry)", get_func(self.on_show_diff_vscode, entry))
         menu_item = menu.append_item(f"Show Difference", get_func(self.on_show_difference, entry))
+        menu_item = menu.append_item(f"Show Difference Inline", get_func(self.on_show_inline_difference, entry))
 
         menu_item = menu.append_item(f"Set As Updated", get_func(self.on_set_as_updated, entry))
 
@@ -510,13 +511,62 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         lines = []
 
         for diff, entries in difference_to_entries.items():
-            lines.append(diff)
+
+            if diff:
+                lines.append(diff)
+            else:
+                lines.append('NO DIFFERENCE')
+
             lines.append('')
             lines.append('')
             lines.append('\n'.join(e.program.blend_path for e in entries))
             lines.append('#' * 80)
 
         dialog = wxp_utils.Text_Dialog(self, "Difference", '\n'.join(lines))
+        dialog.Show()
+
+
+    def on_show_inline_difference(self, entry: updater.Program_Entry):
+
+        import difflib
+
+        def get_difference(entry: updater.Program_Entry):
+            prev_report = entry.program.get_prev_report_diff()
+            next_report = entry.program.get_next_report_diff()
+
+            a = json.dumps(prev_report, default = lambda x: x._to_dict())
+            b = json.dumps(next_report, default = lambda x: x._to_dict())
+
+            matcher = difflib.SequenceMatcher(None, a, b)
+            result = []
+
+            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                if tag == 'replace':
+                    result.append(f"REPLACE:\n{a[i1:i2]} -> {b[j1:j2]}")
+                elif tag == 'delete':
+                    result.append(f"DELETE:\n{a[i1:i2]}")
+                elif tag == 'insert':
+                    result.append(f"INSERT:\n{b[j1:j2]}")
+
+            return '\n\n'.join(result)
+
+        difference_to_entries = utils.list_by_key(self.get_selected_items(), key=get_difference)
+
+        lines = []
+
+        for diff, entries in difference_to_entries.items():
+
+            if diff:
+                lines.append(diff)
+            else:
+                lines.append('NO DIFFERENCE')
+
+            lines.append('')
+            lines.append('')
+            lines.append('\n'.join(e.program.blend_path for e in entries))
+            lines.append('#' * 80)
+
+        dialog = wxp_utils.Text_Dialog(self, "Inline Difference", '\n'.join(lines))
         dialog.Show()
 
 
