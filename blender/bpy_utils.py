@@ -485,7 +485,7 @@ def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material
 
     objects = get_unique_mesh_objects(objects)
 
-    with bpy_context.State() as state, bpy_context.Bpy_State() as bpy_state:
+    with bpy_context.Bpy_State() as state:
 
         for object in objects:
             if object.animation_data:
@@ -494,7 +494,7 @@ def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material
 
         for object in objects:
             for modifier in object.modifiers:
-                bpy_state.set(modifier, 'show_viewport', False)
+                state.set(modifier, 'show_viewport', False)
 
         bpy_uv.ensure_uv_layer(objects, settings.uv_layer_name)
 
@@ -1707,7 +1707,7 @@ def revert_space_out_objects(objects: typing.List[bpy.types.Object]):
 
 def deep_copy_objects(objects: typing.List[bpy.types.Object]):
 
-    with bpy_context.Focus_Objects(objects), bpy_context.State() as state:
+    with bpy_context.Focus_Objects(objects), bpy_context.Bpy_State() as state:
 
         for attr in dir(bpy.context.preferences.edit):
             if attr.startswith('use_duplicate_'):

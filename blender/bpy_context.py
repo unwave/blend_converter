@@ -144,43 +144,6 @@ def get_local_view_objects(context: bpy.types.Context):
         return [object for object in bpy.data.objects if object.evaluated_get(depsgraph).local_view_get(space_view_3d)]
 
 
-class State:
-
-    print_color_code = utils.get_color_code(256,0,128, 0,0,0)
-
-    def __init__(self, settings: typing.Optional[typing.List[typing.Tuple[typing.Any, str, typing.Any]]] = None, print = PRINT_CONTEXT_CHANGES):
-        self.init_state: typing.List[tuple[object, str, typing.Any]] = []
-        self.pre_settings = settings
-        self.print = print
-
-
-    def __enter__(self):
-
-        if  self.pre_settings is not None:
-            for object, attr, value in self.pre_settings:
-                self.set(object, attr, value)
-
-        return self
-
-
-    def set(self, object: object, name: str, value):
-        self.init_state.append((object, name, getattr(object, name)))
-        setattr(object, name, value)
-        if self.print:
-            utils.print_in_color(self.print_color_code, f"{repr(object)}.{name} = {repr(value)}")
-
-
-    def __exit__(self, type, value, traceback):
-        for object, name, value in reversed(self.init_state):
-            setattr(object, name, value)
-
-
-def del_scene_prop(key: str):
-    for scene in bpy.data.scenes:
-        if key in scene.keys():
-            del scene[key]
-
-
 def delete_scene_collection(name: str):
     getattr(bpy.context.scene, name).clear()
     delattr(bpy.types.Scene, name)
@@ -230,18 +193,20 @@ def get_id_data_and_path(object: typing.Union[bpy.types.bpy_struct, bpy.types.bp
 
     if id_data.is_embedded_data:
         return get_embedded_id_data_and_path(object)
+    elif object == id_data:
+        return id_data, ''
+    elif isinstance(object, bpy.types.NlaTrack):
+        return id_data, f'animation_data.nla_tracks["{b_utils.escape_identifier(object.name)}"]'
+    elif isinstance(object, bpy.types.FCurve):
+        # TODO: this may not be adequate, try search by data_path
+        index = list(id_data.animation_data.drivers).index(object)
+        return id_data, f'animation_data.drivers[{index}]'
+    elif isinstance(object, bpy.types.Area):
+        assert isinstance(id_data, bpy.types.Screen)
+        index = list(id_data.areas).index(object)
+        return id_data, f'areas.[{index}]'
     else:
-        if object == id_data:
-            return id_data, ''
-        else:
-            if isinstance(object, bpy.types.NlaTrack):
-                return id_data, f'animation_data.nla_tracks["{b_utils.escape_identifier(object.name)}"]'
-            elif isinstance(object, bpy.types.FCurve):
-                # TODO: this may not be adequate, try search by data_path
-                index = list(id_data.animation_data.drivers).index(object)
-                return id_data, f'animation_data.drivers[{index}]'
-            else:
-                return id_data, object.path_from_id()
+        return id_data, object.path_from_id()
 
 
 class Bpy_State_Item(bpy.types.PropertyGroup):
@@ -317,9 +282,30 @@ finally:
     bpy.utils.register_class(Bpy_State_Item)
 
 
+def is_bpy_struct(object):
+
+    # underlying bpy data structures
+    if not isinstance(object, (bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection)):
+        return False
+
+    id_data = object.id_data
+
+    # bpy.types.Preferences.id_data is None
+    # bpy.types.PreferencesEdit.id_data is None
+    # returns None after assigning to an ID pointer property
+    if id_data is None:
+        return False
+
+    assert isinstance(id_data, bpy.types.ID)
+
+    return True
+
+
 class Bpy_State:
 
-    print_color = utils.get_color_code(256,128,0, 0,0,0)
+    print_color_bpy = utils.get_color_code(256,128,0, 0,0,0)
+    print_color_python = utils.get_color_code(256,0,128, 0,0,0)
+
     error_color = utils.get_color_code(222,93,84, 0,0,0)
 
 
@@ -404,7 +390,7 @@ class Bpy_State:
         init_value = getattr(object, name)
 
 
-        object_is_bpy_struct = isinstance(object, (bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection))
+        object_is_bpy_struct = is_bpy_struct(object)
 
         if object_is_bpy_struct:
             object_index = self.add_bpy_struct(object)
@@ -412,7 +398,7 @@ class Bpy_State:
             object_index = self.add_python_value(object)
 
 
-        value_is_bpy_struct = isinstance(init_value, (bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection))
+        value_is_bpy_struct = is_bpy_struct(init_value)
 
         if value_is_bpy_struct:
             value_index = self.add_bpy_struct(init_value)
@@ -433,17 +419,17 @@ class Bpy_State:
         setattr(object, name, value)
 
         if self.print:
-            utils.print_in_color(self.print_color, f"{repr(object)}.{name} = {repr(value)}")
+            utils.print_in_color(self.print_color_bpy if object_is_bpy_struct else self.print_color_python, f"{repr(object)}.{name} = {repr(value)}")
 
 
     def get_bpy_data(self, index: int):
 
         id_block_index, path_from_id, representation = self.bpy_structs[index]
 
-        pointer = self.id_blocks_collection[id_block_index]
+        pointer: Bpy_ID_Pointer = self.id_blocks_collection[id_block_index]
 
         if pointer.target is None:
-            Exception(f"The underling ID data block has been removed: {representation}")
+            raise Exception(f"The underling ID data block has been removed: {representation}")
         elif path_from_id:
             return pointer.target.path_resolve(path_from_id)
         else:
@@ -538,7 +524,11 @@ class Bpy_Reference_List(Bpy_Reference_Base):
 
 
 class Bpy_ID_Pointer(bpy.types.PropertyGroup):
-    target: bpy.props.PointerProperty(type = bpy.types.ID)
+
+    if typing.TYPE_CHECKING:
+        target: typing.Union[bpy.types.ID, None]
+    else:
+        target: bpy.props.PointerProperty(type = bpy.types.ID)
 
 
 try:
@@ -676,7 +666,7 @@ class Bake_Settings(Bpy_State):
         return self
 
 
-class Global_Optimizations(State):
+class Global_Optimizations(Bpy_State):
 
     @staticmethod
     def dummy_view_layer_update(_):
@@ -1717,7 +1707,7 @@ class Compositor_Input_Lightmap:
 def call_in_uv_editor(func, *args, can_be_canceled = False, **kwargs):
     """ Because some functionally of the operators can change depending on it."""
 
-    with State() as state:
+    with Bpy_State() as state:
 
         window = bpy.data.window_managers[0].windows[0]
 
@@ -1996,9 +1986,9 @@ def set_denoise_tree_settings(bl_tree: bpy.types.CompositorNodeTree, inpaint_dis
             continue
 
         node.inputs[3].default_value = use_hdr
-        node.inputs[4].default_value = prefilter.lower().capitalize()
+        node.inputs[4].default_value = prefilter.replace('_', ' ').lower().title()
 
-        node.quality = quality
+        node.inputs[5].default_value = quality.replace('_', ' ').lower().title()
 
 
 def set_denoise_tree_settings_pre_5_0(bl_tree: bpy.types.CompositorNodeTree, inpaint_distance: int, prefilter = 'NONE', use_hdr = False, quality = 'BALANCED'):

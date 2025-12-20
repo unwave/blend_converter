@@ -287,7 +287,7 @@ class Baked_Image:
         print()
         print('Composing and saving...')
 
-        with bpy_context.State() as state, bpy_context.Bpy_State() as bpy_state:
+        with bpy_context.Bpy_State() as state:
 
             ## set color space
             # this does not affect .exr files
@@ -308,15 +308,15 @@ class Baked_Image:
             if bpy.app.version < (5, 0):
                 # Compositor: Remove scene.use_nodes from Python API #143578
                 # https://projects.blender.org/blender/blender/pulls/143578
-                bpy_state.set(bpy.context.scene, 'use_nodes', True)
+                state.set(bpy.context.scene, 'use_nodes', True)
 
-            bpy_state.set(bpy.context.scene.render, 'use_file_extension', False)
-            bpy_state.set(bpy.context.scene.render, 'dither_intensity', self.settings.dither_intensity)
+            state.set(bpy.context.scene.render, 'use_file_extension', False)
+            state.set(bpy.context.scene.render, 'dither_intensity', self.settings.dither_intensity)
 
             tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
 
             for node in tree.get_by_bl_idname({'CompositorNodeRLayers', 'CompositorNodeComposite', 'CompositorNodeOutputFile', 'CompositorNodeViewer'}):
-                bpy_state.set(node.bl_node, 'mute', True)
+                state.set(node.bl_node, 'mute', True)
 
             file_node = tree.new('CompositorNodeOutputFile')
 
@@ -508,9 +508,9 @@ class Baked_Image:
                     raise ValueError(f"Unexpected identifier length: {self.bake_types}")
 
 
-                bpy_state.set(bpy.context.scene.render, 'resolution_y', self.settings._actual_height)
-                bpy_state.set(bpy.context.scene.render, 'resolution_x', self.settings._actual_width)
-                bpy_state.set(bpy.context.scene.render, 'resolution_percentage', 100)
+                state.set(bpy.context.scene.render, 'resolution_y', self.settings._actual_height)
+                state.set(bpy.context.scene.render, 'resolution_x', self.settings._actual_width)
+                state.set(bpy.context.scene.render, 'resolution_percentage', 100)
 
 
                 if self.settings.view_space_normals_id and not any(self.settings.view_space_normals_id == bake_type._uuid for bake_type in self.bake_types):

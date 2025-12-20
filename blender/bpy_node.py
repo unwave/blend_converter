@@ -1697,14 +1697,14 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
 
             reference['bl_tree'] = bl_tree
 
-            with bpy_context.Bpy_State() as bpy_state, bpy_context.State() as state:
+            with bpy_context.Bpy_State() as state:
 
                 for node in bl_tree.nodes:
 
                     if node in bl_nodes:
-                        node.select = True
+                        node.select = True  # will be deleted
                     else:
-                        bpy_state.set(node, 'select', False)
+                        state.set(node, 'select', False)
 
                 area = bpy.data.window_managers[0].windows[0].screen.areas[0]
                 state.set(area, 'type', 'NODE_EDITOR')
@@ -1751,7 +1751,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
         bl_nodes = {node.bl_node for node in nodes if node.be('ShaderNodeGroup')}
         bl_tree = self.bl_tree
 
-        with bpy_context.Bpy_Reference_Dict() as reference, bpy_context.State() as state:
+        with bpy_context.Bpy_Reference_Dict() as reference, bpy_context.Bpy_State() as state:
 
             reference['bl_tree'] = bl_tree
 
