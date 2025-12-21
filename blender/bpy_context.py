@@ -205,81 +205,10 @@ def get_id_data_and_path(object: typing.Union[bpy.types.bpy_struct, bpy.types.bp
         assert isinstance(id_data, bpy.types.Screen)
         index = list(id_data.areas).index(object)
         return id_data, f'areas.[{index}]'
+    # TODO: ⚓ T51096 path_from_id does not work on subproperties of a custom node
+    # https://developer.blender.org/T51096
     else:
         return id_data, object.path_from_id()
-
-
-class Bpy_State_Item(bpy.types.PropertyGroup):
-
-    attr_name: bpy.props.StringProperty()
-
-    object_id_data: bpy.props.PointerProperty(type = bpy.types.ID)
-    object_path_from_id: bpy.props.StringProperty()
-
-    init_value_id_data: bpy.props.PointerProperty(type = bpy.types.ID)
-    init_value_path_from_id: bpy.props.StringProperty()
-
-    # ⚓ T51096 path_from_id does not work on subproperties of a custom node
-    # https://developer.blender.org/T51096
-
-
-    @property
-    def target(self):
-
-        if self.object_id_data is None:
-            if '_target_repr' in self.keys():
-                raise Exception(f"The underling id data has been removed: {self['_target_repr']}")
-            else:
-                return self['_target']
-        else:
-            if self.object_path_from_id:
-                return self.object_id_data.path_resolve(self.object_path_from_id)
-            else:
-                return self.object_id_data
-
-
-    @target.setter
-    def target(self, object):
-
-        if isinstance(object, (bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection)):
-            self.object_id_data, self.object_path_from_id = get_id_data_and_path(object)
-            self['_target_repr'] = repr(self.object_id_data)
-        else:
-            self['_target'] = object
-
-
-    @property
-    def init_value(self):
-
-        if self.init_value_id_data is None:
-            if '_value_repr' in self.keys():
-                raise Exception(f"The underling value id data has been removed: {self['_value_repr']}")
-            else:
-                return self.get('_init_value')
-        else:
-            if self.init_value_path_from_id:
-                return self.init_value_id_data.path_resolve(self.init_value_path_from_id)
-            else:
-                return self.init_value_id_data
-
-
-    @init_value.setter
-    def init_value(self, value):
-
-        if isinstance(value, (bpy.types.bpy_struct, bpy.types.bpy_prop_array, bpy.types.bpy_prop_collection)):
-            self.init_value_id_data, self.init_value_path_from_id = get_id_data_and_path(value)
-            self['_value_repr'] = repr(self.init_value_id_data)
-        else:
-            self['_init_value'] = value
-
-
-
-try:
-    bpy.utils.unregister_class(Bpy_State_Item)
-except RuntimeError:
-    pass
-finally:
-    bpy.utils.register_class(Bpy_State_Item)
 
 
 def is_bpy_struct(object):
@@ -389,6 +318,9 @@ class Bpy_State:
 
         init_value = getattr(object, name)
 
+        if isinstance(init_value, (mathutils.Color, mathutils.Euler, mathutils.Matrix, mathutils.Quaternion, mathutils.Vector)):
+            init_value =  init_value.copy()
+
 
         object_is_bpy_struct = is_bpy_struct(object)
 
@@ -457,70 +389,6 @@ class Bpy_State:
                 )
 
         delete_scene_collection(self.collection_name)
-
-
-class Bpy_Reference_Base:
-
-    def __init__(self):
-        self._collection_name = 'Bpy_Reference_collection_' + uuid.uuid1().hex
-        setattr(bpy.types.Scene, self._collection_name, bpy.props.CollectionProperty(type = Bpy_State_Item))
-
-    @property
-    def items(self) -> typing.Union[bpy.types.CollectionProperty, typing.List[Bpy_State_Item]]:
-        return getattr(bpy.context.scene, self._collection_name)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        delete_scene_collection(self._collection_name)
-
-
-class Bpy_Reference_Dict(Bpy_Reference_Base):
-
-    def __init__(self):
-        super().__init__()
-        self._item_map = {}
-        self._item_index = 0
-
-    def __getitem__(self, key: str):
-        pointer: Bpy_State_Item = self.items[self._item_map[key]]
-        return pointer.target
-
-    def __setitem__(self, key: str, value: bpy.types.bpy_struct):
-        pointer: Bpy_State_Item = self.items.add()  # type: ignore
-        pointer.name = key
-        pointer.target = value
-
-        self._item_map[key] = self._item_index
-        self._item_index += 1
-
-
-class Bpy_Reference_List(Bpy_Reference_Base):
-
-    def __init__(self):
-        super().__init__()
-        self._index = 0
-
-    def append(self, value: bpy.types.bpy_struct):
-        pointer: Bpy_State_Item = self.items.add()  # type: ignore
-        pointer.name = str(self._index)
-        pointer.target = value
-
-        self._index += 1
-
-        return self._index - 1
-
-    def extend(self, values: typing.Iterable):
-        for value in values:
-            self.append(value)
-
-    def __getitem__(self, index: int):
-        return self.items[index].target
-
-    def __iter__(self):
-        for item in self.items:
-            yield item.target
 
 
 class Bpy_ID_Pointer(bpy.types.PropertyGroup):
@@ -692,7 +560,6 @@ class Armature_Disabled(Bpy_State):
     def __init__(self, object: bpy.types.Object):
         super().__init__()
         self.object = object
-        self.matrix_parent_inverse = None
 
     def __enter__(self):
 
@@ -717,20 +584,8 @@ class Armature_Disabled(Bpy_State):
                     self.set(modifier, 'show_render', False)
 
             if object.parent and object.parent in armatures:
-                self.matrix_parent_inverse = tuple(tuple(vec) for vec in object.matrix_parent_inverse)
+                self.set(object, 'matrix_parent_inverse', mathutils.Matrix())
                 self.set(object, 'parent', None)
-
-    def __exit__(self, type, value, traceback):
-
-        pointer: Bpy_State_Item
-
-        for pointer in reversed(self.id_blocks_collection.values()):  # type: ignore
-            setattr(pointer.target, pointer.attr_name, pointer.init_value)
-
-            if isinstance(pointer.target, bpy.types.Object) and self.matrix_parent_inverse:
-                pointer.target.matrix_parent_inverse = mathutils.Matrix(self.matrix_parent_inverse)
-
-        delattr(bpy.types.Scene, self.collection_name)
 
 
 class Temp_Image:

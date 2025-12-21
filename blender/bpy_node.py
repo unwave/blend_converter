@@ -1693,37 +1693,35 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
         bl_nodes = {node.bl_node for node in nodes}
         bl_tree = self.bl_tree
 
-        with bpy_context.Bpy_Reference_Dict() as reference:
+        with bpy_context.Bpy_State() as state:
 
-            reference['bl_tree'] = bl_tree
+            state.set(bl_tree, 'tag', True)  # ensure the first index is the tree
 
-            with bpy_context.Bpy_State() as state:
+            for node in bl_tree.nodes:
 
-                for node in bl_tree.nodes:
+                if node in bl_nodes:
+                    node.select = True  # will be deleted
+                else:
+                    state.set(node, 'select', False)
 
-                    if node in bl_nodes:
-                        node.select = True  # will be deleted
-                    else:
-                        state.set(node, 'select', False)
+            area = bpy.data.window_managers[0].windows[0].screen.areas[0]
+            state.set(area, 'type', 'NODE_EDITOR')
 
-                area = bpy.data.window_managers[0].windows[0].screen.areas[0]
-                state.set(area, 'type', 'NODE_EDITOR')
+            if bpy.app.version >= (2, 80):
+                state.set(area, 'ui_type', 'ShaderNodeTree')
 
-                if bpy.app.version >= (2, 80):
-                    state.set(area, 'ui_type', 'ShaderNodeTree')
+            space_data = area.spaces[0]
+            state.set(space_data, 'node_tree', bl_tree)
 
-                space_data = area.spaces[0]
-                state.set(space_data, 'node_tree', bl_tree)
+            override = dict(
+                area = area,
+                space_data = space_data,
+                selected_nodes = list(bl_nodes),
+            )
 
-                override = dict(
-                    area = area,
-                    space_data = space_data,
-                    selected_nodes = list(bl_nodes),
-                )
+            bpy_context.call(override, bpy.ops.node.delete_reconnect)
 
-                bpy_context.call(override, bpy.ops.node.delete_reconnect)
-
-            self.__init__(reference['bl_tree'])
+            self.__init__(state.get_bpy_data(0))
 
 
     def ungroup(self, nodes: typing.List[_Shader_Node_Wrapper]):
@@ -1751,9 +1749,9 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
         bl_nodes = {node.bl_node for node in nodes if node.be('ShaderNodeGroup')}
         bl_tree = self.bl_tree
 
-        with bpy_context.Bpy_Reference_Dict() as reference, bpy_context.Bpy_State() as state:
+        with bpy_context.Bpy_State() as state:
 
-            reference['bl_tree'] = bl_tree
+            state.set(bl_tree, 'tag', True)  # ensure the first index is the tree
 
             area = bpy.data.window_managers[0].windows[0].screen.areas[0]
             state.set(area, 'type', 'NODE_EDITOR')
@@ -1778,7 +1776,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
             # TODO: check changed behavior in old versions, it only ungroups the active node
             bpy_context.call(override, bpy.ops.node.group_ungroup)
 
-            self.__init__(reference['bl_tree'])
+            self.__init__(state.get_bpy_data(0))
 
 
     def reset_nodes(self):
