@@ -577,10 +577,10 @@ def convert_materials_to_principled(objects: typing.List[bpy.types.Object], remo
 
         principled = tree.output[0]
 
-        principled.set_input('Base Color', material.diffuse_color)
-        principled.set_input('Metallic', material.metallic)
-        principled.set_input('Specular', material.specular_intensity)
-        principled.set_input('Roughness', material.roughness)
+        principled['Base Color'] = material.diffuse_color
+        principled['Metallic'] = material.metallic
+        principled[bpy_node.Socket_Identifier.SPECULAR_IOR] = material.specular_intensity
+        principled['Roughness'] = material.roughness
 
 
     for material in materials:

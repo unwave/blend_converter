@@ -464,12 +464,12 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
         return list(dict.fromkeys(nodes))
 
 
-    def is_close(self, value: typing.Union[float, typing.Iterable[float]], rel_tol = 1e-6):
+    def is_close(self, value: typing.Union[float, typing.Iterable[float]]):
 
         if isinstance(value, typing.Iterable):
-            return all(math.isclose(a, b, rel_tol=rel_tol) for a, b in zip(value, self.default_value))
+            return all(math.isclose(a, b, rel_tol=1e-6, abs_tol=1e-6) for a, b in zip(value, self.default_value))
         else:
-            return math.isclose(value, self.default_value, rel_tol=rel_tol)
+            return math.isclose(value, self.default_value, rel_tol=1e-6, abs_tol=1e-6)
 
 
     def is_equal(self, other: 'typing_extensions.Self'):
@@ -484,13 +484,9 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
             return False
 
         if self.connections or other.connections:
-            return set(self.connections) == set(other.connections)
+            return set(s.bl_socket for s in self.connections) == set(s.bl_socket for s in other.connections)
 
         return self.default_value == other.default_value
-
-
-    def __hash__(self):
-        return id(self)
 
 
     def be(self, value: typing.Union[str, typing.Container[str], 'bpy.types.bpy_struct']):
@@ -501,6 +497,21 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
             return self.bl_idname in value
         else:
             return isinstance(self.bl_socket, value)
+
+
+    def get_default_value(self):
+
+        if self.type in ('VALUE', 'INT'):
+            return self.default_value
+
+        elif self.type == 'RGBA':
+            return tuple(self.default_value)
+
+        elif self.type == 'VECTOR':
+            return tuple(self.default_value)
+
+        else:
+            return self.default_value
 
 
 class _Sockets_Wrapper(typing.Generic[_S_SOCKET, _S_NODE], typing.Dict[str, _S_SOCKET]):
@@ -598,12 +609,9 @@ class _Node_Wrapper(bpy.types.Node if typing.TYPE_CHECKING else _No_Type, typing
         return f"""< {self.bl_idname} "{self.name}" >"""
 
 
-    def __getitem__(self, key) -> typing.Optional['typing_extensions.Self']:
+    def __getitem__(self, key: typing.Union[int, str]) -> typing.Optional['typing_extensions.Self']:
 
-        if isinstance(key, int):
-            socket = self.inputs[self.bl_node.inputs[key].identifier]
-        else:
-            socket = self.inputs[key]
+        socket = self.inputs[key]
 
         if socket.connections:
             return socket.connections[0].node
@@ -613,33 +621,13 @@ class _Node_Wrapper(bpy.types.Node if typing.TYPE_CHECKING else _No_Type, typing
 
     def __setitem__(self, key: typing.Union[int, str], value):
 
-        if isinstance(key, int):
-            socket = self.inputs[self.bl_node.inputs[key].identifier]
-        else:
-            socket = self.inputs[key]
-
-        if socket.is_output:
-            raise ValueError('Can only set inputs.')
+        socket = self.inputs[key]
 
         if isinstance(value, _Socket_Wrapper):
             socket.join(value, move = False)
         else:
             socket.set_default_value(value)
             socket.disconnect()
-
-
-    def get_value(self, identifier: typing.Union[int, str] , convert = True):
-        if isinstance(identifier, int):
-            value = self.bl_node.inputs[identifier].default_value
-        else:
-            if identifier in self.inputs.keys():
-                value = self.inputs[identifier].bl_socket.default_value
-            else:
-                return None
-        try:
-            return tuple(value)
-        except Exception:
-            return value
 
 
     def delete(self):
@@ -730,25 +718,17 @@ class _Node_Wrapper(bpy.types.Node if typing.TYPE_CHECKING else _No_Type, typing
         """ Get the socket inputting socket or a value if the socket is not connected. """
 
         socket = self.inputs[key]
+
         if socket.connections:
             return socket.connections[0]
+        elif socket_only:
+            return None
         else:
-            if socket_only:
-                return None
-            return self.get_value(key)
-
-
-    def set_input(self, key, value):
-        """ If no such socket when the value is ignored. Does not disconnect when setting a constant value. """
-        socket = self.inputs.get(key)
-        if socket:
-            if isinstance(value, _Socket_Wrapper):
-                socket.join(value)
-            else:
-                socket.bl_socket.default_value = value
+            return socket.get_default_value()
 
 
     def set_inputs(self, settings):
+        """ If no such socket when the value is ignored. Does not disconnect when setting a constant value. """
 
         attributes = settings.pop('Attributes', None)
 
@@ -758,8 +738,18 @@ class _Node_Wrapper(bpy.types.Node if typing.TYPE_CHECKING else _No_Type, typing
                     setattr(self.bl_node, attribute, value)
 
         for key, value in settings.items():
-            if value is not None:
-                self.set_input(key, value)
+
+            if value is None:
+                continue
+
+            socket = self.inputs.get(key)
+            if not socket:
+                continue
+
+            if isinstance(value, _Socket_Wrapper):
+                socket.join(value)
+            else:
+                socket.set_default_value(value)
 
 
     @property
@@ -969,9 +959,7 @@ class _Shader_Node_Wrapper(_Node_Wrapper['Shader_Tree_Wrapper', _Shader_Socket_W
 
     def get_principled_inputs(self):
         """
-        Get all inputs that can be used in a Principled BSDF representation.
-
-        Returns inputs that should be plugged to a Principled BSDF to resemble the shader node as close as possible.
+        Returns inputs that should be assigned to a Principled BSDF node to resemble the shader node.
         """
 
         bl_idname = self.bl_idname
@@ -1185,7 +1173,7 @@ class _Shader_Node_Wrapper(_Node_Wrapper['Shader_Tree_Wrapper', _Shader_Socket_W
 
 
         if bl_idname in SHADER_OUTPUTTING_NODES:
-            raise NotImplementedError(f"The node type is yet supported: {bl_idname}")
+            raise NotImplementedError(f"The node type is not yet supported: {bl_idname}")
         else:
             raise ValueError(f"The node type is not shader outputting: {bl_idname}")
 

@@ -910,7 +910,7 @@ class Output_Socket_Diffuse_AO:
 
         mix_shader.inputs[0].new('ShaderNodeLightPath', 'Is Camera Ray')
         diffuse_node = mix_shader.inputs[2].new('ShaderNodeBsdfDiffuse')
-        diffuse_node.set_input('Color', (1,1,1,1))
+        diffuse_node['Color'] = (1,1,1,1)
 
         node_group_input = mix_shader.inputs[1].new('NodeGroupInput')  # this is expensive
 
@@ -1471,7 +1471,7 @@ class Output_Lightmap:
         mix_shader.inputs[0].new('ShaderNodeLightPath', 'Is Camera Ray')
         node_group_input = mix_shader.inputs[1].new('NodeGroupInput')
         diffuse_node = mix_shader.inputs[2].new('ShaderNodeBsdfDiffuse')
-        diffuse_node.set_input('Color', (1,1,1,1))
+        diffuse_node['Color'] = (1,1,1,1)
         diffuse_node.inputs['Normal'].join(node_group_input.outputs[1], move = False)
 
         # a lossy workaround to avoid artifacts, requires the inpaint
