@@ -184,12 +184,12 @@ ALLOW_NODE_MOVE = True
 
 class _No_Type:
     """ To fix "Cannot create consistent method ordering" """
-    pass
+    __slots__ = []
 
 
 class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No_Type, typing.Generic[_S_NODE]):
 
-    __slots__ = ('bl_socket', 'connections', 'node')
+    __slots__ = ['bl_socket', 'connections', 'node']
 
 
     bl_socket: typing.Union[bpy.types.NodeSocketColor, bpy.types.NodeSocketFloat, bpy.types.NodeSocketVector]
@@ -516,7 +516,7 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
 
 class _Sockets_Wrapper(typing.Generic[_S_SOCKET, _S_NODE], typing.Dict[str, _S_SOCKET]):
 
-    __slots__ = ('identifiers', )
+    __slots__ = ['identifiers']
 
 
     def __init__(self, node: _S_NODE, socket_class: _Socket_Wrapper, is_output: bool):
@@ -552,7 +552,7 @@ class _Sockets_Wrapper(typing.Generic[_S_SOCKET, _S_NODE], typing.Dict[str, _S_S
 
 class _Node_Wrapper(bpy.types.Node if typing.TYPE_CHECKING else _No_Type, typing.Generic[_N_TREE, _N_SOCKET, _BL_TREE, _BL_NODE]):
 
-    __slots__ = ('bl_node', 'tree', 'outputs', 'inputs')
+    __slots__ = ['bl_node', 'tree', 'outputs', 'inputs']
 
     bl_node: _BL_NODE
     tree: _N_TREE
@@ -782,10 +782,10 @@ class _Node_Wrapper(bpy.types.Node if typing.TYPE_CHECKING else _No_Type, typing
 
 class _Tree_Wrapper(bpy.types.NodeTree if typing.TYPE_CHECKING else _No_Type, typing.Generic[_T_NODE, _T_SOCKET, _BL_TREE, _BL_NODE], typing.Dict[_BL_NODE, _T_NODE]):
 
+    __slots__ = ['bl_tree', 'input_bl_socket_to_link_map', '_new_nodes']
+
     _socket_class: _Socket_Wrapper
     _node_class: _T_NODE
-
-    __slots__ = ('bl_tree', 'input_socket_to_link_map', '_new_nodes')
 
 
     def __init__(self, bl_tree: _BL_TREE):
@@ -889,6 +889,8 @@ class _Tree_Wrapper(bpy.types.NodeTree if typing.TYPE_CHECKING else _No_Type, ty
 
 class _Shader_Socket_Wrapper(_Socket_Wrapper['_Shader_Node_Wrapper']):
 
+    __slots__ = []
+
 
     def get_default_value_as_node(self):
 
@@ -934,7 +936,9 @@ class _Shader_Socket_Wrapper(_Socket_Wrapper['_Shader_Node_Wrapper']):
             return self.get_default_value_as_node().outputs[0]
 
 
-class _Shader_Node_Wrapper(_Node_Wrapper['Shader_Tree_Wrapper', _Shader_Socket_Wrapper, bpy.types.ShaderNodeTree, bpy.types.ShaderNode], bpy.types.ShaderNode if typing.TYPE_CHECKING else object):
+class _Shader_Node_Wrapper(_Node_Wrapper['Shader_Tree_Wrapper', _Shader_Socket_Wrapper, bpy.types.ShaderNodeTree, bpy.types.ShaderNode], bpy.types.ShaderNode if typing.TYPE_CHECKING else _No_Type):
+
+    __slots__ = []
 
     outputs: _Sockets_Wrapper[_Shader_Socket_Wrapper, '_Shader_Node_Wrapper']
     inputs: _Sockets_Wrapper[_Shader_Socket_Wrapper, '_Shader_Node_Wrapper']
@@ -1253,7 +1257,9 @@ class _Shader_Node_Wrapper(_Node_Wrapper['Shader_Tree_Wrapper', _Shader_Socket_W
 
 
 
-class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wrapper, bpy.types.ShaderNodeTree, bpy.types.ShaderNode], bpy.types.ShaderNodeTree if typing.TYPE_CHECKING else object):
+class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wrapper, bpy.types.ShaderNodeTree, bpy.types.ShaderNode], bpy.types.ShaderNodeTree if typing.TYPE_CHECKING else _No_Type):
+
+    __slots__ = []
 
     _socket_class = _Shader_Socket_Wrapper
     _node_class = _Shader_Node_Wrapper
@@ -1786,16 +1792,21 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
 
 
 class _Compositor_Socket_Wrapper(_Socket_Wrapper['_Compositor_Node_Wrapper']):
-    pass
+
+    __slots__ = []
 
 
-class _Compositor_Node_Wrapper(_Node_Wrapper['Compositor_Tree_Wrapper', _Compositor_Socket_Wrapper, bpy.types.CompositorNodeTree, bpy.types.CompositorNode], bpy.types.CompositorNode if typing.TYPE_CHECKING else object):
+class _Compositor_Node_Wrapper(_Node_Wrapper['Compositor_Tree_Wrapper', _Compositor_Socket_Wrapper, bpy.types.CompositorNodeTree, bpy.types.CompositorNode], bpy.types.CompositorNode if typing.TYPE_CHECKING else _No_Type):
+
+    __slots__ = []
 
     outputs: _Sockets_Wrapper[_Compositor_Socket_Wrapper, '_Compositor_Node_Wrapper']
     inputs: _Sockets_Wrapper[_Compositor_Socket_Wrapper, '_Compositor_Node_Wrapper']
 
 
-class Compositor_Tree_Wrapper(_Tree_Wrapper[_Compositor_Node_Wrapper, _Compositor_Socket_Wrapper, bpy.types.CompositorNodeTree, bpy.types.CompositorNode], bpy.types.CompositorNodeTree if typing.TYPE_CHECKING else object):
+class Compositor_Tree_Wrapper(_Tree_Wrapper[_Compositor_Node_Wrapper, _Compositor_Socket_Wrapper, bpy.types.CompositorNodeTree, bpy.types.CompositorNode], bpy.types.CompositorNodeTree if typing.TYPE_CHECKING else _No_Type):
+
+    __slots__ = []
 
     _socket_class = _Compositor_Socket_Wrapper
     _node_class = _Compositor_Node_Wrapper
