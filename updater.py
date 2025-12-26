@@ -266,6 +266,45 @@ class Blend_Event_Handler(watchdog_events.PatternMatchingEventHandler):
         self.queue.put(event.dest_path)
 
 
+def import_files(files: typing.List[str]):
+
+    modules: typing.Dict[str, types.ModuleType] = {}
+
+    files = utils.deduplicate(os.path.realpath(f) for f in files)
+    dirs = utils.deduplicate(os.path.dirname(f) for f in files)
+
+    for dir in dirs:
+        if not dir in sys.path:
+            sys.path.append(dir)
+
+    for file in files:
+        modules[file] = utils.import_module_from_file(file)
+
+    return modules
+
+
+def get_program_entries(file_and_getter_pairs):
+
+    entries = []
+
+    modules = import_files([p[0] for p in file_and_getter_pairs])
+
+    for file_name, getter_name in file_and_getter_pairs:
+
+        module = modules[os.path.realpath(file_name)]
+
+        key_to_program: dict = getattr(module, getter_name)()
+
+        for key, program in key_to_program.items():
+            if isinstance(program, common.Program):
+                entries.append(Program_Entry(program, module.__file__, getter_name, key))
+            else:
+                utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"`{key}` is not a common.Program: {repr(program)}", file=sys.stderr)
+
+    return entries
+
+
+
 class Updater:
 
     def __init__(self):
@@ -273,14 +312,6 @@ class Updater:
         self.is_paused = True
 
         self.entries: list[Program_Entry] = []
-
-        self.modules: list[types.ModuleType] = []
-
-        self.init_modules = set(sys.modules)
-
-        self.imported_modules = set()
-
-        self.init_files = []
 
         self.max_parallel_execution_per_tag = {}
 
@@ -319,66 +350,21 @@ class Updater:
             self.observer.schedule(self.event_handler, dir, recursive=True)
 
 
-    def reload_files(self, files: list[str]):
-
-        if self.imported_modules:
-
-            # TODO: there are stale copies of blend_converter parts somewhere and importlib.reloads needs a fix for multiprocessing pickling
-            for imported_module in self.imported_modules:
-                try:
-                    del sys.modules[imported_module]
-                except KeyError:
-                    traceback.print_exc()
-
-            importlib.invalidate_caches()
-
-        self.modules.clear()
-
-        dirs = set(os.path.dirname(file) for file in files)
-        for dir in dirs:
-            if not dir in sys.path:
-                sys.path.append(dir)
-
-        for file in files:
-            module = utils.import_module_from_file(file)
-            self.modules.append(module)
-
-        self.imported_modules = set(sys.modules) - self.init_modules
-
-        self.init_files = files
-
-        print(self.imported_modules)
-
-
     @classmethod
-    def from_files(cls, files: list[str], programs_getter_name: str):
+    def from_files(cls, file_and_getter_pairs: typing.List[typing.Tuple[str, str]]):
 
         updater = cls()
 
-        updater.reload_files(files)
-        updater.set_entires_from_modules(programs_getter_name)
+        updater.entries = get_program_entries(file_and_getter_pairs)
+
         updater.poke_all()
+
         updater.init_observer()
         updater.schedule_observer()
 
         update_ui()
 
         return updater
-
-    def set_entires_from_modules(self, programs_getter_name: str):
-
-        for entry in self.entries:
-            entry.terminate()
-
-        self.entries.clear()
-
-        for module in self.modules:
-            for key, program in getattr(module, programs_getter_name)().items():
-                if isinstance(program, common.Program):
-                    self.entries.append(Program_Entry(program, module.__file__, programs_getter_name, key))
-                else:
-                    utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"`{key}` is not a common.Program: {repr(program)}", file=sys.stderr)
-
 
 
     def has_non_updated_dependency(self, entry: Program_Entry):
@@ -407,26 +393,6 @@ class Updater:
 
         for entry in entries:
             self.poke_entry(entry)
-
-    def reload_targets(self):
-
-        for entry in self.entries:
-            entry.terminate()
-
-        self.observer.unschedule_all()
-
-        with self.queue.mutex:
-            self.queue.queue.clear()
-
-        self.reload_files([module.__file__ for module in self.modules])
-        self.set_entires_from_modules()
-
-        self.poke_all()
-        self.schedule_observer()
-
-        print(f"Targets reloaded {utils.get_time_str_from(time.time())}")
-
-        update_ui()
 
 
     def poking(self):

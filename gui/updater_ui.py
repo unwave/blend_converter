@@ -826,12 +826,12 @@ class BC_App(wx.App):
 class Main_Frame(wxp_utils.Generic_Frame):
 
 
-    def __init__(self, files: list[str], programs_getter_name: str, columns: typing.Optional[typing.Iterable[typing.Tuple[str, int, typing.Callable[[int], str]]]] = None):
+    def __init__(self, file_and_getter_pairs: typing.List[typing.Tuple[str, str]], columns: typing.Optional[typing.Iterable[typing.Tuple[str, int, typing.Callable[[int], str]]]] = None):
 
-        self.updater = updater.Updater.from_files(files, programs_getter_name)
+        self.updater = updater.Updater.from_files(file_and_getter_pairs)
 
         if not self.updater.entries:
-            raise Exception(f"No programs with getter '{programs_getter_name}' provided in files: {files}")
+            raise Exception(f"No programs provided in files: {file_and_getter_pairs}")
 
         blender_executable = collections.Counter([entry.program.blender_executable for entry in self.updater.entries]).most_common(1)[0][0]
 
@@ -880,12 +880,12 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     @classmethod
-    def get_app(cls, files: typing.List[str], programs_getter_name: str, columns = None):
+    def get_app(cls, file_and_getter_pairs: typing.List[typing.Tuple[str, str]], columns = None):
 
         print(sys.argv)
 
         app = BC_App()
-        frame = cls(files=files, programs_getter_name = programs_getter_name, columns = columns)
+        frame = cls(file_and_getter_pairs, columns = columns)
         app.main_frame = frame
 
         is_console_shown = False
@@ -967,8 +967,6 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         menu.AppendSeparator()
 
-        # self.Bind(wx.EVT_MENU, self.on_reload_updater, menu.Append(wx.ID_ANY, "Reload Scripts\tCtrl+R"))
-
         self.Bind(wx.EVT_MENU, self.on_restart, menu.Append(wx.ID_ANY, "Restart\tCtrl+R"))
 
         menu.AppendSeparator()
@@ -1021,12 +1019,6 @@ class Main_Frame(wxp_utils.Generic_Frame):
         else:
             self.SetTitle(self.init_title)
             self.pause_menu_item.SetItemLabel("Pause\tCtrl+P")
-
-
-    def on_reload_updater(self, event):
-        self.updater.reload_targets()
-        self.result_panel.execute_search('')
-        self.set_blends()
 
 
     def on_mark_update_all(self, event):
