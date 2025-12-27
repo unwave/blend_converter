@@ -90,19 +90,13 @@ class File:
 
 
     @property
-    def dirname(self):
+    def dir(self):
         return os.path.dirname(self.path)
 
 
     @property
-    def dir_basename(self):
+    def dir_name(self):
         return os.path.basename(os.path.dirname(self.path))
-
-
-    @property
-    def dir_based_name(self):
-        return self.dir_basename + self.ext
-
 
 
 class Instruction:
