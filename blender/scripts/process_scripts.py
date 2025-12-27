@@ -203,10 +203,16 @@ def process():
 
             error_type, error_value, error_tb = sys.exc_info()
 
+            traceback_text = traceback.format_exc()
+            exception_text = ''.join(traceback.format_exception_only(error_type, error_value))
+
+            if traceback_text.endswith(exception_text):
+                traceback_text = traceback_text[:-len(exception_text)]
+
             print()
             utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"Fail at script: {instruction['name']}", file=sys.stderr)
-            utils.print_in_color(utils.get_color_code(180,0,0,0,0,0,), ''.join(traceback.format_tb(error_tb)), file=sys.stderr)
-            utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), ''.join(traceback.format_exception_only(error_type, error_value)), file=sys.stderr)
+            utils.print_in_color(utils.get_color_code(180,0,0,0,0,0,), traceback_text, file=sys.stderr)
+            utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), exception_text, file=sys.stderr)
             print()
 
             blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_SCRIPT_ALL)
