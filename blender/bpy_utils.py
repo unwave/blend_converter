@@ -2308,7 +2308,7 @@ def is_smooth_modifier(modifier: bpy.types.Modifier):
 
 
 
-def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '', include_name = '', ignore_type = set(), include_type = set(), ignore_canceled = False):
+def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '', include_name = '', ignore_type = set(), include_type = set()):
     """
     If `ignore_name` is not empty modifiers with names matching the regular expression will be ignored.
 
@@ -2334,17 +2334,12 @@ def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '',
             if include_name and not re.match(include_name, modifier.name):
                 continue
 
-            modifiers_to_apply.append(modifier)
+            modifiers_to_apply.append(modifier.name)
 
 
-        if not modifiers_to_apply:
-            continue
+        for name in modifiers_to_apply:
+            bpy_modifier.apply_modifier(object.modifiers[name])
 
-        try:
-            for modifier in modifiers_to_apply:
-                bpy_modifier.apply_modifier(modifier, can_be_canceled = ignore_canceled)
-        except Exception as e:
-            raise Exception(f"Fail to apply {modifier.type} modifier '{modifier.name}' to object '{object.name_full}'.") from e
 
 
 def get_unique_materials(objects: typing.List[bpy.types.Object]):
