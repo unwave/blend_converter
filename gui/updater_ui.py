@@ -997,12 +997,15 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     def on_show_app_scripts(self, event = None):
-        utils.os_show(utils.deduplicate(self.updater.init_files))
+        utils.os_show(utils.deduplicate(utils.deduplicate(e.from_module_file for e in self.updater.entries)))
 
 
     def on_open_VSCode_workspace(self, event = None):
-        for init_file in self.updater.init_files:
-            for path in os.scandir(os.path.dirname(init_file)):
+
+        folders = utils.deduplicate(os.path.dirname(e.from_module_file) for e in self.updater.entries)
+
+        for folder in folders:
+            for path in os.scandir(folder):
                 if path.is_file() and path.name.endswith('.code-workspace'):
                     utils.os_open(path)
 
