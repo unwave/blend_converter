@@ -32,7 +32,7 @@ from .. import utils
 T_Objects = typing.TypeVar('T_Objects', bpy.types.Object, typing.List[bpy.types.Object], typing.Iterable[bpy.types.Object])
 
 
-def get_view_layer_objects(view_layer: typing.Optional[bpy.types.ViewLayer] = None) -> typing.List[bpy.types.Object]:
+def get_view_layer_objects(view_layer: typing.Optional['bpy.types.ViewLayer'] = None) -> typing.List[bpy.types.Object]:
     """
     #113378 - Regression: Deleting Objects in a View Layer leaves None in the View Layer's .objects for the script duration
     https://projects.blender.org/blender/blender/issues/113378
@@ -223,7 +223,7 @@ def make_object_data_independent_from_other(objects: bpy.types.Object):
             object.data = data_copy
 
 
-def _focus(objects: typing.List[bpy.types.Object], view_layer: bpy.types.ViewLayer):
+def _focus(objects: typing.List[bpy.types.Object], view_layer: 'bpy.types.ViewLayer'):
 
     view_layer.update()
     view_layer_objects = get_view_layer_objects(view_layer)
@@ -246,7 +246,7 @@ def _focus(objects: typing.List[bpy.types.Object], view_layer: bpy.types.ViewLay
     return objects
 
 
-def focus(objects: T_Objects, view_layer: bpy.types.ViewLayer = None) -> T_Objects:
+def focus(objects: T_Objects, view_layer: 'bpy.types.ViewLayer' = None) -> T_Objects:
     """
     Deselect, unhide, select and make active the objects according to `view_layer`.
 
@@ -684,7 +684,7 @@ def get_unique_meshes(objects: typing.List[bpy.types.Object]) -> typing.List[bpy
     return [object.data for object in get_unique_mesh_objects(objects)]
 
 
-def get_view_layer_materials(view_layer: typing.Optional[bpy.types.ViewLayer] = None):
+def get_view_layer_materials(view_layer: typing.Optional['bpy.types.ViewLayer'] = None):
     return [material for material in group_objects_by_material(get_view_layer_objects(view_layer)).keys() if material and not material.is_grease_pencil]
 
 
@@ -815,7 +815,7 @@ def unify_color_attributes_format(objects: typing.List[bpy.types.Object]):
                 bpy_context.call_for_object(object, bpy.ops.geometry.color_attribute_convert, domain='POINT', data_type='FLOAT_COLOR')
 
 
-def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: bpy.types.ShaderNodeTree, texture_coordinates_collection: bpy.types.Collection, check_only = False):
+def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: bpy.types.ShaderNodeTree, texture_coordinates_collection: 'bpy.types.Collection', check_only = False):
     """ Make a shader node tree independent from its object. """
 
     tree = bpy_node.Shader_Tree_Wrapper(node_tree)
@@ -1140,7 +1140,7 @@ def is_node_tree_object_dependent(object: bpy.types.Object, node_tree: bpy.types
     return False
 
 
-def make_node_tree_independent_recursive(object: bpy.types.Object, node_tree: bpy.types.ShaderNodeTree, texture_coordinates_collection: bpy.types.Collection):
+def make_node_tree_independent_recursive(object: bpy.types.Object, node_tree: bpy.types.ShaderNodeTree, texture_coordinates_collection: 'bpy.types.Collection'):
     """ Recursively call `make_node_tree_independent_from_object`. """
 
     make_node_tree_independent_from_object(object, node_tree, texture_coordinates_collection)

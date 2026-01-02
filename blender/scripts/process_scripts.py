@@ -24,7 +24,11 @@ SENTINEL = object()
 if 'bpy' in sys.modules:
     # TODO: open the blend as a home file and remap paths to prevent overwriting it by mistake
     import bpy
-    bpy.context.preferences.filepaths.save_version = 32
+
+    if hasattr(bpy.context, 'preferences'):
+        bpy.context.preferences.filepaths.save_version = 32
+    else:  # 2.79-
+        bpy.context.user_preferences.filepaths.save_version = 32
 
 
 def remove_PYTHONPATH():

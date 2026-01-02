@@ -1186,7 +1186,7 @@ class Compositor_Input_AO_Diffuse:
 
 
 
-def set_mode(objects: typing.List[bpy.types.Object], mode: str, view_layer: bpy.types.ViewLayer):
+def set_mode(objects: typing.List[bpy.types.Object], mode: str, view_layer: 'bpy.types.ViewLayer'):
     """
     `bpy.ops.object.mode_set` works for multiple selected objects, but.
 
@@ -1246,7 +1246,7 @@ def set_mode(objects: typing.List[bpy.types.Object], mode: str, view_layer: bpy.
 class Focus_Objects:
 
 
-    def __init__(self, objects: typing.Union[bpy.types.Object, typing.List[bpy.types.Object]], mode = 'OBJECT', view_layer: bpy.types.ViewLayer = None):
+    def __init__(self, objects: typing.Union[bpy.types.Object, typing.List[bpy.types.Object]], mode = 'OBJECT', view_layer: 'bpy.types.ViewLayer' = None):
 
         if view_layer is None:
             view_layer = bpy.context.view_layer
@@ -1264,12 +1264,12 @@ class Focus_Objects:
 
 
     @property
-    def view_layer(self) -> bpy.types.ViewLayer:
+    def view_layer(self) -> 'bpy.types.ViewLayer':
         return self.references[0].path_resolve(self._view_layer_path_from_id)
 
 
     @property
-    def visible_collection(self) -> bpy.types.Collection:
+    def visible_collection(self) -> 'bpy.types.Collection':
         return self.references[1]
 
 

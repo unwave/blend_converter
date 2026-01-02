@@ -189,7 +189,14 @@ def get_blender_executable():
 
 
 
-def run_blender(executable: typing.Union[str, typing.List[str]], arguments: typing.List[str], argv: typing.Optional[typing.List[str]] = None, stdout = None, check = True):
+def run_blender(
+        executable: typing.Union[str, typing.List[str]],
+        arguments: typing.List[str],
+        argv: typing.Optional[typing.List[str]] = None,
+        stdout = None,
+        check = True,
+        use_system_env = False,
+    ):
     """
         Parameters
         ----------
@@ -217,7 +224,7 @@ def run_blender(executable: typing.Union[str, typing.List[str]], arguments: typi
 
         '-b',
         '-noaudio',
-        '--python-use-system-env',
+        *(['--python-use-system-env'] if use_system_env else []),
         '--factory-startup',
         '--python-exit-code',
         '1',
