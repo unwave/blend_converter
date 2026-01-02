@@ -20,7 +20,10 @@ def save_as_mainfile(filepath: str, compress = True, relative_remap = True, copy
         bpy.ops.wm.save_as_mainfile(filepath=filepath, compress=compress, relative_remap=relative_remap, copy=copy)
     except RuntimeError as e:
         if 'Unable to pack file' in str(e):
-            print(e)
+            pass
+        elif "has an invalid 'from' pointer (0000000000000000), it will be deleted" in str(e):
+            # https://projects.blender.org/blender/blender/issues/111905
+            pass
         else:
             raise e
 
