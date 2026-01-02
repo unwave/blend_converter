@@ -318,7 +318,14 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
 
 
             if VALIDATE_NEW_LINKS and not bl_link.is_valid:
-                raise RuntimeError(f"Invalid link created: from node: '{socket.node.name}' [{socket.node.bl_idname}] and socket: '{socket.identifier}' to node: '{self.node.name}' [{self.node.bl_idname}] and socket: '{self.identifier}'")
+                raise RuntimeError(
+                    "Invalid link created."
+                    "\n\t" f"Tree: {repr(self.node.tree.bl_tree)}"
+                    "\n\t" f"From node: '{socket.node.name}' [{socket.node.bl_idname}]"
+                    "\n\t" f"From socket: '{socket.identifier}'"
+                    "\n\t" f"To node: '{self.node.name}' [{self.node.bl_idname}]"
+                    "\n\t" f"To socket: '{self.identifier}'"
+                )
 
             # only one input is allowed
             for _socket in self.connections:
@@ -351,7 +358,14 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
 
 
             if VALIDATE_NEW_LINKS and not bl_link.is_valid:
-                raise RuntimeError(f"Invalid link created: from node: '{self.node.name}' [{self.node.bl_idname}] and socket: '{self.identifier}' to node: '{socket.node.name}' [{socket.node.bl_idname}] and socket: '{socket.identifier}'")
+                raise RuntimeError(
+                    "Invalid link created."
+                    "\n\t" f"Tree: {repr(self.node.tree.bl_tree)}"
+                    "\n\t" f"From node: '{self.node.name}' [{self.node.bl_idname}]"
+                    "\n\t" f"From socket: '{self.identifier}'"
+                    "\n\t" f"To node: '{socket.node.name}' [{socket.node.bl_idname}]"
+                    "\n\t" f"To socket: '{socket.identifier}'"
+                )
 
             # only one input is allowed
             for _socket in socket.connections:
