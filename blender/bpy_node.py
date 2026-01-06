@@ -1729,7 +1729,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
 
             bpy_context.call(override, bpy.ops.node.delete_reconnect)
 
-            self.__init__(state.get_bpy_data(0))
+            self.__init__(state.get_bpy_struct(0))
 
 
     def ungroup(self, nodes: typing.List[_Shader_Node_Wrapper]):
@@ -1784,7 +1784,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
             # TODO: check changed behavior in old versions, it only ungroups the active node
             bpy_context.call(override, bpy.ops.node.group_ungroup)
 
-            self.__init__(state.get_bpy_data(0))
+            self.__init__(state.get_bpy_struct(0))
 
 
     def reset_nodes(self):

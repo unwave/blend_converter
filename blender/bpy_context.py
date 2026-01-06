@@ -314,7 +314,7 @@ class Bpy_State:
         return self._index_python_values - 1
 
 
-    def set(self, object: bpy.types.bpy_struct, name: str, value):
+    def remember(self, object: bpy.types.bpy_struct, name: str):
 
         init_value = getattr(object, name)
 
@@ -338,55 +338,81 @@ class Bpy_State:
             value_index = self.add_python_value(init_value)
 
 
-        self.states.append(
-            (
-                object_index,
-                object_is_bpy_struct,
-                name,
-                value_index,
-                value_is_bpy_struct,
-            )
+        state = (
+            object_index,
+            object_is_bpy_struct,
+            name,
+            value_index,
+            value_is_bpy_struct,
         )
+
+        self.states.append(state)
+
+        return state
+
+
+    def set(self, object: bpy.types.bpy_struct, name: str, value):
+
+        state = self.remember(object, name)
 
         setattr(object, name, value)
 
         if self.print:
-            utils.print_in_color(self.print_color_bpy if object_is_bpy_struct else self.print_color_python, f"{repr(object)}.{name} = {repr(value)}")
+            utils.print_in_color(self.print_color_bpy if state[1] else self.print_color_python, f"{repr(object)}.{name} = {repr(value)}")
 
 
-    def get_bpy_data(self, index: int):
+    def get_bpy_struct(self, index: int):
 
         id_block_index, path_from_id, representation = self.bpy_structs[index]
 
         pointer: Bpy_ID_Pointer = self.id_blocks_collection[id_block_index]
 
         if pointer.target is None:
-            raise Exception(f"The underling ID data block has been removed: {representation}")
+
+            if path_from_id and representation.endswith(path_from_id):
+                id = representation[:-len(path_from_id)]
+            else:
+                id = representation
+
+            raise Exception(
+                "Underling ID data block has been removed."
+                "\n\t"  f"ID: {id}"
+                "\n\t"  f"path_from_id: {repr(path_from_id)}"
+            )
         elif path_from_id:
-            return pointer.target.path_resolve(path_from_id)
+            try:
+                return pointer.target.path_resolve(path_from_id)
+            except ValueError as e:
+                raise Exception(
+                    "Fail to resolve path from id."
+                    "\n\t" f"ID: {repr(pointer.target)}"
+                    "\n\t" f"Path: {path_from_id}"
+                )  from e
         else:
             return pointer.target
 
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
 
-        if self.except_exit_errors or exc_type:
-            for object_index, object_is_bpy_struct, name, value_index, value_is_bpy_struct in reversed(self.states):
-                try:
-                    setattr(
-                        self.get_bpy_data(object_index) if object_is_bpy_struct else self.python_values[object_index],
-                        name,
-                        self.get_bpy_data(value_index) if value_is_bpy_struct else self.python_values[value_index],
-                    )
-                except Exception:
-                    utils.print_in_color(self.error_color, traceback.format_exc())
-        else:
-            for object_index, object_is_bpy_struct, name, value_index, value_is_bpy_struct in reversed(self.states):
+        for object_index, object_is_bpy_struct, name, value_index, value_is_bpy_struct in reversed(self.states):
+
+            try:
                 setattr(
-                    self.get_bpy_data(object_index) if object_is_bpy_struct else self.python_values[object_index],
+                    self.get_bpy_struct(object_index) if object_is_bpy_struct else self.python_values[object_index],
                     name,
-                    self.get_bpy_data(value_index) if value_is_bpy_struct else self.python_values[value_index],
+                    self.get_bpy_struct(value_index) if value_is_bpy_struct else self.python_values[value_index],
                 )
+            except Exception as e:
+
+                if self.except_exit_errors:
+                    utils.print_in_color(self.error_color, traceback.format_exc())
+                else:
+                    raise Exception(
+                        "Fail to unset property."
+                        "\n\t" f"Object: {self.bpy_structs[object_index][2] if object_is_bpy_struct else self.python_values[object_index]}"
+                        "\n\t" f"Name: {name}"
+                        "\n\t" f"Value: {self.bpy_structs[value_index][2] if value_is_bpy_struct else self.python_values[value_index]}"
+                    ) from e
 
         delete_scene_collection(self.collection_name)
 
