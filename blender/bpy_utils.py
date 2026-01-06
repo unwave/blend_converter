@@ -2296,6 +2296,23 @@ def move_modifier_to_first(modifier: bpy.types.Modifier):
         bpy_context.call_for_object(object, bpy.ops.object.modifier_move_to_index, modifier = modifier.name, index=0)
 
 
+def move_modifier_to_last(modifier: bpy.types.Modifier):
+
+    object: bpy.types.Object = modifier.id_data
+
+    last_index = len(object.modifiers) - 1
+
+    index = list(object.modifiers).index(modifier)
+    if index == last_index:
+        return
+
+    if bpy.app.version < (2,90,0):
+        for _ in range(last_index - index):
+            bpy_context.call_for_object(object, bpy.ops.object.modifier_move_down, modifier = modifier.name)
+    else:
+        bpy_context.call_for_object(object, bpy.ops.object.modifier_move_to_index, modifier = modifier.name, index=last_index)
+
+
 def is_smooth_modifier(modifier: bpy.types.Modifier):
 
     if modifier.type != 'NODES':
