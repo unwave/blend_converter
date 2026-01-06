@@ -658,6 +658,8 @@ def scale_uv_to_world_per_uv_layout(objects: typing.List[bpy.types.Object], uv_l
 
     from mathutils.geometry import area_tri
 
+    objects = bpy_utils.get_unique_data_objects(objects)
+
     with bpy_context.Focus_Objects(objects, mode='EDIT'):
 
         for object in objects:
