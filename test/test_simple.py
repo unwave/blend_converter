@@ -27,7 +27,7 @@ def get_program_1(blend_dir: str, blender_executable: str):
 
     blend_path = common.File(utils.get_last_blend(blend_dir))
     result_dir = get_result_dir(blend_dir)
-    result_path = os.path.join(result_dir, blend_path.dir_basename + '.gltf')
+    result_path = os.path.join(result_dir, blend_path.dir_name + '.gltf')
 
     blender = Blender(blender_executable)
 
@@ -74,7 +74,7 @@ def get_program_2(blend_dir: str, blender_executable: str):
 
     blend_path = common.File(utils.get_last_blend(blend_dir))
     result_dir = get_result_dir(blend_dir)
-    result_path = os.path.join(result_dir, blend_path.dir_basename + '.gltf')
+    result_path = os.path.join(result_dir, blend_path.dir_name + '.gltf')
 
     blender = Blender(blender_executable)
 
