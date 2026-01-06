@@ -1844,3 +1844,24 @@ class Compositor_Tree_Wrapper(_Tree_Wrapper[_Compositor_Node_Wrapper, _Composito
             scene.compositing_node_group = tree
 
             return cls(tree)
+
+
+class _Geometry_Socket_Wrapper(_Socket_Wrapper['_Geometry_Node_Wrapper']):
+
+    __slots__ = []
+
+
+class _Geometry_Node_Wrapper(_Node_Wrapper['Geometry_Tree_Wrapper', _Geometry_Socket_Wrapper, 'bpy.types.GeometryNodeTree', 'bpy.types.GeometryNode'], bpy.types.GeometryNode if typing.TYPE_CHECKING else _No_Type):
+
+    __slots__ = []
+
+    outputs: _Sockets_Wrapper[_Geometry_Socket_Wrapper, '_Geometry_Node_Wrapper']
+    inputs: _Sockets_Wrapper[_Geometry_Socket_Wrapper, '_Geometry_Node_Wrapper']
+
+
+class Geometry_Tree_Wrapper(_Tree_Wrapper[_Geometry_Node_Wrapper, _Geometry_Socket_Wrapper, 'bpy.types.GeometryNodeTree', 'bpy.types.GeometryNode'], bpy.types.GeometryNodeTree if typing.TYPE_CHECKING else _No_Type):
+
+    __slots__ = []
+
+    _socket_class = _Geometry_Socket_Wrapper
+    _node_class = _Geometry_Node_Wrapper
