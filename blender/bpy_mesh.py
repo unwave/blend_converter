@@ -130,12 +130,12 @@ def make_bake_cage(object: bpy.types.Object, cage_offset = 0.15, voxel_size = 0.
         bpy_modifier.apply_remesh(guide_cage, voxel_size)
 
 
-        smooth: bpy.types.CorrectiveSmoothModifier = bake_cage.modifiers.new(name = 'CORRECTIVE_SMOOTH', type='CORRECTIVE_SMOOTH')
+        smooth: bpy.types.CorrectiveSmoothModifier = bake_cage.modifiers.new(name = '', type='CORRECTIVE_SMOOTH')
         smooth.rest_source = 'BIND'
         smooth.use_pin_boundary = True
         bpy_context.call_for_object(bake_cage, bpy.ops.object.correctivesmooth_bind, modifier=smooth.name)
 
-        shrinkwrap: bpy.types.ShrinkwrapModifier = bake_cage.modifiers.new(name = 'SHRINKWRAP', type='SHRINKWRAP')
+        shrinkwrap: bpy.types.ShrinkwrapModifier = bake_cage.modifiers.new(name = '', type='SHRINKWRAP')
         shrinkwrap.target = guide_cage
         bpy_utils.move_modifier_to_first(shrinkwrap)
 

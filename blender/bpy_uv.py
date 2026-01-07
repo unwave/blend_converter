@@ -494,7 +494,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
         def apply_uv_data_transfer_modifier(from_object: bpy.types.Object, to_object: bpy.types.Object, uv_layer_name: str):
 
-            modifier: bpy.types.DataTransferModifier = to_object.modifiers.new('_', type='DATA_TRANSFER')
+            modifier: bpy.types.DataTransferModifier = to_object.modifiers.new('', type='DATA_TRANSFER')
 
             modifier.object = from_object
             modifier.use_loop_data = True
@@ -502,8 +502,6 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
             modifier.loop_mapping = 'NEAREST_POLYNOR'
             modifier.layers_uv_select_src = uv_layer_name
             modifier.show_expanded = False
-
-            modifier.name = 'UV' + modifier.type
 
             apply_modifier(modifier)
 

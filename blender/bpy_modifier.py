@@ -53,83 +53,74 @@ def apply_modifier(modifier: bpy.types.Modifier):
 
 
 def apply_collapse(object: bpy.types.Object, ratio: float):
-    modifier: bpy.types.DecimateModifier = object.modifiers.new(name = '_', type='DECIMATE')
+    modifier: bpy.types.DecimateModifier = object.modifiers.new(name = '', type='DECIMATE')
     modifier.decimate_type = 'COLLAPSE'
     modifier.ratio = ratio
     modifier.use_collapse_triangulate = True
 
-    modifier.name = modifier.type + ' ' + modifier.decimate_type
     apply_modifier(modifier)
 
 
 def apply_dissolve(object: bpy.types.Object, degrees: float):
-    modifier: bpy.types.DecimateModifier = object.modifiers.new(name = '_', type='DECIMATE')
+    modifier: bpy.types.DecimateModifier = object.modifiers.new(name = '', type='DECIMATE')
     modifier.decimate_type = 'DISSOLVE'
     modifier.angle_limit = math.radians(degrees)
 
-    modifier.name = modifier.type + ' ' + modifier.decimate_type
     apply_modifier(modifier)
 
 
 def apply_shrinkwrap(object: bpy.types.Object, target: bpy.types.Object):
-    modifier: bpy.types.ShrinkwrapModifier = object.modifiers.new(name = '_', type='SHRINKWRAP')
+    modifier: bpy.types.ShrinkwrapModifier = object.modifiers.new(name = '', type='SHRINKWRAP')
     modifier.target = target
 
-    modifier.name = modifier.type
     apply_modifier(modifier)
 
 
 def apply_weld(object: bpy.types.Object, merge_threshold: float):
-    modifier: bpy.types.WeldModifier = object.modifiers.new(name = '_', type='WELD')
+    modifier: bpy.types.WeldModifier = object.modifiers.new(name = '', type='WELD')
     modifier.merge_threshold = merge_threshold
     modifier.mode = 'CONNECTED'
 
-    modifier.name = modifier.type + ' ' + modifier.mode
     apply_modifier(modifier)
 
 
 def apply_weighted_normal(object: bpy.types.Object, keep_sharp = False, mode = 'FACE_AREA'):
-    modifier: bpy.types.WeightedNormalModifier = object.modifiers.new(name = '_', type='WEIGHTED_NORMAL')
+    modifier: bpy.types.WeightedNormalModifier = object.modifiers.new(name = '', type='WEIGHTED_NORMAL')
     modifier.keep_sharp = keep_sharp
     modifier.mode = mode
 
-    modifier.name = modifier.type
     apply_modifier(modifier)
 
 
 def apply_solidify(object: bpy.types.Object, thickness: float):
-    modifier: bpy.types.SolidifyModifier = object.modifiers.new(name = '_', type='SOLIDIFY')
+    modifier: bpy.types.SolidifyModifier = object.modifiers.new(name = '', type='SOLIDIFY')
     modifier.thickness = thickness
 
-    modifier.name = modifier.type
     apply_modifier(modifier)
 
 
 def apply_displace(object: bpy.types.Object, strength: float):
-    modifier: bpy.types.DisplaceModifier = object.modifiers.new(name = '_', type='DISPLACE')
+    modifier: bpy.types.DisplaceModifier = object.modifiers.new(name = '', type='DISPLACE')
     modifier.strength = strength
 
-    modifier.name = modifier.type
     apply_modifier(modifier)
 
 
 def apply_remesh(object: bpy.types.Object, voxel_size: float):
-    modifier: bpy.types.RemeshModifier = object.modifiers.new(name = '_', type='REMESH')
+    modifier: bpy.types.RemeshModifier = object.modifiers.new(name = '', type='REMESH')
     modifier.mode = 'VOXEL'
     modifier.voxel_size = voxel_size
 
-    modifier.name = modifier.type
     apply_modifier(modifier)
 
 
 def apply_triangulate(object: bpy.types.Object, keep_custom_normals = False, min_vertices = 4, quad_method = 'BEAUTY', ngon_method = 'BEAUTY'):
-    modifier: bpy.types.TriangulateModifier = object.modifiers.new(name = '_', type='TRIANGULATE')
+    modifier: bpy.types.TriangulateModifier = object.modifiers.new(name = '', type='TRIANGULATE')
     modifier.quad_method = quad_method
     modifier.ngon_method = ngon_method
     modifier.keep_custom_normals = keep_custom_normals
     modifier.min_vertices = min_vertices
 
-    modifier.name = modifier.type
     apply_modifier(modifier)
 
 
@@ -150,13 +141,11 @@ def apply_smooth_by_angle(object: bpy.types.Object, degrees: float):
 
         node_group = data_to.node_groups[0]
 
-    modifier: bpy.types.NodesModifier = object.modifiers.new(name = '_', type = 'NODES')
+    modifier: bpy.types.NodesModifier = object.modifiers.new(name = '', type = 'NODES')
     modifier.node_group = node_group
     modifier['Input_1'] = math.radians(degrees)  # Angle
     modifier['Socket_1'] = True  # Ignore Sharp
 
-
-    modifier.name = node_group_name
     apply_modifier(modifier)
 
 
@@ -260,8 +249,7 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
 
     def add_surface_deform(object: bpy.types.Object, target: bpy.types.Object):
 
-        modifier: bpy.types.SurfaceDeformModifier = object.modifiers.new(name = '_', type='SURFACE_DEFORM')
-        modifier.name = modifier.type
+        modifier: bpy.types.SurfaceDeformModifier = object.modifiers.new(name = '__bc_shape_key', type='SURFACE_DEFORM')
         modifier.target = target
 
         def bind():
