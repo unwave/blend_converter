@@ -1,6 +1,6 @@
 if __name__ == '__main__':
     from blend_converter.gui import updater_ui
-    app = updater_ui.Main_Frame.get_app([__file__], 'get_programs')
+    app = updater_ui.Main_Frame.get_app([(__file__, 'get_programs')])
     app.MainLoop()
 
 
