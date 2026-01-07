@@ -279,7 +279,7 @@ def get_island_margin(meshes: typing.Iterable[bpy.types.Mesh], settings: tool_se
 
 def mark_seams_from_islands(object: bpy.types.Object, uv_layer_name: typing.Optional[str] = None):
 
-    with bpy_context.Focus_Objects(object, 'EDIT'), bpy_context.State() as state:
+    with bpy_context.Focus(object, 'EDIT'), bpy_context.State() as state:
 
         if uv_layer_name is not None:
             state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
@@ -294,7 +294,7 @@ def mark_seams_from_islands(object: bpy.types.Object, uv_layer_name: typing.Opti
 
 def get_object_copy_for_uv_unwrap(object: bpy.types.Object):
 
-    with bpy_context.Focus_Objects(object):
+    with bpy_context.Focus(object):
 
         object_copy = object.copy()
         object_copy.data = object.data.copy()
@@ -344,15 +344,15 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
     yellow_color = utils.get_color_code(219, 185, 61, 0,0,0)
 
 
-    with bpy_context.Focus_Objects(object):
+    with bpy_context.Focus(object):
 
         object_copy = get_object_copy_for_uv_unwrap(object)
         object_copy.name = "EXPORT_" + object_copy.name
 
-        with bpy_context.Focus_Objects(object_copy):
+        with bpy_context.Focus(object_copy):
 
 
-            with bpy_context.Focus_Objects(object_copy, 'EDIT'), bpy_context.State() as state:
+            with bpy_context.Focus(object_copy, 'EDIT'), bpy_context.State() as state:
 
                 bpy.ops.mesh.reveal()
                 bpy.ops.mesh.select_all(action='SELECT')
@@ -510,7 +510,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         except ValueError:
             traceback.print_exc(file = sys.stderr)
 
-            with bpy_context.Focus_Objects([imported_object, object_copy, object]):
+            with bpy_context.Focus([imported_object, object_copy, object]):
                 apply_uv_data_transfer_modifier(imported_object, object_copy, uv_layer_name)
 
                 # loops that are failed to be transferred create overlaps
@@ -524,7 +524,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
 def re_unwrap_overlaps(object: bpy.types.Object, uv_layer_name: str):
 
-    with bpy_context.Focus_Objects(object, mode='EDIT'):
+    with bpy_context.Focus(object, mode='EDIT'):
         object.data.uv_layers.active = object.data.uv_layers[uv_layer_name]
 
         bpy.ops.mesh.reveal()
@@ -581,7 +581,7 @@ def scale_uv_to_world_per_uv_island(objects: typing.List[bpy.types.Object], uv_l
         # TODO: try to rewrite to not toggle on and off the edit mode
         # currently it is needed for bpy.ops.uv.unwrap to not unwrap other objects
         # https://docs.blender.org/api/current/mathutils.html#mathutils.Matrix.lerp
-        with bpy_context.Focus_Objects(object, mode='EDIT'):
+        with bpy_context.Focus(object, mode='EDIT'):
 
             bm = bmesh.from_edit_mesh(object.data)
 
@@ -658,7 +658,7 @@ def scale_uv_to_world_per_uv_layout(objects: typing.List[bpy.types.Object], uv_l
 
     objects = bpy_utils.get_unique_data_objects(objects)
 
-    with bpy_context.Focus_Objects(objects, mode='EDIT'):
+    with bpy_context.Focus(objects, mode='EDIT'):
 
         for object in objects:
 
@@ -720,7 +720,7 @@ def scale_uv_to_world_per_uv_layout(objects: typing.List[bpy.types.Object], uv_l
 def scale_uv_islands_by_weight_group(object: bpy.types.Object, uv_layer_name: str, weight_group_name: str, factor = 1.0):
     print(f"{scale_uv_islands_by_weight_group.__name__}...")
 
-    with bpy_context.Focus_Objects(object, mode='EDIT'):
+    with bpy_context.Focus(object, mode='EDIT'):
 
         bm = bmesh.from_edit_mesh(object.data)
 
@@ -826,7 +826,7 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
         print("No valid objects to pack: ", [o.name_full for o in objects])
         return
 
-    with bpy_context.Focus_Objects(objects, mode='EDIT'), bpy_context.State() as state:
+    with bpy_context.Focus(objects, mode='EDIT'), bpy_context.State() as state:
 
         state.set(bpy.context.scene.tool_settings, 'use_uv_select_sync', False)
 
@@ -1120,7 +1120,7 @@ def ensure_pixel_per_island(objects: typing.List[bpy.types.Object], settings: to
 
     objects = bpy_utils.get_unique_mesh_objects(objects)
 
-    with bpy_context.Focus_Objects(objects, mode='EDIT'), bpy_context.State() as state:
+    with bpy_context.Focus(objects, mode='EDIT'), bpy_context.State() as state:
 
         for object in objects:
 
@@ -1230,7 +1230,7 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
 
     all_bound_box_ratios: typing.List[float] = []
 
-    with bpy_context.Focus_Objects(objects, mode='EDIT'):
+    with bpy_context.Focus(objects, mode='EDIT'):
 
         for object in objects:
 
@@ -1259,7 +1259,7 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
 
     for object in objects:
 
-        with bpy_context.Focus_Objects(object, mode='EDIT'):
+        with bpy_context.Focus(object, mode='EDIT'):
 
             bm = bmesh.from_edit_mesh(object.data)
             if not bm.faces:
@@ -1414,7 +1414,7 @@ def copy_uv(from_object: bpy.types.Object, to_object: bpy.types.Object, uv_layer
         ]))
 
 
-    with bpy_context.Focus_Objects([from_object, to_object]):
+    with bpy_context.Focus([from_object, to_object]):
 
         uvs = array.array('f', [0.0, 0.0]) * len(from_object.data.loops)
 
@@ -1636,7 +1636,7 @@ def select_collapsed_islands(object: bpy.types.Object, uv_layer_name: str, toler
 
     loop_count = 0
 
-    with bpy_context.Focus_Objects([object], mode='EDIT'):
+    with bpy_context.Focus([object], mode='EDIT'):
 
         bpy.ops.mesh.reveal()
         bpy.ops.mesh.select_all(action='SELECT')
@@ -1664,14 +1664,14 @@ def select_collapsed_islands(object: bpy.types.Object, uv_layer_name: str, toler
 def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str, clear_seams = True):
 
     # save the uvs
-    with bpy_context.Focus_Objects(object):
+    with bpy_context.Focus(object):
         saved_uvs = array.array('f', [0.0, 0.0]) * len(object.data.loops)
         object.data.uv_layers[uv_layer_name].data.foreach_get('uv', saved_uvs)
 
 
     stretches = []
 
-    with bpy_context.Focus_Objects([object]):
+    with bpy_context.Focus([object]):
 
         # https://blender.stackexchange.com/questions/139996/how-to-get-uv-stretching-angle-or-area-colors-with-python-without-looking-at-v
 
@@ -1689,7 +1689,7 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str, cl
             stretches.append((lvs - luvs).length)
 
 
-    with bpy_context.Focus_Objects([object], mode='EDIT'):
+    with bpy_context.Focus([object], mode='EDIT'):
 
         bpy.ops.mesh.reveal()
         bpy.ops.mesh.select_all(action='SELECT')
@@ -1795,7 +1795,7 @@ def scale_uv_to_bounds(objects: typing.List[bpy.types.Object], margin: float = 0
 
     objects = bpy_utils.get_unique_data_objects(objects)
 
-    with bpy_context.Focus_Objects(objects, mode='EDIT'):
+    with bpy_context.Focus(objects, mode='EDIT'):
 
         bmeshes = [bmesh.from_edit_mesh(object.data) for object in objects]
 
@@ -2219,7 +2219,7 @@ def brute_force_unwrap(
 
         def copy_active_render_uv():
 
-            with bpy_context.Focus_Objects(object_copy):
+            with bpy_context.Focus(object_copy):
                 uvs = array.array('f', [0.0, 0.0]) * len(object_copy.data.loops)
                 get_active_render_uv_layer(object_copy).data.foreach_get('uv', uvs)
                 object_copy.data.uv_layers[object_copy.data.uv_layers.active.name].data.foreach_set('uv', uvs)
@@ -2406,7 +2406,7 @@ def brute_force_unwrap(
         the_best = Unwrap_Quality_Score._get_best(measures)[1]
 
 
-        with bpy_context.Focus_Objects(object):
+        with bpy_context.Focus(object):
             object.data.uv_layers[settings.uv_layer_name].data.foreach_set('uv', the_best._uvs)
 
         re_unwrap_overlaps(object, settings.uv_layer_name)
@@ -2414,7 +2414,7 @@ def brute_force_unwrap(
 
         if blend_inspector.has_identifier(blend_inspector.COMMON.INSPECT_UV_UNWRAP):
 
-            with bpy_context.Focus_Objects(object_copy):
+            with bpy_context.Focus(object_copy):
                 object_copy.data.uv_layers[settings.uv_layer_name].data.foreach_set('uv', the_best._uvs)
 
             re_unwrap_overlaps(object_copy, settings.uv_layer_name)

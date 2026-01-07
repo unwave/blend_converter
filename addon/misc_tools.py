@@ -563,7 +563,7 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
             bpy_uv.unwrap_with_fallback([object], uvs_unwrap_settings, ministry_of_flat_settings)
 
 
-            with bpy_context.Focus_Objects(object, mode='EDIT'):
+            with bpy_context.Focus(object, mode='EDIT'):
 
                 bpy.ops.mesh.select_all(action='SELECT')
                 bpy.ops.uv.reveal()

@@ -19,13 +19,13 @@ def create_object_from_selected_edit_mode_geometry():
 
     objects_in_edit_mode = [o.copy() for o in objects_in_edit_mode]
 
-    with bpy_context.Focus_Objects(objects_in_edit_mode):
+    with bpy_context.Focus(objects_in_edit_mode):
 
         new_object = bpy.data.objects.new('collision_shape', bpy.data.meshes.new(name='collision_shape'))
 
         merged_object = bpy_utils.merge_objects(bpy_utils.convert_to_mesh(objects_in_edit_mode), merge_into=new_object)
 
-        with bpy_context.Focus_Objects(merged_object, 'EDIT'):
+        with bpy_context.Focus(merged_object, 'EDIT'):
 
             bm = bmesh.from_edit_mesh(merged_object.data)
 
@@ -42,7 +42,7 @@ def create_object_from_selected_objects():
     if not selected_objects_copy:
         raise Exception("No selected objects.")
 
-    with bpy_context.Focus_Objects(selected_objects_copy):
+    with bpy_context.Focus(selected_objects_copy):
 
         new_object = bpy.data.objects.new('collision_shape', bpy.data.meshes.new(name='collision_shape'))
 
@@ -95,7 +95,7 @@ def get_decimated_copy(high_poly: bpy.types.Object, target_triangles = 15000, st
     bpy_modifier.apply_weld(low_poly, 0.02)
 
 
-    with bpy_context.Focus_Objects(low_poly, mode='EDIT'):
+    with bpy_context.Focus(low_poly, mode='EDIT'):
         bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='VERT')
         bpy.ops.mesh.reveal()
         bpy.ops.mesh.select_all(action='SELECT')
@@ -156,7 +156,7 @@ def bisect(object: bpy.types.Object, axis = 'X', flip = False, mirror_object: ty
     plane_no = mathutils.Vector((axis == 'X', axis == 'Y' , axis == 'Z'))
     plane_no.rotate(rotation_euler)
 
-    with bpy_context.Focus_Objects(object, 'EDIT'):
+    with bpy_context.Focus(object, 'EDIT'):
 
         bpy.ops.mesh.reveal()
         bpy.ops.mesh.select_all(action = 'SELECT')
@@ -231,7 +231,7 @@ def make_manifold(object: bpy.types.Object):
     For the convex decomposition to avoid operating on the shell.
     """
 
-    with bpy_context.Focus_Objects(object, 'EDIT'):
+    with bpy_context.Focus(object, 'EDIT'):
 
         bpy.ops.mesh.select_mode(type="VERT")
         bpy.ops.mesh.reveal()

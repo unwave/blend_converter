@@ -1183,7 +1183,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
     if settings.isolate_objects:
         Focus = bpy_context.Isolate_Focus
     else:
-        Focus = bpy_context.Focus_Objects
+        Focus = bpy_context.Focus
 
     with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), Focus(objects), bpy_context.State() as state:
 

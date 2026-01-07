@@ -99,7 +99,7 @@ def create_simplified_armature_and_constrain(armature: bpy.types.Object, deform_
 
 
     # define parenting hierarchy
-    with bpy_context.Focus_Objects(armature), bpy_context.State() as state:
+    with bpy_context.Focus(armature), bpy_context.State() as state:
 
         state.set(armature.data, 'pose_position','REST')
         armature.update_tag()
@@ -109,7 +109,7 @@ def create_simplified_armature_and_constrain(armature: bpy.types.Object, deform_
 
 
     # convert edit bones
-    with bpy_context.Focus_Objects(new, 'EDIT'), bpy_context.State() as state:
+    with bpy_context.Focus(new, 'EDIT'), bpy_context.State() as state:
 
         state.set(new.data, 'pose_position','REST')
         new.update_tag()
@@ -255,7 +255,7 @@ def create_simplified_armature_and_constrain(armature: bpy.types.Object, deform_
 
 
     # remove converted bendy bones
-    with bpy_context.Focus_Objects(new, 'EDIT'):
+    with bpy_context.Focus(new, 'EDIT'):
         for name in bendy_bone_to_segments:
             new.data.edit_bones.remove(new.data.edit_bones[name])
 
@@ -401,7 +401,7 @@ def bake_actions(
     objects = list(map(operator.itemgetter(0), itertools.chain(source_object_action_pairs, target_object_action_pairs)))
 
 
-    with bpy_context.Focus_Objects(objects), bpy_context.State() as state:
+    with bpy_context.Focus(objects), bpy_context.State() as state:
 
         if do_reset_pose_to_rest:
             for object in objects:
@@ -465,7 +465,7 @@ def unassign_deform_bones_with_missing_weights(armature: bpy.types.Object, meshe
     for object in bpy_utils.get_unique_mesh_objects(meshes):
         vertex_group_names.update(get_assigned_weights_groups(object))
 
-    with bpy_context.Focus_Objects(armature, 'EDIT'):
+    with bpy_context.Focus(armature, 'EDIT'):
 
         for bone in armature.data.edit_bones:
             if bone.use_deform:

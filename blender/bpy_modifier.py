@@ -356,7 +356,7 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
             if modifier_type == 'MIRROR':
                 bpy_mesh.bisect_by_mirror_modifiers(bind_copy)
 
-            with bpy_context.Focus_Objects(bind_copy, 'EDIT'):
+            with bpy_context.Focus(bind_copy, 'EDIT'):
 
                 # TODO: edit the mesh only if you cannot bind because of the errors
                 # https://docs.blender.org/manual/en/latest/modeling/modifiers/deform/surface_deform.html#options

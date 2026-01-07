@@ -44,7 +44,7 @@ def delete_other(object_names):
 
     from blend_converter.blender import bpy_context
 
-    with bpy_context.Focus_Objects([object for object in bpy.data.objects if object.name in object_names]):
+    with bpy_context.Focus([object for object in bpy.data.objects if object.name in object_names]):
         bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
 
     bpy.data.batch_remove(set(object for object in bpy.data.objects if object.name not in object_names))

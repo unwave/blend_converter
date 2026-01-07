@@ -141,7 +141,7 @@ def _convert_to_mesh(objects: typing.List[bpy.types.Object]):
 
     metaball_family = f"__metaball_family_{uuid.uuid1().hex}"
 
-    with bpy_context.Focus_Objects(objects):
+    with bpy_context.Focus(objects):
 
         bpy.ops.object.make_local(type='SELECT_OBDATA')
 
@@ -385,7 +385,7 @@ def merge_objects(objects: typing.List[bpy.types.Object], *, merge_into: typing.
             vertex_group.add(range(len(object.data.vertices)), 1, 'REPLACE')
 
 
-    with bpy_context.Focus_Objects(objects):
+    with bpy_context.Focus(objects):
         bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
         bpy.context.view_layer.objects.active = merged_object = merge_into
         bpy.ops.object.join()
@@ -533,7 +533,7 @@ def convert_materials_to_principled(objects: typing.List[bpy.types.Object], remo
 
 
     if remove_unused:
-        with bpy_context.Focus_Objects(objects) as context:
+        with bpy_context.Focus(objects) as context:
             object_with_materials = next((object for object in context.view_layer.objects if hasattr(object, 'material_slots') and object.material_slots), None)
             if object_with_materials is not None:
                 context.view_layer.objects.active = object_with_materials
@@ -1216,7 +1216,7 @@ def merge_material_slots_with_the_same_materials(objects: typing.List[bpy.types.
         material_to_indexes = utils.list_by_key(index_to_polygons, lambda i: object.material_slots[i].material)
 
 
-        with bpy_context.Focus_Objects(object):
+        with bpy_context.Focus(object):
             bpy.ops.object.material_slot_remove_all()
 
             index_to_new_index = {}
@@ -1340,7 +1340,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
         bpy_uv.ensure_uv_layer([merged_object], pack_uvs_settings.uv_layer_name, init_from=uv_layer_bake)
 
 
-        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.State() as state:
+        with bpy_context.Focus(merged_object, mode='EDIT'), bpy_context.State() as state:
 
             state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[uv_layer_bake])
 
@@ -1438,7 +1438,7 @@ def get_texture_resolution(objects: typing.List[bpy.types.Object], *, uv_layer_n
     from mathutils.geometry import area_tri
 
 
-    with bpy_context.Focus_Objects(objects), bpy_context.State() as state:
+    with bpy_context.Focus(objects), bpy_context.State() as state:
 
         for object in objects:
             state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
@@ -1516,7 +1516,7 @@ def split_objects_into_pre_merged_objects(objects: typing.List[bpy.types.Object]
         if not merged_objects_info:
             continue
 
-        with bpy_context.Focus_Objects(object, 'EDIT'):
+        with bpy_context.Focus(object, 'EDIT'):
 
             bpy.ops.mesh.reveal()
 
@@ -1583,7 +1583,7 @@ def split_objects_into_pre_merged_objects(objects: typing.List[bpy.types.Object]
             except TypeError:
                 traceback.print_exc(file=sys.stderr)
 
-        with bpy_context.Focus_Objects(object):
+        with bpy_context.Focus(object):
             bpy.context.scene.cursor.location = object_info['location']
             bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
 
@@ -1706,7 +1706,7 @@ def revert_space_out_objects(objects: typing.List[bpy.types.Object]):
 
 def deep_copy_objects(objects: typing.List[bpy.types.Object]):
 
-    with bpy_context.Focus_Objects(objects), bpy_context.State() as state:
+    with bpy_context.Focus(objects), bpy_context.State() as state:
 
         for attr in dir(bpy.context.preferences.edit):
             if attr.startswith('use_duplicate_'):
@@ -1774,7 +1774,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         raise ValueError(f"Specified objects cannot be baked, type must be MESH or convertible to MESH: {[o.name_full for o in objects]}\nIncompatible: {[o.name_full for o in incompatible_objects]}")
 
 
-    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.State() as state_0:
+    with bpy_context.Global_Optimizations(), bpy_context.Focus(objects), bpy_context.State() as state_0:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
         for object in bpy.data.objects:
@@ -1868,7 +1868,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         ## average uv islands scale
-        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.State() as state:
+        with bpy_context.Focus(merged_object, mode='EDIT'), bpy_context.State() as state:
 
             state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[settings.uv_layer_bake])
 
@@ -2018,7 +2018,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
         ## copy materials
         for orig, copy in map_original_to_copy.items():
-            with bpy_context.Focus_Objects(copy):
+            with bpy_context.Focus(copy):
                 bpy.ops.object.material_slot_remove_unused()  # when called with call_for_objects returns CANCELLED
 
             # Operator bpy.ops.object.material_slot_copy.poll() failed, context is incorrect
@@ -2063,7 +2063,7 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
         )
 
 
-    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.State() as state:
+    with bpy_context.Global_Optimizations(), bpy_context.Focus(objects), bpy_context.State() as state:
 
 
         ## this can help to reduce `Dependency cycle detected` spam in rigs

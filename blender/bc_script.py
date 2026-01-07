@@ -471,9 +471,9 @@ def clean_up_topology_and_triangulate_ngons(objects: Objects_Like = None, split_
 
     for object in bpy_utils.get_unique_mesh_objects(objects):
 
-        with bpy_context.Focus_Objects(object):
+        with bpy_context.Focus(object):
 
-            with bpy_context.Focus_Objects(object, mode = 'EDIT'):
+            with bpy_context.Focus(object, mode = 'EDIT'):
                 bpy.ops.mesh.reveal()
                 bpy.ops.mesh.select_all(action='SELECT')
                 bpy.ops.mesh.delete_loose()
@@ -483,7 +483,7 @@ def clean_up_topology_and_triangulate_ngons(objects: Objects_Like = None, split_
             bpy_modifier.apply_triangulate(object, keep_custom_normals = True, min_vertices = 5)
 
             if split_concave_faces or tris_to_quads:
-                with bpy_context.Focus_Objects(object, mode = 'EDIT'):
+                with bpy_context.Focus(object, mode = 'EDIT'):
                     bpy.ops.mesh.select_all(action='SELECT')
                     if tris_to_quads:
                         # TODO: ideally should be applied only to the former ngons

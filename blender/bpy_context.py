@@ -1269,7 +1269,7 @@ def set_mode(objects: typing.List[bpy.types.Object], mode: str, view_layer: 'bpy
             raise Exception(text + "\n\t" + "Unknown reason.")
 
 
-class Focus_Objects:
+class Focus:
 
 
     def __init__(self, objects: typing.Union[bpy.types.Object, typing.List[bpy.types.Object]], mode = 'OBJECT', view_layer: 'bpy.types.ViewLayer' = None):
@@ -1321,7 +1321,7 @@ class Focus_Objects:
         affected_objects = [object for object in bpy_utils.get_view_layer_objects(view_layer) if object.visible_get(view_layer=view_layer)] + self.focused_objects
         affected_objects = list(dict.fromkeys(affected_objects))
 
-        visible_collection = bpy.data.collections.new('__bc_focus_objects')
+        visible_collection = bpy.data.collections.new('__bc_focus')
         view_layer.layer_collection.collection.children.link(visible_collection)
         self.references.append(visible_collection)
 
