@@ -137,7 +137,7 @@ def make_bake_cage(object: bpy.types.Object, cage_offset = 0.15, voxel_size = 0.
 
         shrinkwrap: bpy.types.ShrinkwrapModifier = bake_cage.modifiers.new(name = '', type='SHRINKWRAP')
         shrinkwrap.target = guide_cage
-        bpy_utils.move_modifier_to_first(shrinkwrap)
+        bpy_modifier.move_modifier_to_first(shrinkwrap)
 
         bpy_utils.convert_to_mesh(bake_cage)
 

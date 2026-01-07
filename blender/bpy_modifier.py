@@ -6,9 +6,40 @@ import math
 import os
 
 from . import bpy_context
-from . import bpy_utils
 from . import bpy_node
 from . import bpy_mesh
+
+
+def move_modifier_to_first(modifier: bpy.types.Modifier):
+
+    object: bpy.types.Object = modifier.id_data
+
+    index = list(object.modifiers).index(modifier)
+    if index == 0:
+        return
+
+    if bpy.app.version < (2,90,0):
+        for _ in range(index):
+            bpy_context.call_for_object(object, bpy.ops.object.modifier_move_up, modifier = modifier.name)
+    else:
+        bpy_context.call_for_object(object, bpy.ops.object.modifier_move_to_index, modifier = modifier.name, index=0)
+
+
+def move_modifier_to_last(modifier: bpy.types.Modifier):
+
+    object: bpy.types.Object = modifier.id_data
+
+    last_index = len(object.modifiers) - 1
+
+    index = list(object.modifiers).index(modifier)
+    if index == last_index:
+        return
+
+    if bpy.app.version < (2,90,0):
+        for _ in range(last_index - index):
+            bpy_context.call_for_object(object, bpy.ops.object.modifier_move_down, modifier = modifier.name)
+    else:
+        bpy_context.call_for_object(object, bpy.ops.object.modifier_move_to_index, modifier = modifier.name, index=last_index)
 
 
 def _apply_modifier(object: bpy.types.Object, name: str):
@@ -264,7 +295,7 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
         bind_correction: bpy.types.NodesModifier = target.modifiers.new(name = '__bc_bind_correction', type='NODES')
         bind_correction.node_group = get_bind_correction_geometry_tree()
 
-        bpy_utils.move_modifier_to_first(bind_correction)
+        move_modifier_to_first(bind_correction)
 
         bind()
         if modifier.is_bound:
@@ -272,7 +303,7 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
         else:
             bind()  # unbind
 
-        bpy_utils.move_modifier_to_last(bind_correction)
+        move_modifier_to_last(bind_correction)
 
         bind()
         if not modifier.is_bound:
