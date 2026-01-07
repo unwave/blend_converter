@@ -51,8 +51,8 @@ def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, *, init_f
 
         if init_from:
             if mesh.uv_layers.get(init_from):
-                with bpy_context.State() as bpy_state:
-                    bpy_state.set(mesh.uv_layers, 'active', mesh.uv_layers[init_from])
+                with bpy_context.State() as state:
+                    state.set(mesh.uv_layers, 'active', mesh.uv_layers[init_from])
                     uvs = mesh.uv_layers.new(name = name, do_init = True)
             elif init_from_does_not_exist_ok:
                 uvs = mesh.uv_layers.new(name = name, do_init = False)
@@ -279,10 +279,10 @@ def get_island_margin(meshes: typing.Iterable[bpy.types.Mesh], settings: tool_se
 
 def mark_seams_from_islands(object: bpy.types.Object, uv_layer_name: typing.Optional[str] = None):
 
-    with bpy_context.Focus_Objects(object, 'EDIT'), bpy_context.State() as bpy_state:
+    with bpy_context.Focus_Objects(object, 'EDIT'), bpy_context.State() as state:
 
         if uv_layer_name is not None:
-            bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
+            state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
 
         bpy.ops.mesh.reveal()
         bpy.ops.mesh.select_all(action='SELECT')
@@ -344,7 +344,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
     yellow_color = utils.get_color_code(219, 185, 61, 0,0,0)
 
 
-    with bpy_context.Focus_Objects(object), bpy_context.State() as bpy_state:
+    with bpy_context.Focus_Objects(object):
 
         object_copy = get_object_copy_for_uv_unwrap(object)
         object_copy.name = "EXPORT_" + object_copy.name
@@ -352,15 +352,15 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         with bpy_context.Focus_Objects(object_copy):
 
 
-            with bpy_context.Focus_Objects(object_copy, 'EDIT'):
+            with bpy_context.Focus_Objects(object_copy, 'EDIT'), bpy_context.State() as state:
 
                 bpy.ops.mesh.reveal()
                 bpy.ops.mesh.select_all(action='SELECT')
 
-                bpy_state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'BOUNDING_BOX_CENTER')
+                state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'BOUNDING_BOX_CENTER')
                 bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(1/0.1, 1/0.1, 1/0.1), mirror=False, use_proportional_edit=False, snap=False)
 
-                bpy_state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'INDIVIDUAL_ORIGINS')
+                state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'INDIVIDUAL_ORIGINS')
                 bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(0.1, 0.1, 0.1), mirror=False, use_proportional_edit=False, snap=False)
 
 
@@ -826,12 +826,12 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
         print("No valid objects to pack: ", [o.name_full for o in objects])
         return
 
-    with bpy_context.Focus_Objects(objects, mode='EDIT'), bpy_context.State() as bpy_state:
+    with bpy_context.Focus_Objects(objects, mode='EDIT'), bpy_context.State() as state:
 
-        bpy_state.set(bpy.context.scene.tool_settings, 'use_uv_select_sync', False)
+        state.set(bpy.context.scene.tool_settings, 'use_uv_select_sync', False)
 
         for object in objects:
-            bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
+            state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
 
 
         bpy.ops.mesh.reveal()
@@ -846,7 +846,7 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
 
             for object in objects:
 
-                bpy_state.set(object, 'active_material_index', 0)
+                state.remember(object, 'active_material_index')
 
                 for material_index in range(len(object.material_slots)):
 
@@ -881,7 +881,7 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
             # https://github.com/blender/blender/blob/6329ac2f7ddee0fc203f9dc90dca07d4cc048e7e/source/blender/editors/uvedit/uvedit_unwrap_ops.cc#L270C6-L270C40
             # can also crate an empty or procedural texture in the material and make active
             for material_slot in object.material_slots:
-                bpy_state.set(material_slot, 'material', None)
+                state.set(material_slot, 'material', None)
 
 
         print('Pre-packing UV islands...')
@@ -1120,13 +1120,13 @@ def ensure_pixel_per_island(objects: typing.List[bpy.types.Object], settings: to
 
     objects = bpy_utils.get_unique_mesh_objects(objects)
 
-    with bpy_context.Focus_Objects(objects, mode='EDIT'), bpy_context.State() as bpy_state:
+    with bpy_context.Focus_Objects(objects, mode='EDIT'), bpy_context.State() as state:
 
         for object in objects:
 
             mesh: bpy.types.Mesh = object.data
 
-            bpy_state.set(mesh.uv_layers, 'active', mesh.uv_layers[settings.uv_layer_name])
+            state.set(mesh.uv_layers, 'active', mesh.uv_layers[settings.uv_layer_name])
 
         _ensure_pixel_per_island(objects, settings._actual_width, settings._actual_height)
 
@@ -1177,22 +1177,22 @@ def unwrap(objects: typing.List[bpy.types.Object], *,
     ensure_uv_layer(objects, settings.uv_layer_name, init_from = uv_layer_reuse, init_from_does_not_exist_ok=True)
 
 
-    with bpy_context.State() as bpy_state, bpy_context.Global_Optimizations():
+    with bpy_context.State() as state, bpy_context.Global_Optimizations():
 
         for object in bpy_utils.get_view_layer_objects():
             if object.animation_data:
                 for driver in object.animation_data.drivers:
-                    bpy_state.set(driver, 'mute', True)
+                    state.set(driver, 'mute', True)
 
                 for nla_track in object.animation_data.nla_tracks:
-                    bpy_state.set(nla_track, 'mute', True)
+                    state.set(nla_track, 'mute', True)
 
         for object in bpy_utils.get_view_layer_objects():
             for modifier in object.modifiers:
-                bpy_state.set(modifier, 'show_viewport', False)
+                state.set(modifier, 'show_viewport', False)
 
         for object in objects:
-            bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
+            state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
 
         with bpy_context.Empty_Scene():
             unwrap_with_fallback(objects, settings, ministry_of_flat_settings)

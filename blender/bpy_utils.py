@@ -613,12 +613,12 @@ def split_into_alpha_and_non_alpha_groups(objects: typing.List[bpy.types.Object]
 
 def bake_materials(objects: typing.List[bpy.types.Object], image_dir: str, resolution: int, **bake_kwargs):
 
-    with bpy_context.Global_Optimizations(), bpy_context.State() as bpy_state_0:
+    with bpy_context.Global_Optimizations(), bpy_context.State() as state:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
         for o in bpy.data.objects:
             if o.type == 'ARMATURE':
-                bpy_state_0.set(o.pose, 'ik_solver', 'LEGACY')
+                state.set(o.pose, 'ik_solver', 'LEGACY')
 
 
         convert_materials_to_principled(objects)
@@ -1287,12 +1287,12 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
     objects = get_meshable_objects(objects)
 
 
-    with bpy_context.Global_Optimizations(), bpy_context.State() as bpy_state_0:
+    with bpy_context.Global_Optimizations(), bpy_context.State() as state_0:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
         for o in bpy.data.objects:
             if o.type == 'ARMATURE':
-                bpy_state_0.set(o.pose, 'ik_solver', 'LEGACY')
+                state_0.set(o.pose, 'ik_solver', 'LEGACY')
 
 
         convert_materials_to_principled(objects, remove_unused=False)
@@ -1308,21 +1308,21 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
         # TODO: check results for non mesh objects, they supposed to have valid auto-generated UVs, like curves do
         objects_to_unwrap = get_unique_mesh_objects([object for object in objects if hasattr(object.data, 'uv_layers') and not uv_layer_reuse in object.data.uv_layers])
 
-        with bpy_context.State() as bpy_state:
+        with bpy_context.State() as state:
 
             for object in objects_to_unwrap:
                 if object.animation_data:
                     for driver in object.animation_data.drivers:
-                        bpy_state.set(driver, 'mute', True)
+                        state.set(driver, 'mute', True)
 
             for object in objects_to_unwrap:
                 for modifier in object.modifiers:
-                    bpy_state.set(modifier, 'show_viewport', False)
+                    state.set(modifier, 'show_viewport', False)
 
             bpy_uv.ensure_uv_layer(objects_to_unwrap, unwrap_uvs_settings.uv_layer_name)
 
             for object in objects_to_unwrap:
-                bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[unwrap_uvs_settings.uv_layer_name])
+                state.set(object.data.uv_layers, 'active', object.data.uv_layers[unwrap_uvs_settings.uv_layer_name])
 
             bpy_uv.unwrap_with_fallback(objects_to_unwrap, unwrap_uvs_settings)
 
@@ -1340,9 +1340,9 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
         bpy_uv.ensure_uv_layer([merged_object], pack_uvs_settings.uv_layer_name, init_from=uv_layer_bake)
 
 
-        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.State() as bpy_state:
+        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.State() as state:
 
-            bpy_state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[uv_layer_bake])
+            state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[uv_layer_bake])
 
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.uv.reveal()
@@ -1746,14 +1746,14 @@ def unwrap_unique_meshes(
 
     objects = get_unique_mesh_objects(objects)
 
-    with bpy_context.State() as bpy_state:
+    with bpy_context.State() as state:
 
         for object in objects:
             for modifier in object.modifiers:
-                bpy_state.set(modifier, 'show_viewport', False)
+                state.set(modifier, 'show_viewport', False)
 
         for object in objects:
-            bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
+            state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
 
         with bpy_context.Empty_Scene():
             bpy_uv.unwrap_with_fallback(objects, settings, ministry_of_flat_settings)
@@ -1774,12 +1774,12 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         raise ValueError(f"Specified objects cannot be baked, type must be MESH or convertible to MESH: {[o.name_full for o in objects]}\nIncompatible: {[o.name_full for o in incompatible_objects]}")
 
 
-    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.State() as bpy_state_0:
+    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.State() as state_0:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
         for object in bpy.data.objects:
             if object.type == 'ARMATURE':
-                bpy_state_0.set(object.pose, 'ik_solver', 'LEGACY')
+                state_0.set(object.pose, 'ik_solver', 'LEGACY')
 
 
         for object in objects:
@@ -1787,10 +1787,10 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
             if object.animation_data:
 
                 for driver in object.animation_data.drivers:
-                    bpy_state_0.set(driver, 'mute', True)
+                    state_0.set(driver, 'mute', True)
 
                 for nla_track in object.animation_data.nla_tracks:
-                    bpy_state_0.set(nla_track, 'mute', True)
+                    state_0.set(nla_track, 'mute', True)
 
         if settings.convert_materials:
             convert_materials_to_principled(objects, remove_unused=False)
@@ -1868,9 +1868,9 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         ## average uv islands scale
-        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.State() as bpy_state:
+        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.State() as state:
 
-            bpy_state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[settings.uv_layer_bake])
+            state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[settings.uv_layer_bake])
 
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.uv.reveal()
@@ -2063,13 +2063,13 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
         )
 
 
-    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.State() as bpy_state:
+    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.State() as state:
 
 
         ## this can help to reduce `Dependency cycle detected` spam in rigs
         for object in bpy.data.objects:
             if object.type == 'ARMATURE':
-                bpy_state.set(object.pose, 'ik_solver', 'LEGACY')
+                state.set(object.pose, 'ik_solver', 'LEGACY')
 
 
         ## disable animation for consistency
@@ -2077,10 +2077,10 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
             if object.animation_data:
 
                 for driver in object.animation_data.drivers:
-                    bpy_state.set(driver, 'mute', True)
+                    state.set(driver, 'mute', True)
 
                 for nla_track in object.animation_data.nla_tracks:
-                    bpy_state.set(nla_track, 'mute', True)
+                    state.set(nla_track, 'mute', True)
 
 
         ## process the materials

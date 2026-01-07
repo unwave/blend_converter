@@ -615,7 +615,7 @@ def get_conformed_pass_filter():
         return {'NONE'}
 
 
-def set_all_image_nodes_interpolation_to_smart(bl_tree: bpy.types.ShaderNodeTree, bpy_state: bpy_context.State):
+def set_all_image_nodes_interpolation_to_smart(bl_tree: bpy.types.ShaderNodeTree, state: bpy_context.State):
 
     pool = [bl_tree]
     processed = set()
@@ -631,7 +631,7 @@ def set_all_image_nodes_interpolation_to_smart(bl_tree: bpy.types.ShaderNodeTree
 
         for node in tree.nodes:
             if node.bl_idname == 'ShaderNodeTexImage' and node.image:
-                bpy_state.set(node, 'interpolation', 'Smart')
+                state.set(node, 'interpolation', 'Smart')
             elif node.bl_idname == 'ShaderNodeGroup' and node.node_tree:
                 pool.append(node.node_tree)
 
@@ -1185,7 +1185,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
     else:
         Focus = bpy_context.Focus_Objects
 
-    with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), Focus(objects), bpy_context.State() as bpy_state:
+    with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), Focus(objects), bpy_context.State() as state:
 
 
         if settings.use_selected_to_active:
@@ -1206,15 +1206,15 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
             if object.animation_data:
                 # drivers can modify render visibility
                 for driver in object.animation_data.drivers:
-                    bpy_state.set(driver, 'mute', True)
+                    state.set(driver, 'mute', True)
 
-            bpy_state.set(object, 'hide_render', False)
+            state.set(object, 'hide_render', False)
 
 
         # set smart interpolation
         if settings.use_smart_texture_interpolation:
             for material in bpy_utils.get_unique_materials(objects):
-                set_all_image_nodes_interpolation_to_smart(material.node_tree, bpy_state)
+                set_all_image_nodes_interpolation_to_smart(material.node_tree, state)
 
 
         # set active uv layer
@@ -1228,7 +1228,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
             except KeyError as e:
                 raise Exception(f"UV map '{settings.uv_layer_name}' for baking is missing in object: {object.name_full}") from e
 
-            bpy_state.set(object.data.uv_layers, 'active', uv_map)
+            state.set(object.data.uv_layers, 'active', uv_map)
 
 
         # bake objects
@@ -1237,7 +1237,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
             if len(objects) > 1:
                 # ⚓ T83971 Blender baking's margin overlap if multiple meshes are selected
                 # https://developer.blender.org/T83971
-                bpy_state.set(bpy.context.scene.render.bake, 'margin', min(1, settings.margin))
+                state.set(bpy.context.scene.render.bake, 'margin', min(1, settings.margin))
 
             bake_objects(objects, settings)
 
