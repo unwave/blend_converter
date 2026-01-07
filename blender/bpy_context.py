@@ -230,7 +230,7 @@ def is_bpy_struct(object):
     return True
 
 
-class Bpy_State:
+class State:
 
     print_color_bpy = utils.get_color_code(256,128,0, 0,0,0)
     print_color_python = utils.get_color_code(256,0,128, 0,0,0)
@@ -479,7 +479,7 @@ class Bpy_Reference_Collection:
             yield item.target
 
 
-class Bake_Settings(Bpy_State):
+class Bake_Settings(State):
 
 
     def __init__(self, bake_settings: 'tool_settings.Bake'):
@@ -560,7 +560,7 @@ class Bake_Settings(Bpy_State):
         return self
 
 
-class Global_Optimizations(Bpy_State):
+class Global_Optimizations(State):
 
     @staticmethod
     def dummy_view_layer_update(_):
@@ -581,7 +581,7 @@ class Global_Optimizations(Bpy_State):
         return self
 
 
-class Armature_Disabled(Bpy_State):
+class Armature_Disabled(State):
 
     def __init__(self, object: bpy.types.Object):
         super().__init__()
@@ -982,7 +982,7 @@ class Output_Socket_Diffuse_AO:
         self.tree.delete_new_nodes()
 
 
-class Diffuse_AO_Bake_Settings(Bpy_State):
+class Diffuse_AO_Bake_Settings(State):
 
     ao_bake_world_name = '__blend_converter_ao_bake_world_name'
 
@@ -1410,7 +1410,7 @@ class Focus_Objects:
         self.references.__exit__(type, value, traceback)
 
 
-class Light_Map_Bake_Settings(Bpy_State):
+class Light_Map_Bake_Settings(State):
 
 
         def __init__(self, samples = 16):
@@ -1588,7 +1588,7 @@ class Compositor_Input_Lightmap:
 def call_in_uv_editor(func, *args, can_be_canceled = False, **kwargs):
     """ Because some functionally of the operators can change depending on it."""
 
-    with Bpy_State() as state:
+    with State() as state:
 
         window = bpy.data.window_managers[0].windows[0]
 

@@ -51,7 +51,7 @@ def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, *, init_f
 
         if init_from:
             if mesh.uv_layers.get(init_from):
-                with bpy_context.Bpy_State() as bpy_state:
+                with bpy_context.State() as bpy_state:
                     bpy_state.set(mesh.uv_layers, 'active', mesh.uv_layers[init_from])
                     uvs = mesh.uv_layers.new(name = name, do_init = True)
             elif init_from_does_not_exist_ok:
@@ -279,7 +279,7 @@ def get_island_margin(meshes: typing.Iterable[bpy.types.Mesh], settings: tool_se
 
 def mark_seams_from_islands(object: bpy.types.Object, uv_layer_name: typing.Optional[str] = None):
 
-    with bpy_context.Focus_Objects(object, 'EDIT'), bpy_context.Bpy_State() as bpy_state:
+    with bpy_context.Focus_Objects(object, 'EDIT'), bpy_context.State() as bpy_state:
 
         if uv_layer_name is not None:
             bpy_state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
@@ -344,7 +344,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
     yellow_color = utils.get_color_code(219, 185, 61, 0,0,0)
 
 
-    with bpy_context.Focus_Objects(object), bpy_context.Bpy_State() as bpy_state:
+    with bpy_context.Focus_Objects(object), bpy_context.State() as bpy_state:
 
         object_copy = get_object_copy_for_uv_unwrap(object)
         object_copy.name = "EXPORT_" + object_copy.name
@@ -826,7 +826,7 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
         print("No valid objects to pack: ", [o.name_full for o in objects])
         return
 
-    with bpy_context.Focus_Objects(objects, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
+    with bpy_context.Focus_Objects(objects, mode='EDIT'), bpy_context.State() as bpy_state:
 
         bpy_state.set(bpy.context.scene.tool_settings, 'use_uv_select_sync', False)
 
@@ -1120,7 +1120,7 @@ def ensure_pixel_per_island(objects: typing.List[bpy.types.Object], settings: to
 
     objects = bpy_utils.get_unique_mesh_objects(objects)
 
-    with bpy_context.Focus_Objects(objects, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
+    with bpy_context.Focus_Objects(objects, mode='EDIT'), bpy_context.State() as bpy_state:
 
         for object in objects:
 
@@ -1177,7 +1177,7 @@ def unwrap(objects: typing.List[bpy.types.Object], *,
     ensure_uv_layer(objects, settings.uv_layer_name, init_from = uv_layer_reuse, init_from_does_not_exist_ok=True)
 
 
-    with bpy_context.Bpy_State() as bpy_state, bpy_context.Global_Optimizations():
+    with bpy_context.State() as bpy_state, bpy_context.Global_Optimizations():
 
         for object in bpy_utils.get_view_layer_objects():
             if object.animation_data:

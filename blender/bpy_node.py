@@ -1701,7 +1701,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
         bl_nodes = {node.bl_node for node in nodes}
         bl_tree = self.bl_tree
 
-        with bpy_context.Bpy_State() as state:
+        with bpy_context.State() as state:
 
             state.set(bl_tree, 'tag', True)  # ensure the first index is the tree
 
@@ -1757,7 +1757,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
         bl_nodes = {node.bl_node for node in nodes if node.be('ShaderNodeGroup')}
         bl_tree = self.bl_tree
 
-        with bpy_context.Bpy_State() as state:
+        with bpy_context.State() as state:
 
             state.set(bl_tree, 'tag', True)  # ensure the first index is the tree
 

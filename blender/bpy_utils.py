@@ -485,7 +485,7 @@ def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material
 
     objects = get_unique_mesh_objects(objects)
 
-    with bpy_context.Bpy_State() as state:
+    with bpy_context.State() as state:
 
         for object in objects:
             if object.animation_data:
@@ -613,7 +613,7 @@ def split_into_alpha_and_non_alpha_groups(objects: typing.List[bpy.types.Object]
 
 def bake_materials(objects: typing.List[bpy.types.Object], image_dir: str, resolution: int, **bake_kwargs):
 
-    with bpy_context.Global_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
+    with bpy_context.Global_Optimizations(), bpy_context.State() as bpy_state_0:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
         for o in bpy.data.objects:
@@ -1287,7 +1287,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
     objects = get_meshable_objects(objects)
 
 
-    with bpy_context.Global_Optimizations(), bpy_context.Bpy_State() as bpy_state_0:
+    with bpy_context.Global_Optimizations(), bpy_context.State() as bpy_state_0:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
         for o in bpy.data.objects:
@@ -1308,7 +1308,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
         # TODO: check results for non mesh objects, they supposed to have valid auto-generated UVs, like curves do
         objects_to_unwrap = get_unique_mesh_objects([object for object in objects if hasattr(object.data, 'uv_layers') and not uv_layer_reuse in object.data.uv_layers])
 
-        with bpy_context.Bpy_State() as bpy_state:
+        with bpy_context.State() as bpy_state:
 
             for object in objects_to_unwrap:
                 if object.animation_data:
@@ -1340,7 +1340,7 @@ def merge_objects_and_bake_materials(objects: typing.List[bpy.types.Object], ima
         bpy_uv.ensure_uv_layer([merged_object], pack_uvs_settings.uv_layer_name, init_from=uv_layer_bake)
 
 
-        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
+        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.State() as bpy_state:
 
             bpy_state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[uv_layer_bake])
 
@@ -1438,7 +1438,7 @@ def get_texture_resolution(objects: typing.List[bpy.types.Object], *, uv_layer_n
     from mathutils.geometry import area_tri
 
 
-    with bpy_context.Focus_Objects(objects), bpy_context.Bpy_State() as state:
+    with bpy_context.Focus_Objects(objects), bpy_context.State() as state:
 
         for object in objects:
             state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
@@ -1706,7 +1706,7 @@ def revert_space_out_objects(objects: typing.List[bpy.types.Object]):
 
 def deep_copy_objects(objects: typing.List[bpy.types.Object]):
 
-    with bpy_context.Focus_Objects(objects), bpy_context.Bpy_State() as state:
+    with bpy_context.Focus_Objects(objects), bpy_context.State() as state:
 
         for attr in dir(bpy.context.preferences.edit):
             if attr.startswith('use_duplicate_'):
@@ -1746,7 +1746,7 @@ def unwrap_unique_meshes(
 
     objects = get_unique_mesh_objects(objects)
 
-    with bpy_context.Bpy_State() as bpy_state:
+    with bpy_context.State() as bpy_state:
 
         for object in objects:
             for modifier in object.modifiers:
@@ -1774,7 +1774,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
         raise ValueError(f"Specified objects cannot be baked, type must be MESH or convertible to MESH: {[o.name_full for o in objects]}\nIncompatible: {[o.name_full for o in incompatible_objects]}")
 
 
-    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.Bpy_State() as bpy_state_0:
+    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.State() as bpy_state_0:
 
         # this can help to reduce `Dependency cycle detected` spam in rigs
         for object in bpy.data.objects:
@@ -1868,7 +1868,7 @@ def copy_and_bake_materials(objects: typing.List[bpy.types.Object], settings: to
 
 
         ## average uv islands scale
-        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.Bpy_State() as bpy_state:
+        with bpy_context.Focus_Objects(merged_object, mode='EDIT'), bpy_context.State() as bpy_state:
 
             bpy_state.set(merged_object.data.uv_layers, 'active', merged_object.data.uv_layers[settings.uv_layer_bake])
 
@@ -2063,7 +2063,7 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
         )
 
 
-    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.Bpy_State() as bpy_state:
+    with bpy_context.Global_Optimizations(), bpy_context.Focus_Objects(objects), bpy_context.State() as bpy_state:
 
 
         ## this can help to reduce `Dependency cycle detected` spam in rigs

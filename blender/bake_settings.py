@@ -199,7 +199,7 @@ class _Principled_Input(_Bake_Type, tool_settings.Settings):
             if hasattr(bpy.context.scene.render.bake, 'margin_type'):
                 settings.append((bpy.context.scene.render.bake, 'margin_type', 'ADJACENT_FACES'))
 
-        return bpy_context.Bpy_State(settings)
+        return bpy_context.State(settings)
 
 
     def _get_material_context(self, material: 'bpy.types.Material'):
@@ -265,7 +265,7 @@ class Normal(_Principled_Input):
         if hasattr(bpy.context.scene.render.bake, 'margin_type'):
             settings.append((bpy.context.scene.render.bake, 'margin_type', 'EXTEND'))
 
-        return bpy_context.Bpy_State(settings)
+        return bpy_context.State(settings)
 
 
     def _get_material_context(self, material: 'bpy.types.Material'):
@@ -385,7 +385,7 @@ class AO_Node(_AO):
             if hasattr(bpy.context.scene.render.bake, 'margin_type'):
                 settings.append((bpy.context.scene.render.bake, 'margin_type', 'ADJACENT_FACES'))
 
-        return bpy_context.Bpy_State(settings)
+        return bpy_context.State(settings)
 
 
     def _get_material_context(self, material: 'bpy.types.Material'):
@@ -501,7 +501,7 @@ class Diffuse(_Bake_Type, tool_settings.Settings):
         if self.use_denoise:
             settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
 
-        return bpy_context.Bpy_State(settings)
+        return bpy_context.State(settings)
 
 
 
@@ -549,7 +549,7 @@ class Glossy(_Bake_Type, tool_settings.Settings):
         if self.use_denoise:
             settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
 
-        return bpy_context.Bpy_State(settings)
+        return bpy_context.State(settings)
 
 
 
@@ -666,7 +666,7 @@ class View_Space_Normal(_Bake_Type, tool_settings.Settings):
         if hasattr(bpy.context.scene.render.bake, 'margin_type'):
             settings.append((bpy.context.scene.render.bake, 'margin_type', 'EXTEND'))
 
-        return bpy_context.Bpy_State(settings)
+        return bpy_context.State(settings)
 
 
     def _get_material_context(self, material):
@@ -758,12 +758,12 @@ class Buffer_Factor(_Bake_Type, tool_settings.Settings):
 
         def _get_setup_context(self):
             if hasattr(bpy.context.scene.render.bake, 'margin_type'):
-                return bpy_context.Bpy_State([
+                return bpy_context.State([
                     (bpy.context.scene.render.bake, 'margin', 1),
                     (bpy.context.scene.render.bake, 'margin_type', 'ADJACENT_FACES'),
                 ])
             else:
-                return bpy_context.Bpy_State([(bpy.context.scene.render.bake, 'margin', 1)])
+                return bpy_context.State([(bpy.context.scene.render.bake, 'margin', 1)])
 
 
         def _get_material_context(self, material: 'bpy.types.Material'):
@@ -794,7 +794,7 @@ class Normal_Native(_Bake_Type, tool_settings.Settings):
 
 
     def _get_setup_context(self):
-        return bpy_context.Bpy_State([(bpy.context.scene.cycles, 'bake_type', 'NORMAL')])
+        return bpy_context.State([(bpy.context.scene.cycles, 'bake_type', 'NORMAL')])
 
 
     def _get_compositor_context(self, input_socket, images, channel):
@@ -855,7 +855,7 @@ class Combined(_Bake_Type, tool_settings.Settings):
         if self.use_denoise:
             settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
 
-        return bpy_context.Bpy_State(settings)
+        return bpy_context.State(settings)
 
 
 @dataclass
@@ -885,4 +885,4 @@ class AO_Native(_Bake_Type, tool_settings.Settings):
         if self.use_denoise:
             settings.append((bpy.context.scene.render.bake, 'margin', get_margin()))
 
-        return bpy_context.Bpy_State(settings)
+        return bpy_context.State(settings)

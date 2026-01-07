@@ -281,7 +281,7 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
         return bind_correction.name
 
 
-    with bpy_context.Bpy_State() as state:
+    with bpy_context.State() as state:
 
 
         ## disabling modifiers
@@ -405,7 +405,7 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
 
                 temp.modifiers.clear()
 
-                with bpy_context.Bpy_State() as state_2:
+                with bpy_context.State() as state_2:
 
                     # TODO: add other exceptions when a modifier settings can be changed
                     # so it won't be modifying the topology in a position sensitive way

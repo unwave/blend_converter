@@ -287,7 +287,7 @@ class Baked_Image:
         print()
         print('Composing and saving...')
 
-        with bpy_context.Bpy_State() as state:
+        with bpy_context.State() as state:
 
             ## set color space
             # this does not affect .exr files
@@ -615,7 +615,7 @@ def get_conformed_pass_filter():
         return {'NONE'}
 
 
-def set_all_image_nodes_interpolation_to_smart(bl_tree: bpy.types.ShaderNodeTree, bpy_state: bpy_context.Bpy_State):
+def set_all_image_nodes_interpolation_to_smart(bl_tree: bpy.types.ShaderNodeTree, bpy_state: bpy_context.State):
 
     pool = [bl_tree]
     processed = set()
@@ -737,7 +737,7 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                     for material in materials_to_bake:
                         enter_output_context(material, bake_task)
 
-                    disable_material_state = context_stack.enter_context(bpy_context.Bpy_State())
+                    disable_material_state = context_stack.enter_context(bpy_context.State())
                     for object in objects:
                         for slot in object.material_slots:
                             if not slot.material in materials_to_bake:
@@ -1057,7 +1057,7 @@ def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings
 
     with contextlib.ExitStack() as exit_stack:
 
-        state = exit_stack.enter_context(bpy_context.Bpy_State())
+        state = exit_stack.enter_context(bpy_context.State())
 
         # hide other object in render
         if settings.isolate_objects:
@@ -1185,7 +1185,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
     else:
         Focus = bpy_context.Focus_Objects
 
-    with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), Focus(objects), bpy_context.Bpy_State() as bpy_state:
+    with bpy_context.Bake_Settings(settings), bpy_context.Global_Optimizations(), Focus(objects), bpy_context.State() as bpy_state:
 
 
         if settings.use_selected_to_active:
