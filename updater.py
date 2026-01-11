@@ -144,9 +144,10 @@ class Program_Entry:
 
             try:
                 self.program.execute()
-            except Exception as e:
+            except BaseException as e:
                 error = e
-                traceback.print_exc(file=sys.stderr)
+                if str(e) != 'BLENDER':
+                    traceback.print_exc(file=sys.stderr)
 
         stdout_capture.lines.put_nowait(None)
         stdout_capture_thread.join()
