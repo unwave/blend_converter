@@ -23,7 +23,7 @@ UPDATE_DELAY = 2
 """ For update debouncing. """
 
 
-LOG_DIR = r'D:\Desktop\temp_log_location_bc'
+LOG_DIR = os.path.join(utils.BLEND_CONVERTER_USER_DIR, 'logs')
 
 
 def kill_process(process: multiprocessing.Process):
@@ -116,6 +116,9 @@ class Program_Entry:
 
         from . import utils
         utils.print_in_color = utils.dummy_print_in_color
+
+        os.makedirs(os.path.dirname(self.stdout_file), exist_ok=True)
+        os.makedirs(os.path.dirname(self.stderr_file), exist_ok=True)
 
         def stdout_capture_job():
             with open(self.stdout_file, 'a+', encoding='utf-8') as f:

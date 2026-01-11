@@ -33,6 +33,9 @@ T = typing.TypeVar('T')
 T2 = typing.TypeVar('T2')
 
 
+BLEND_CONVERTER_USER_DIR = os.path.join(os.path.expanduser("~"), '.blend_converter')
+
+
 def get_time_stamp():
     return time.strftime('%Y%m%d_%H%M%S')
 
@@ -792,8 +795,6 @@ class Capture_Stderr(Capture_Output):
 
 
 # shelve
-USER_DIR = os.path.expanduser("~")
-BLEND_CONVERTER_USER_DIR = os.path.join(USER_DIR, '.blend_converter')
 shelve_files = {}
 
 
