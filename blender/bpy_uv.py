@@ -28,6 +28,7 @@ from . import blend_inspector
 
 from .. import utils
 from .. import tool_settings
+from .. import common
 
 
 def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, *, init_from: str = '', init_from_does_not_exist_ok = False):
@@ -204,13 +205,11 @@ def execute_uv_packer_addon(self: 'uv_packer.UVPackerPackButtonOperator', contex
 
 def import_uv_packer_addon():
 
-    uv_packer_path = r'D:\source\software\blender\scripts\addons\UV_Packer\__init__.py'
+    uv_packer_path = os.path.join(common.ROOT_DIR, 'external', 'uv_packer', '__init__.py')
     if os.path.exists(uv_packer_path):
         return utils.import_module_from_file(uv_packer_path)
 
-    # UV-Packer
-
-    raise NotImplementedError('Here goes the usual import.')
+    raise Exception(f"UV Packer was not found in path: {uv_packer_path}")
 
 
 def enable_uv_packer_addon():
@@ -230,8 +229,8 @@ def enable_uv_packer_addon():
 
         uv_packer.register()
         uv_packer.UVPackerPackButtonOperator.execute = execute_uv_packer_addon
-    except ImportError as e:
-        print(e)
+    except Exception as e:
+        traceback.print_exc(file=sys.stderr)
         return False
     else:
         return True
