@@ -174,9 +174,9 @@ def execute_uv_packer_addon(self: 'uv_packer.UVPackerPackButtonOperator', contex
             for message in iter(self.msg_queue.get, None):
                 messages.append(message)
                 if len(message) == 2 and message[0] == 1:
-                    print(round(message[1] * 100, 3), "%")
+                    print(round(message[1] * 100, 3), "%", flush=True)
                 else:
-                    print(message)
+                    print(message, flush=True)
 
         message_thread = threading.Thread(target=message_job, daemon=True)
         message_thread.start()
