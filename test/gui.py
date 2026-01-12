@@ -10,7 +10,9 @@ def get_programs():
 
     from test_simple import BLEND_DIRS, get_program_1, get_program_2
 
-    executable = r'C:\blender\blender-5.0.0-beta+v50.504cdd714675-windows.amd64-release\blender.exe'
+    executable = utils.get_blender_executable()
+    if not executable:
+        raise Exception(f"Blender executable not found: {repr(executable)}")
 
     programs = utils.Appendable_Dict()
 

@@ -164,8 +164,9 @@ def get_blender_executable_windows():
 @functools.lru_cache(None)
 def get_blender_executable():
 
-    if shutil.which('blender'):
-        return 'blender'
+    path = shutil.which('blender')
+    if path:
+        return path
 
     if sys.platform == 'win32':
         path = get_blender_executable_windows()
