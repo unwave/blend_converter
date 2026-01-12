@@ -121,23 +121,32 @@ class Program_Entry:
         os.makedirs(os.path.dirname(self.stderr_file), exist_ok=True)
 
         def stdout_capture_job():
-            with open(self.stdout_file, 'a+', encoding='utf-8') as f:
+
+            with open(self.stdout_file, 'w', encoding='utf-8') as f:
+
+                f.reconfigure(line_buffering = True)
+
                 for line in iter(stdout_capture.lines.get, None):
+
                     self.stdout_queue.put_nowait(line)
-                    f.write(line)
+                    f.write(f"[{time.strftime('%H:%M:%S %Y-%m-%d')}]: {line.rstrip()}\n")
 
         def stderr_capture_job():
-            with open(self.stderr_file, 'a+', encoding='utf-8') as f:
+
+            with open(self.stderr_file, 'w', encoding='utf-8') as f:
+
+                f.reconfigure(line_buffering = True)
+
                 for line in iter(stderr_capture.lines.get, None):
                     self.stderr_queue.put_nowait(line)
-                    f.write(line)
+                    f.write(f"[{time.strftime('%H:%M:%S %Y-%m-%d')}]: {line.rstrip()}\n")
 
         stdout_capture_thread = threading.Thread(target=stdout_capture_job, daemon=True)
         stderr_capture_thread = threading.Thread(target=stderr_capture_job, daemon=True)
 
         error = None
 
-        with utils.Capture_Stdout() as stdout_capture, utils.Capture_Stderr() as stderr_capture:
+        with utils.Capture_Stdout(line_buffering = True) as stdout_capture, utils.Capture_Stderr(line_buffering = True) as stderr_capture:
 
             stderr_capture_thread.start()
             stdout_capture_thread.start()
