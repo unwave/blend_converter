@@ -387,6 +387,9 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         except subprocess.TimeoutExpired as e:
             bpy.data.objects.remove(object_copy)
             raise utils.Fallback(f"Timeout: {object.name_full}") from e
+        except FileNotFoundError as e:
+            bpy.data.objects.remove(object_copy)
+            raise utils.Fallback(str(e) + '\n' + str(cmd)) from e
 
         returncode = process.returncode
 
