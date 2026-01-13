@@ -277,7 +277,7 @@ def os_show(files: typing.Union[str, typing.Iterable[str]]):
 
     if sys.platform != 'win32':
         for directory in deduplicate([os.path.dirname(file) for file in files]):
-            os_open(operator, directory)
+            os_open(directory)
         return
 
     files = [file.lower() for file in files]
