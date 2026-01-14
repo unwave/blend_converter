@@ -24,6 +24,7 @@
 			".pytest_cache": true,
 			"**.egg-info/": true,
 			"dist": true,
+			"build": true,
 		},
 		"python.analysis.diagnosticSeverityOverrides": {
 			"reportInvalidTypeForm": "none"
