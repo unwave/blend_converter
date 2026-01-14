@@ -33,9 +33,7 @@ def get_program_1(blend_dir: str, blender_executable: str):
         blender_executable = blender.binary_path
     )
 
-    program.run(blender, open_mainfile, blend_path)
-
-    program.run(blender, bc_script.reset_ui_layout)
+    program.run(blender, open_mainfile, blend_path, load_ui = False)
 
     program.run(blender, bc_script.merge_objects_and_bake_materials, program.run(blender, bc_script.get_view_layer_objects), image_dir=os.path.join(result_dir, 'textures'), resolution=128)
 
@@ -73,10 +71,7 @@ def get_program_2(blend_dir: str, blender_executable: str):
         blender_executable = blender.binary_path
     )
 
-    program.run(blender, open_mainfile, blend_path)
-
-    # TODO: getting a crash on `bpy_context.call_in_view3d(bpy.ops.transform.resize...` for an BLENDER_v249 file
-    program.run(blender, bc_script.reset_ui_layout)
+    program.run(blender, open_mainfile, blend_path, load_ui = False)
 
     objects = program.run(blender, bc_script.get_meshable_objects, program.run(blender, bc_script.get_view_layer_objects))
 
