@@ -1,17 +1,15 @@
 import os
 import time
+import tempfile
+import uuid
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 BLEND_DIRS = [file.path for file in os.scandir(os.path.join(DIR, 'blend')) if file.is_dir() and not file.name.startswith('_')]
 
-RESULTS_DIR = os.path.join(DIR, '_result')
-
 
 def get_result_dir(blend_dir):
-    result_dir = os.path.join(RESULTS_DIR, os.path.basename(blend_dir) + f"_{time.strftime('%Y%m%d_%H%M%S')}")
-    os.makedirs(result_dir, exist_ok=True)
-    return result_dir
+    return os.path.join(tempfile.tempdir, 'blend_converter', 'test', os.path.basename(blend_dir) + '_' + uuid.uuid1().hex)
 
 
 def get_program_1(blend_dir: str, blender_executable: str):
