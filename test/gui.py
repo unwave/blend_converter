@@ -8,7 +8,7 @@ def get_programs():
 
     from blend_converter import utils
 
-    from test_simple import BLEND_DIRS, get_program_1, get_program_2
+    from simple_programs import BLEND_DIRS, get_program_1, get_program_2
 
     executable = utils.get_blender_executable()
     if not executable:
