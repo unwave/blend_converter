@@ -1,12 +1,59 @@
-import os
 import typing
+import os
+import sys
 import subprocess
 
-DIR = os.path.dirname(os.path.realpath(__file__))
+import setuptools
+from pathspec import GitIgnoreSpec
 
 
-def get_git_ignored_files():
+DIR = os.path.dirname(__file__)
 
+
+def get_files_pathspec(root: str):
+
+    included_files: typing.List[str] = []
+    excluded_files: typing.List[str] = []
+
+
+    def read_file(path: str):
+        with open(path) as f:
+            return f.read().splitlines()
+
+
+    def traverse(path: str, specs: list = None):
+
+        if specs is None:
+            specs: typing.List[GitIgnoreSpec] = []
+        else:
+            specs = specs.copy()
+
+        for file in os.scandir(path):
+
+            if file.name == '.gitignore':
+                specs.append(GitIgnoreSpec.from_lines(read_file(file.path)))
+
+        for file in os.scandir(path):
+
+            if file.name == '.git':
+                continue
+
+            if file.is_dir():
+                traverse(file.path, specs)
+                continue
+
+            if any(spec.match_file(file.path) for spec in specs):
+                excluded_files.append(file.path)
+            else:
+                included_files.append(file.path)
+
+
+    traverse(root)
+
+    return included_files, excluded_files
+
+
+def get_git_ignored_files(root: str):
 
     result = subprocess.run(
         [
@@ -16,19 +63,18 @@ def get_git_ignored_files():
             '--exclude-standard',
             '--others',
             '--full-name',
-            '--directory',
             '-z',
         ],
         stdout = subprocess.PIPE,
         check = True,
         text = True,
         encoding = 'utf-8',
-        cwd = DIR
+        cwd = root
     )
 
     ignored_files = result.stdout.split('\0') if result.stdout else []
-    ignored_files = [os.path.realpath(os.path.join(DIR, file)) for file in ignored_files]
-    ignored_files.append(os.path.realpath(os.path.join(DIR, '.git')))
+    ignored_files = [os.path.realpath(os.path.join(root, file)) for file in ignored_files]
+    ignored_files.append(os.path.realpath(os.path.join(root, '.git')))
 
     return list(dict.fromkeys(ignored_files))
 
@@ -50,28 +96,40 @@ def get_files(path, filter_func: typing.Callable[[os.DirEntry], bool], recursive
     return files
 
 
-def get_git_files():
+def get_files_git(root: str):
 
-    ignored_files = get_git_ignored_files()
+    ignored_files = get_git_ignored_files(root)
 
 
     def filter_func(entry: os.DirEntry):
         return not os.path.realpath(entry.path) in ignored_files
 
 
-    included_files = [file.path for file in get_files(DIR, filter_func) if file.is_file()]
+    included_files = [file.path for file in get_files(root, filter_func) if file.is_file()]
     excluded_files = [file for file in ignored_files if os.path.isfile(file)]
 
-    package_data = {'': [os.path.relpath(os.path.realpath(path), DIR) for path in included_files]}
-    exclude_package_data = {'': [os.path.relpath(os.path.realpath(path), DIR) for path in excluded_files]}
-
-    return package_data, exclude_package_data
+    return included_files, excluded_files
 
 
-package_data, exclude_package_data = get_git_files()
+
+included_files, excluded_files = get_files_pathspec(DIR)
+
+try:
+    included_files_git, excluded_files_git = get_files_git(DIR)
+except (subprocess.SubprocessError, FileNotFoundError) as e:
+    print(e)
+else:
+    if set(included_files) != set(included_files_git):
+        raise Exception(f"Included files mismatch: {set(included_files).symmetric_difference(included_files_git)}")
+
+    if  set(excluded_files) != set(excluded_files_git):
+        raise Exception(f"Excluded files mismatch: {set(excluded_files).symmetric_difference(excluded_files_git)}")
 
 
-import sys
+
+package_data = {'': [os.path.relpath(os.path.realpath(path), DIR) for path in included_files]}
+exclude_package_data = {'': [os.path.relpath(os.path.realpath(path), DIR) for path in excluded_files]}
+
 
 if '__test__' in sys.argv:
 
@@ -101,20 +159,28 @@ if '__test__' in sys.argv:
 
 ## super-flat-layout
 
+
 # sdist and wheel files are identical
-# all files are specified by git
+# all files are specified by .gitignore
 
-## to get sdist use
+# if git is present, happens during the sdist build, it will check pathspec against git ls-files
+# can use --no-isolation to also do it when building the wheel
+
+# FIXME: there are duplicates in SOURCES.txt
+
+
+## sdist
 # py -m build --sdist
-# FIXME: there duplicates in SOURCES.txt
-# TODO: currently it not possible to build from sdist without the .git and a git client
 
-## to get wheel use
+## wheel
+# py -m build --wheel
+
+## wheel + git check
 # py -m build --wheel --no-isolation
-# TODO: --no-isolation is because .git is needed
 
+## both
+# py -m build
 
-import setuptools
 
 setuptools.setup(
 
