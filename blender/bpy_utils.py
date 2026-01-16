@@ -2179,6 +2179,7 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
                 pre_bake_settings.use_anti_aliasing = False
                 pre_bake_settings.material_key = material_key
                 pre_bake_settings.bake_types = [view_space_normals_bake_type]
+                pre_bake_settings.texture_name_prefix = uuid.uuid1().hex
 
                 pre_bake_tasks.append(pre_bake_settings)
 
