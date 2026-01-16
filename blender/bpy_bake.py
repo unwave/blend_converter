@@ -513,7 +513,15 @@ class Baked_Image:
                 state.set(bpy.context.scene.render, 'resolution_percentage', 100)
 
 
-                if self.settings.view_space_normals_id and not any(self.settings.view_space_normals_id == bake_type._uuid for bake_type in self.bake_types):
+                use_view_space_normals = (
+                    # the settings have view space normals assigned for denoising
+                    self.settings.view_space_normals_id
+                    and
+                    # the image, which is being saved, is not itself the view space normals
+                    not any(self.settings.view_space_normals_id == bake_type._uuid for bake_type in self.bake_types)
+                )
+
+                if use_view_space_normals:
 
                     tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
 
