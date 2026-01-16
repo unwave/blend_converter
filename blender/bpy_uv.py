@@ -2093,7 +2093,7 @@ def brute_force_unwrap(
 
                     return get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
             except utils.Fallback:
-                    traceback.print_exc(file=sys.stderr)
+                    traceback.print_exc()
                     return None
 
 
@@ -2110,7 +2110,7 @@ def brute_force_unwrap(
 
                     return get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
             except utils.Fallback:
-                    traceback.print_exc(file=sys.stderr)
+                    traceback.print_exc()
                     return None
 
         def mof_use_normal():
@@ -2126,7 +2126,7 @@ def brute_force_unwrap(
 
                     return get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
             except utils.Fallback:
-                    traceback.print_exc(file=sys.stderr)
+                    traceback.print_exc()
                     return None
 
 
@@ -2247,7 +2247,7 @@ def brute_force_unwrap(
                 measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
             except Exception:
                 measure = None
-                traceback.print_exc(file=sys.stderr)
+                traceback.print_exc()
 
             measures[name] = measure
             skip_inspect or binspect(name)
@@ -2264,7 +2264,7 @@ def brute_force_unwrap(
                 measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
             except Exception:
                 measure = None
-                traceback.print_exc(file=sys.stderr)
+                traceback.print_exc()
 
             measures[name] = measure
             skip_inspect or binspect(name)
@@ -2302,7 +2302,7 @@ def brute_force_unwrap(
                 reunwrap_with_minimal_stretch()
                 measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
             except Exception:
-                traceback.print_exc(file=sys.stderr)
+                traceback.print_exc()
                 is_minimal_stretch_failed = True
                 measure = None
 
@@ -2319,7 +2319,7 @@ def brute_force_unwrap(
                 reunwrap_conformal()
                 measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
             except Exception:
-                traceback.print_exc(file=sys.stderr)
+                traceback.print_exc()
                 measure = None
 
             measures[name] = measure
@@ -2342,7 +2342,7 @@ def brute_force_unwrap(
                     rescale()
                     measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name, clear_seams = False)
                 except Exception:
-                    traceback.print_exc(file=sys.stderr)
+                    traceback.print_exc()
                     measure = None
 
                 measures[name] = measure
@@ -2356,7 +2356,7 @@ def brute_force_unwrap(
                     rescale()
                     measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
                 except Exception:
-                    traceback.print_exc(file=sys.stderr)
+                    traceback.print_exc()
                     measure = None
 
                 measures[name] = measure
@@ -2380,7 +2380,7 @@ def brute_force_unwrap(
                     rescale()
                     measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name, clear_seams = False)
                 except Exception:
-                    traceback.print_exc(file=sys.stderr)
+                    traceback.print_exc()
                     measure = None
 
                 measures[name] = measure
@@ -2395,7 +2395,7 @@ def brute_force_unwrap(
                     rescale()
                     measure = get_unwrap_quality_measures(object_copy, settings.uv_layer_name)
                 except Exception:
-                    traceback.print_exc(file=sys.stderr)
+                    traceback.print_exc()
                     measure = None
 
                 measures[name] = measure
