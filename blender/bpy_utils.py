@@ -2239,6 +2239,17 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         bake_proxy = merge_objects(objects_copy, name = '__bc_bake')
 
+        ## remove unused materials
+        # Blender 5.0
+        # merge_material_slots_with_the_same_materials can leave objects with 0 polygons without materials
+        # joining the objects with no materials creates an empty material slot for them
+        # the empty material slot fail the bake
+        # related
+        # https://projects.blender.org/blender/blender/issues/146878
+
+        with bpy_context.Focus(bake_proxy):
+            bpy.ops.object.material_slot_remove_unused()
+
 
         ## bake
         for pre_bake_settings in pre_bake_tasks:
