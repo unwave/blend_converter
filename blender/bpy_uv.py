@@ -2442,7 +2442,13 @@ def unwrap_with_fallback(
 
     settings = tool_settings.Unwrap_UVs()._update(settings)
 
-    if settings.use_brute_force_unwrap:
+    use_use_brute_force_unwrap = (
+        settings.use_brute_force_unwrap
+        and
+        not blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_UNWRAP)
+    )
+
+    if use_use_brute_force_unwrap:
 
         if settings.brute_unwrap_methods:
             methods = set(settings.brute_unwrap_methods)
