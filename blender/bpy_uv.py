@@ -1809,6 +1809,7 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str, cl
 
         _, _,  texel_density_deviation, area_ratios_deviation = get_texel_density_for_uv_quality(object, uv_layer_name)
 
+        bpy.ops.uv.select_all(action='SELECT')
         scale_uv_to_bounds([object])
 
         texel_density, uv_area_taken,  _, _ = get_texel_density_for_uv_quality(object, uv_layer_name)
@@ -1849,8 +1850,7 @@ def scale_uv_to_bounds(objects: typing.List[bpy.types.Object], margin: float = 0
             uv_layer = bm.loops.layers.uv.verify()
 
             for face in bm.faces:
-                for loop in face.loops:
-                    uv = loop[uv_layer].uv
+                for uv in iter_selected_uvs(face, uv_layer):
                     min_x = min(min_x, uv.x)
                     min_y = min(min_y, uv.y)
                     max_x = max(max_x, uv.x)
@@ -1864,8 +1864,7 @@ def scale_uv_to_bounds(objects: typing.List[bpy.types.Object], margin: float = 0
             uv_layer = bm.loops.layers.uv.verify()
 
             for face in bm.faces:
-                for loop in face.loops:
-                    uv = loop[uv_layer].uv
+                for uv in iter_selected_uvs(face, uv_layer):
                     uv.x = (uv.x - min_x) * scale_x + margin / 2
                     uv.y = (uv.y - min_y) * scale_y + margin / 2
 
@@ -2517,6 +2516,12 @@ if bpy.app.version >= (5, 0):
     def get_selected_uvs_count(islands: typing.List[typing.List[bmesh.types.BMFace]], uv_layer: bmesh.types.BMLayerItem):
         return sum(loop.uv_select_vert for island in islands for face in island for loop in face.loops)
 
+
+    def iter_selected_uvs(face: bmesh.types.BMFace, uv_layer: bmesh.types.BMLayerItem) -> typing.Generator[mathutils.Vector, None, None]:
+        for loop in face.loops:
+            if loop.uv_select_vert:
+                yield loop[uv_layer].uv
+
 else:
 
     def select_island(island: typing.List[bmesh.types.BMFace], uv_layer: bmesh.types.BMLayerItem):
@@ -2528,3 +2533,9 @@ else:
 
     def get_selected_uvs_count(islands: typing.List[typing.List[bmesh.types.BMFace]], uv_layer: bmesh.types.BMLayerItem):
         return sum(loop[uv_layer].select for island in islands for face in island for loop in face.loops)
+
+
+    def iter_selected_uvs(face: bmesh.types.BMFace, uv_layer: bmesh.types.BMLayerItem) -> typing.Generator[mathutils.Vector, None, None]:
+        for loop in face.loops:
+            if loop[uv_layer].select:
+                yield loop[uv_layer].uv
