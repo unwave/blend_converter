@@ -850,18 +850,37 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
 
                 state.remember(object, 'active_material_index')
 
-                for material_index in range(len(object.material_slots)):
+                for slot in object.material_slots:
 
-                    object.active_material_index = material_index
-                    if not object.active_material.get(settings.material_key):
+                    object.active_material_index = slot.slot_index
+
+                    if not slot.material.get(settings.material_key):
                         continue
 
                     result = bpy_context.call_for_object(object, bpy.ops.object.material_slot_select, can_be_canceled = True)
-                    any_material_selected = 'CANCELLED' not in result  # can be canceled if the material slot is not assigned to any polygon
+
+                    # can be canceled if the material slot is not assigned to any polygon
+                    is_selected = 'CANCELLED' not in result
+
+                    if is_selected:
+
+                        utils.print_in_color(utils.get_color_code(139, 224, 56, 18, 18, 18),
+                            f"Material Selected:"
+                            "\n\t" f"Object: {object.name_full}"
+                            "\n\t" f"Key: {settings.material_key}"
+                            "\n\t" f"Name: {slot.material.name_full}"
+                            "\n\t" f"Slot Index: {slot.slot_index}"
+                        )
+
+                        any_material_selected = True
 
 
             if not any_material_selected:
-                utils.print_in_color(utils.get_color_code(255, 219, 187, 0,0,0), f"Objects do not use materials with key:\n\tobjects = {', '.join([o.name_full for o in objects])}\n\tmaterial_key = {settings.material_key}")
+                utils.print_in_color(utils.get_color_code(255, 219, 187, 0,0,0),
+                    f"Objects do not use materials with key:"
+                    "\n\t" f"objects = {[o.name_full for o in objects]}"
+                    "\n\t" f"material_key = {settings.material_key}"
+                )
                 return
 
             bpy.ops.uv.select_all(action='SELECT')
