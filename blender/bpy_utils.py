@@ -2105,34 +2105,31 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         materials = list(group_objects_by_material(objects))
 
-        def pack_uvs(resolution):
-            for material_key in (opaque_material_key, alpha_material_key):
+        def pack_uvs(resolution: int, material_key: str):
 
-                if not any(m for m in materials if m.get(material_key)):
-                    continue
+            _pack_settings = tool_settings.Pack_UVs(
+                resolution = resolution,
+                uv_layer_name = settings.uv_layer_bake,
+                material_key = material_key,
+                average_uv_scale = False,
+            )._update(pack_settings)
 
-                _pack_settings = tool_settings.Pack_UVs(
+            _pack_settings._set_suggested_padding()
+
+            bpy_uv.pack(objects, _pack_settings)
+
+
+        def ensure_pixel_per_island(resolution: int, material_key: str):
+
+            _pack_settings = tool_settings.Pack_UVs(
                     resolution = resolution,
                     uv_layer_name = settings.uv_layer_bake,
                     material_key = material_key,
-                    average_uv_scale = False,
                 )
 
-                if pack_settings:
-                    _pack_settings._update(pack_settings)
-
-                _pack_settings._set_suggested_padding()
-                bpy_uv.pack(objects, _pack_settings)
-                bpy_uv.ensure_pixel_per_island(objects, _pack_settings)
+            bpy_uv.ensure_pixel_per_island(objects, _pack_settings)
 
 
-        if settings.resolution:
-            pack_uvs(settings.resolution)
-        else:
-            # pre packing
-            # needed to calculate the texel density
-            # but to match the final resolution, we have to pack a second time for preciseness
-            pack_uvs(get_closest_power_of_two((settings.min_resolution + settings.max_resolution)/2))
 
 
         ## collect bake settings
@@ -2153,9 +2150,14 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
             _bake_settings = tool_settings.Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)._update(bake_settings)
 
             if settings.resolution:
+                # the final resolution is hard set
                 _bake_settings.resolution = settings.resolution
             else:
-                # calculate target resolution and pack
+                # pre packing to calculate the texel density
+                # to match the final resolution, we have to pack a second time for preciseness
+                pack_uvs(get_closest_power_of_two((settings.min_resolution + settings.max_resolution)/2), material_key)
+
+                # calculate target resolution
                 _bake_settings.resolution = get_texture_resolution(
                     objects,
                     uv_layer_name = settings.uv_layer_bake,
@@ -2163,8 +2165,10 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
                     px_per_meter = settings.texel_density,
                     min_res = settings.min_resolution,
                     max_res = settings.max_resolution,
-                    )
-                pack_uvs(_bake_settings.resolution)
+                )
+
+            pack_uvs(_bake_settings.resolution, material_key)
+            ensure_pixel_per_island(_bake_settings.resolution, material_key)
 
 
             if settings.denoise_all:
