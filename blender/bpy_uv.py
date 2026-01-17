@@ -990,7 +990,13 @@ def get_spiral_shifts(n = 6):
     return coords
 
 
-def _ensure_pixel_per_island(objects: typing.List[bpy.types.Object], res_x: int, res_y: int, SPIRAL_SHIFTS = get_spiral_shifts()):
+def _ensure_pixel_per_island(
+            objects: typing.List[bpy.types.Object],
+            res_x: int,
+            res_y: int,
+            material_key = '',
+            SPIRAL_SHIFTS = get_spiral_shifts()
+        ):
     """
     Baking pixel-perfect maps is extremely inaccurate #74823
     https://projects.blender.org/blender/blender/issues/74823
@@ -1071,6 +1077,38 @@ def _ensure_pixel_per_island(objects: typing.List[bpy.types.Object], res_x: int,
 
         islands_without_pixels = [island for island in linked_uv_islands if not has_pixels(island)]
 
+
+        material_indexes = set()
+
+        if material_key:
+
+            for slot in object.material_slots:
+
+                if not slot.material:
+                    continue
+
+                if slot.material.get(material_key):
+                    material_indexes.add(slot.slot_index)
+
+            if not material_indexes:
+                continue
+
+            islands_without_pixels = [[face for face in island if face.material_index in material_indexes] for island in islands_without_pixels]
+            islands_without_pixels = list(filter(None, islands_without_pixels))
+
+
+        if not islands_without_pixels:
+            continue
+
+        utils.print_in_color(utils.get_color_code(222, 148, 40, 18, 18, 18),
+            f"Ensure pixel per island:"
+            "\n\t" f"Object: {object.name_full}"
+            "\n\t" f"Resolution: {res_x, res_y}"
+            "\n\t" f"Material Indexes: {material_indexes}"
+            "\n\t" f"Island Count: {len(islands_without_pixels)}"
+        )
+
+
         for island in islands_without_pixels:
 
             # select_island(island, uv_layer)
@@ -1130,7 +1168,7 @@ def ensure_pixel_per_island(objects: typing.List[bpy.types.Object], settings: to
 
             state.set(mesh.uv_layers, 'active', mesh.uv_layers[settings.uv_layer_name])
 
-        _ensure_pixel_per_island(objects, settings._actual_width, settings._actual_height)
+        _ensure_pixel_per_island(objects, settings._actual_width, settings._actual_height, material_key = settings.material_key)
 
 
 
