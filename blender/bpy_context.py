@@ -616,7 +616,7 @@ class Armature_Disabled(State):
 
 class Temp_Image:
 
-    uuid_key = 'blend_converter_uuid1_hex'
+    K_UUID = '__bc_temp_image_uuid1'
 
     def __init__(self, x, y):
         self.width = x
@@ -627,14 +627,14 @@ class Temp_Image:
         self.uuid_hex = uuid.uuid1().hex
 
         image = bpy.data.images.new(self.uuid_hex, width=self.width, height=self.height, float_buffer=True, is_data=True)
-        image[self.uuid_key] = self.uuid_hex
+        image[self.K_UUID] = self.uuid_hex
 
         return image
 
     def __exit__(self, type, value, traceback):
 
         for image in list(bpy.data.images):
-            if image.get(self.uuid_key) == self.uuid_hex:
+            if image.get(self.K_UUID) == self.uuid_hex:
                 break
         else:
             raise Exception(f"Temp image not found: {self.uuid_hex}")

@@ -297,13 +297,13 @@ class BLENDCONVERTER_OT_export_and_inspect(bpy.types.Operator):
 
 
     bullet_physics: bpy.props.BoolProperty()
-    COLLISION_OBJECT_KEY = 'atool_collision_object_type'
+    _K_COLLISION_OBJECT = 'atool_collision_object_type'
 
 
     def execute(self, context):
 
         if self.bullet_physics:
-            objects = [object for object in context.view_layer.objects if object.get(self.COLLISION_OBJECT_KEY)]
+            objects = [object for object in context.view_layer.objects if object.get(self._K_COLLISION_OBJECT)]
             if not objects:
                 self.report({'ERROR'}, "No valid collision objects found to export.")
                 return {'CANCELLED'}

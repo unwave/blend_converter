@@ -1001,14 +1001,14 @@ class Bake(Settings):
     #### Default: `True`
     """
 
-    _BAKE_TYPES_IDS = '__bc_bake_types'
+    _K_BAKE_TYPES = '__bc_bake_types'
     """
-    A key for a list of UUIDs of the bake types.
+    The property key of a `bpy.types.Image` that contains a list of UUIDs of the bake types used to bake that image.
     """
 
-    _MAP_IDENTIFIER_KEY = '__bc_map_identifier'
+    _K_MAP_IDENTIFIER = '__bc_map_identifier'
     """
-    The key for an `bpy.types.Image` ID property that contains the type of the image.
+    The property key of a `bpy.types.Image` that contains a texture type of the image.
     """
 
     _K_MATERIAL_KEY = '__bc_material_key'

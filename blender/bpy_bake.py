@@ -246,7 +246,7 @@ class Baked_Image:
         else:
             image.generated_color = [ *(sub_task._default_value for sub_task in bake_task), 0.0 ]
 
-        image[self.settings._MAP_IDENTIFIER_KEY] = {sub_task._identifier: bool(sub_task) for sub_task in bake_task}
+        image[self.settings._K_MAP_IDENTIFIER] = {sub_task._identifier: bool(sub_task) for sub_task in bake_task}
 
         self.sub_images.append(image)
 
@@ -526,7 +526,7 @@ class Baked_Image:
                     tree = bpy_node.Compositor_Tree_Wrapper.from_scene(bpy.context.scene)
 
                     for image in bpy.data.images:
-                        if self.settings.view_space_normals_id in image.get(self.settings._BAKE_TYPES_IDS, ()):
+                        if self.settings.view_space_normals_id in image.get(self.settings._K_BAKE_TYPES, ()):
                             view_space_normals_image = image
                             break
                     else:
@@ -564,8 +564,8 @@ class Baked_Image:
                 else:
                     image = bpy.data.images.load(final_path, check_existing=True)
 
-                image[self.settings._MAP_IDENTIFIER_KEY] = {bake_type._identifier: bool(bake_type) for bake_type in self.bake_types}
-                image[self.settings._BAKE_TYPES_IDS] = [bake_type._uuid for bake_type in self.bake_types]
+                image[self.settings._K_MAP_IDENTIFIER] = {bake_type._identifier: bool(bake_type) for bake_type in self.bake_types}
+                image[self.settings._K_BAKE_TYPES] = [bake_type._uuid for bake_type in self.bake_types]
                 image.name = self.image_name
 
                 image.colorspace_settings.name = 'sRGB' if self.is_srgb_image else 'Non-Color'
@@ -842,7 +842,13 @@ def get_gltf_settings_node_tree():
     return node_tree
 
 
-def create_material(name: str, uv_layer: str, images: typing.Iterable[bpy.types.Image], material: typing.Optional[bpy.types.Material] = None, map_identifier_key = tool_settings.Bake._MAP_IDENTIFIER_KEY):
+def create_material(
+            name: str,
+            uv_layer: str,
+            images: typing.Iterable[bpy.types.Image],
+            material: typing.Optional[bpy.types.Material] = None,
+            k_map_identifier = tool_settings.Bake._K_MAP_IDENTIFIER
+        ):
 
     do_reset = False
 
@@ -889,7 +895,7 @@ def create_material(name: str, uv_layer: str, images: typing.Iterable[bpy.types.
 
     for image in images:
 
-        map_identifier = list(image[map_identifier_key].keys())
+        map_identifier = list(image[k_map_identifier].keys())
 
         if len(map_identifier) in (1,2):
             input = get_input(map_identifier[0])
@@ -962,7 +968,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             if not material_name:
                 material_name = bpy_utils.get_common_name(objects)
 
-            material = create_material(material_name, 'UVMap', images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+            material = create_material(material_name, 'UVMap', images, k_map_identifier = settings._K_MAP_IDENTIFIER)
             material[settings._K_MATERIAL_KEY] = settings.material_key
 
             for object in objects:
@@ -1014,7 +1020,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             if not material_name:
                 material_name = bpy_utils.get_common_name(materials_to_bake)
 
-            material = create_material(material_name, uv_layer_name, images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+            material = create_material(material_name, uv_layer_name, images, k_map_identifier = settings._K_MAP_IDENTIFIER)
             material[settings._K_MATERIAL_KEY] = settings.material_key
 
             for object in objects_in_group:
@@ -1036,7 +1042,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             settings._images.extend(images)
 
             if settings.create_materials:
-                material = create_material(material.name, uv_layer_name, images, material, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+                material = create_material(material.name, uv_layer_name, images, material, k_map_identifier = settings._K_MAP_IDENTIFIER)
                 material[settings._K_MATERIAL_KEY] = settings.material_key
 
         if settings.create_materials:
