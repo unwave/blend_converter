@@ -14,8 +14,7 @@ def get_result_dir(blend_dir):
 
 def get_bake_program(blend_dir: str, blender_executable: str):
 
-    from blend_converter.blender.formats.gltf import export_gltf, Settings_GLTF
-    from blend_converter.blender.formats.blend import open_mainfile
+    from blend_converter.blender.formats.blend import open_mainfile, save_as_mainfile
     from blend_converter.blender import bc_script
     from blend_converter.blender import Blender
     from blend_converter import common
@@ -25,7 +24,7 @@ def get_bake_program(blend_dir: str, blender_executable: str):
 
     blend_path = common.File(utils.get_last_blend(blend_dir))
     result_dir = get_result_dir(blend_dir)
-    result_path = os.path.join(result_dir, blend_path.dir_name + '.glb')
+    result_path = os.path.join(result_dir, blend_path.dir_name + '.blend')
 
     blender = Blender(blender_executable)
 
@@ -58,12 +57,11 @@ def get_bake_program(blend_dir: str, blender_executable: str):
 
     program.run(blender, bc_script.select_uv_layer, objects, tool_settings.DEFAULT_UV_LAYER_NAME)
 
-    program.run(blender, bc_script.save_blend_as_copy, os.path.join(result_dir, f'{blend_path.stem}_debug.blend'))
-
     program.run(blender, bc_script.scene_clean_up)
 
     program.run(blender, bc_script.remove_all_node_groups_from_materials)
 
-    program.run(blender, export_gltf, program.result_path, Settings_GLTF(export_apply=True))
+    program.run(blender, save_as_mainfile, result_path)
+
 
     return program
