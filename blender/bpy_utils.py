@@ -2134,8 +2134,8 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         ## collect bake settings
 
-        pre_bake_tasks = []
-        bake_tasks = []
+        pre_bake_tasks: typing.List[tool_settings.Bake] = []
+        bake_tasks: typing.List[tool_settings.Bake] = []
 
         # TODO: this only works for the materials that has been processed, not others in the scene
         environment_has_transparent_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))
@@ -2270,14 +2270,23 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         ## assign the baked materials
 
+        def get_material(key: str):
+
+            for slot in bake_proxy.material_slots:
+
+                if not slot.material:
+                    continue
+
+                for bake_settings in bake_tasks:
+                    if slot.material.get(bake_settings._K_MATERIAL_KEY) == key:
+                        return slot.material
+
+
         for object in objects:
             for material_slot in object.material_slots:
-
-                if material_slot.material.get(opaque_material_key):
-                    material_slot.material = bake_proxy.material_slots[0].material
-
-                if material_slot.material.get(alpha_material_key):
-                    material_slot.material = bake_proxy.material_slots[1].material
+                for material_key in (opaque_material_key, alpha_material_key):
+                    if material_slot.material.get(material_key):
+                        material_slot.material = get_material(material_key)
 
 
         merge_material_slots_with_the_same_materials(objects)

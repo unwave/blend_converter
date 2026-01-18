@@ -1011,6 +1011,11 @@ class Bake(Settings):
     The key for an `bpy.types.Image` ID property that contains the type of the image.
     """
 
+    _K_MATERIAL_KEY = '__bc_material_key'
+    """
+    The property key of a new baked material holding the settings' `material_key`.
+    """
+
     _images = []
     """
     The baked images.

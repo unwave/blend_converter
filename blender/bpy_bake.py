@@ -963,6 +963,8 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
                 material_name = bpy_utils.get_common_name(objects)
 
             material = create_material(material_name, 'UVMap', images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+            material[settings._K_MATERIAL_KEY] = settings.material_key
+
             for object in objects:
                 mesh: bpy.types.Mesh = object.data
 
@@ -1013,6 +1015,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
                 material_name = bpy_utils.get_common_name(materials_to_bake)
 
             material = create_material(material_name, uv_layer_name, images, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+            material[settings._K_MATERIAL_KEY] = settings.material_key
 
             for object in objects_in_group:
 
@@ -1033,7 +1036,8 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             settings._images.extend(images)
 
             if settings.create_materials:
-                create_material(material.name, uv_layer_name, images, material, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+                material = create_material(material.name, uv_layer_name, images, material, map_identifier_key = settings._MAP_IDENTIFIER_KEY)
+                material[settings._K_MATERIAL_KEY] = settings.material_key
 
         if settings.create_materials:
 
