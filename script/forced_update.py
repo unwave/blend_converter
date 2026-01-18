@@ -84,6 +84,9 @@ OPTIONS = {
     'from': "show the source file in the explorer [does not convert]",
     'to': "show the result file in the explorer [does not convert]",
 
+    'open:from': "open the source file [does not convert]",
+    'open:to': "open the result file [does not convert]",
+
     'validate': "validate commands and do nothing else [does not convert]",
 
     'diff': "show diff based on the written json file, uses VSCode [does not convert] ['code' must be in the PATH environment variable]",
@@ -141,7 +144,16 @@ def color_print(fg_rgb: list, bg_rgb: list, *args, **kwargs):
     utils.print_in_color(utils.get_color_code(*fg_rgb, *bg_rgb), *args, **kwargs)
 
 
-non_convert_options = {'help', 'from', 'to', 'diff', 'makeupdated', 'validate'}
+non_convert_options = {
+    'help',
+    'from',
+    'to',
+    'diff',
+    'makeupdated',
+    'validate',
+    'open:from',
+    'open:to',
+}
 
 
 def unshorten(arg: str):
@@ -231,6 +243,24 @@ for index, arg in enumerate(ARGS):
 
 
 
+def get_result_path(program: common.Program):
+
+    if os.path.exists(program.result_path):
+        return program.result_path
+    elif os.path.exists(os.path.dirname(program.result_path)):
+        return os.path.dirname(program.result_path)
+    else:
+        return None
+
+
+def open_path(path: str, blender_executable: str):
+
+    if path.endswith('.blend'):
+        utils.open_blender_detached(blender_executable, path)
+    else:
+        utils.os_open(path)
+
+
 
 def run_program(module_path, programs_getter_name, program_name):
 
@@ -261,19 +291,32 @@ def run_program(module_path, programs_getter_name, program_name):
             if input("Are you sure you want to set the json as up to date? (y/n)").lower() == 'y':
                 program.write_report()
 
+
         if 'from' in ARGS:
             utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.blend_path)
             utils.os_show(program.blend_path)
 
         if 'to' in ARGS:
-            if os.path.exists(program.result_path):
+            path = get_result_path(program)
+            if path:
                 utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.result_path)
-                utils.os_show(program.result_path)
-            elif os.path.exists(os.path.dirname(program.result_path)):
-                utils.print_in_color(utils.get_foreground_color_code(0,191,255), os.path.dirname(program.result_path))
-                utils.os_show(os.path.dirname(program.result_path))
+                utils.os_show(path)
             else:
-                utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), "The result folder does not exist yet.")
+                utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), "The result does not exist yet.")
+
+
+        if 'open:from' in ARGS:
+            utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.blend_path)
+            open_path(program.blend_path, program.blender_executable)
+
+        if 'open:to' in ARGS:
+            path = get_result_path(program)
+            if path:
+                utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.result_path)
+                open_path(path, program.blender_executable)
+            else:
+                utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), "The result does not exist yet.")
+
 
         raise SystemExit(0)
 
@@ -289,7 +332,7 @@ def run_program(module_path, programs_getter_name, program_name):
         utils.os_show(program.result_path)
 
     if 'open' in ARGS:
-        utils.open_blender_detached(program.blender_executable, program.result_path)
+        open_path(program.result_path, program.blender_executable)
 
 
 for module_path, programs_getter_name, name in json.loads(programs)['programs']:
