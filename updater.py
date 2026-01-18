@@ -213,6 +213,7 @@ class Program_Entry:
         read_stderr_thread.join()
 
         if is_superseded:
+            update_ui()
             return
 
         if process.exitcode == 0:

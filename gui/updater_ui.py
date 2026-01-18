@@ -850,6 +850,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         def refresh():
             if self.__nonzero__():
+                self.Refresh()
                 self.result_panel.refresh()
 
         updater.update_ui = refresh
