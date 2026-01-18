@@ -338,11 +338,6 @@ def merge_objects_respect_materials(objects: Objects_Like):
     return bpy_utils.merge_objects(objects)
 
 
-@wraps(bpy_utils.merge_objects_and_bake_materials if typing.TYPE_CHECKING else object)
-def merge_objects_and_bake_materials(objects: Objects_Like, *args, **kwargs):
-    bpy_utils.merge_objects_and_bake_materials(get_objects(objects), *args, **kwargs)
-
-
 def ensure_debugpy():
 
     from . import ensure_site_packages
@@ -496,3 +491,7 @@ def clean_up_topology_and_triangulate_ngons(objects: Objects_Like = None, split_
 @wraps(bpy_utils.label_mix_shader_nodes if typing.TYPE_CHECKING else object)
 def label_mix_shader_nodes(objects: Objects_Like):
     return bpy_utils.label_mix_shader_nodes(get_objects(objects))
+
+
+def do_nothing(*args, **kwargs):
+    pass

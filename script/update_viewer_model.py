@@ -86,7 +86,7 @@ if __name__ == '__main__':
 
         kwargs = dict(image_dir = temp_dir, resolution = 1024)
         kwargs.update(bake_settings)
-        program.run(blender, bc_script.merge_objects_and_bake_materials, object_names, **kwargs)
+        program.run(blender, bc_script.do_nothing, object_names, **kwargs)
 
         program.run(blender, delete_other, object_names)
 

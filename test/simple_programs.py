@@ -12,43 +12,7 @@ def get_result_dir(blend_dir):
     return os.path.join(tempfile.tempdir, 'blend_converter', 'test', os.path.basename(blend_dir) + '_' + uuid.uuid1().hex)
 
 
-def get_program_1(blend_dir: str, blender_executable: str):
-
-    from blend_converter.blender.formats.gltf import export_gltf, Settings_GLTF
-    from blend_converter.blender.formats.blend import open_mainfile
-    from blend_converter.blender import bc_script
-    from blend_converter.blender import Blender
-    from blend_converter import common
-    from blend_converter import utils
-
-    blend_path = common.File(utils.get_last_blend(blend_dir))
-    result_dir = get_result_dir(blend_dir)
-    result_path = os.path.join(result_dir, blend_path.dir_name + '.gltf')
-
-    blender = Blender(blender_executable)
-
-    program = common.Program(
-        blend_path = blend_path,
-        result_path = result_path,
-        blender_executable = blender.binary_path
-    )
-
-    program.run(blender, open_mainfile, blend_path, load_ui = False)
-
-    program.run(blender, bc_script.merge_objects_and_bake_materials, program.run(blender, bc_script.get_view_layer_objects), image_dir=os.path.join(result_dir, 'textures'), resolution=128)
-
-    program.run(blender, bc_script.save_blend_as_copy, os.path.join(result_dir, f'{blend_path.stem}_debug.blend'))
-
-    program.run(blender, bc_script.scene_clean_up)
-
-    program.run(blender, bc_script.remove_all_node_groups_from_materials)
-
-    program.run(blender, export_gltf, program.result_path, Settings_GLTF(export_apply=True))
-
-    return program
-
-
-def get_program_2(blend_dir: str, blender_executable: str):
+def get_bake_program(blend_dir: str, blender_executable: str):
 
     from blend_converter.blender.formats.gltf import export_gltf, Settings_GLTF
     from blend_converter.blender.formats.blend import open_mainfile

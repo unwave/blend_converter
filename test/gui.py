@@ -8,7 +8,7 @@ def get_programs():
 
     from blend_converter import utils
 
-    from simple_programs import BLEND_DIRS, get_program_1, get_program_2
+    from simple_programs import BLEND_DIRS, get_bake_program
 
     executable = utils.get_blender_executable()
     if not executable:
@@ -17,11 +17,7 @@ def get_programs():
     programs = utils.Appendable_Dict()
 
     for blend_dir in BLEND_DIRS:
-        programs.append(get_program_1(blend_dir, executable))
-
-
-    for blend_dir in BLEND_DIRS:
-        programs.append(get_program_2(blend_dir, executable))
+        programs.append(get_bake_program(blend_dir, executable))
 
 
     return programs
