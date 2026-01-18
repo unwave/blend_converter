@@ -582,7 +582,7 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
                 uv_packer_addon_pin_largest_island=operator.uv_packer_addon_pin_largest_island,
                 use_uv_packer_for_pre_packing = operator.use_uv_packer_for_pre_packing,
             )
-            pack_uvs_settings._set_suggested_padding()
+
             bpy_uv.pack([object], pack_uvs_settings)
             bpy_uv.ensure_pixel_per_island([object], pack_uvs_settings)
 

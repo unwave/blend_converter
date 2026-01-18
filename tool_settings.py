@@ -1162,7 +1162,7 @@ class Pack_UVs(Settings):
     @property
     def _uv_island_margin_fraction(self):
         """ The pixel padding for a UV island in the UV space coordinates. """
-        return self.padding / min(self._actual_height, self._actual_width)
+        return self._actual_padding / min(self._actual_height, self._actual_width)
 
 
     resolution: int = 1024
@@ -1213,11 +1213,16 @@ class Pack_UVs(Settings):
     #### Default: `''`
     """
 
-    padding: int = 4
+    padding: int = -1
     """
-    An amount of pixels reserved around a UV island. So if padding is 4 there will be 8 pixels between the two UV islands.
+    An amount of pixels reserved around a UV island.
+    If the padding is 4 there will be 8 pixels between two UV islands.
 
-    #### Default: `4`
+    Due to how the margin generation is working and how Cycles is baking from the centers of the pixels, the values less than 4 are not generally working.
+
+    `-1` means calculated automatically: `max(4, self.resolution / 128 / 2)`
+
+    #### Default: `-1`
     """
 
     merge_overlap: bool = False
@@ -1277,19 +1282,13 @@ class Pack_UVs(Settings):
     #### Default: `False`
     """
 
+    @property
+    def _actual_padding(self):
 
-    def _set_suggested_padding(self, resolution: typing.Optional[int] = None):
+        if self.padding >= 0:
+            return self.padding
 
-        if resolution is None:
-            resolution = self.resolution
-
-        padding = resolution/128/2
-        if padding <= 4:
-            padding += 1
-
-        self.padding = padding
-
-        return padding
+        return max(4, self.resolution / 128 / 2)
 
 
 

@@ -481,7 +481,6 @@ def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material
     print(f"{create_uvs.__name__}...")
 
     settings = tool_settings.Pack_UVs(resolution=resolution)
-    settings._set_suggested_padding()
 
     objects = get_unique_mesh_objects(objects)
 
@@ -1680,8 +1679,6 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
                 material_key = material_key,
                 average_uv_scale = False,
             )._update(pack_settings)
-
-            _pack_settings._set_suggested_padding()
 
             bpy_uv.pack(objects, _pack_settings)
 

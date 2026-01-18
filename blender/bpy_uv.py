@@ -910,7 +910,7 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
         if blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_PACK):
             pass
         elif settings.use_uv_packer_addon and settings.use_uv_packer_for_pre_packing and enable_uv_packer_addon():
-            uv_packer_pack(settings._actual_width, settings._actual_height, settings.padding, settings.uvp_prerotate, settings.uvp_rescale, use_high_quality_engine=False)
+            uv_packer_pack(settings._actual_width, settings._actual_height, settings._actual_padding, settings.uvp_prerotate, settings.uvp_rescale, use_high_quality_engine=False)
         else:
             aabb_pack(merge_overlap=settings.merge_overlap)
 
@@ -925,7 +925,7 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
             if settings.uv_packer_addon_pin_largest_island:
                 pin_largest_island(bpy.context.object.data)
 
-            uv_packer_pack(settings._actual_width, settings._actual_height, settings.padding, settings.uvp_prerotate, settings.uvp_rescale)
+            uv_packer_pack(settings._actual_width, settings._actual_height, settings._actual_padding, settings.uvp_prerotate, settings.uvp_rescale)
 
             if settings.uv_packer_addon_pin_largest_island:
                 bpy.ops.uv.pin(clear=True)
