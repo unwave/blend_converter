@@ -230,7 +230,7 @@ def enable_uv_packer_addon():
         uv_packer.register()
         uv_packer.UVPackerPackButtonOperator.execute = execute_uv_packer_addon
     except Exception as e:
-        traceback.print_exc(file=sys.stderr)
+        traceback.print_exc()
         return False
     else:
         return True
@@ -510,7 +510,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         try:
             copy_uv(imported_object, object, uv_layer_name)
         except ValueError:
-            traceback.print_exc(file = sys.stderr)
+            traceback.print_exc()
 
             with bpy_context.Focus([imported_object, object_copy, object]):
                 apply_uv_data_transfer_modifier(imported_object, object_copy, uv_layer_name)

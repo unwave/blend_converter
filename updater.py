@@ -156,7 +156,7 @@ class Program_Entry:
             except BaseException as e:
                 error = e
                 if str(e) != 'BLENDER':
-                    traceback.print_exc(file=sys.stderr)
+                    traceback.print_exc()
 
         stdout_capture.lines.put_nowait(None)
         stdout_capture_thread.join()

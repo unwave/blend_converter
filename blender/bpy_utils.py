@@ -644,7 +644,7 @@ def read_homefile(blend_file, load_ui = True):
     try:
         bpy.ops.wm.read_homefile(filepath=blend_file, load_ui = load_ui)
     except RuntimeError:
-        traceback.print_exc(file=sys.stderr)
+        traceback.print_exc()
 
     for library in bpy.data.libraries:
         if library.filepath.startswith('//'):
@@ -1432,7 +1432,7 @@ def split_objects_into_pre_merged_objects(objects: typing.List[bpy.types.Object]
             try:
                 object[key] = value
             except TypeError:
-                traceback.print_exc(file=sys.stderr)
+                traceback.print_exc()
 
         with bpy_context.Focus(object):
             bpy.context.scene.cursor.location = object_info['location']
