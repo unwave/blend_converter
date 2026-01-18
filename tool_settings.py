@@ -1967,6 +1967,14 @@ class Bake_Materials(Settings):
     #### Default: `[]`
     """
 
+    split_faces_by_materials: bool = True
+    """
+    Split the bake mesh faces by materials.
+
+    To negate the effect of the `ADJACENT_FACES` margin generation bleeding between different materials.
+
+    #### Default: `True`
+    """
 
 @dataclasses.dataclass
 class Future_Bake_Materials(Settings):

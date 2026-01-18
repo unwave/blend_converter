@@ -1808,6 +1808,11 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         bake_proxy = merge_objects(objects_copy, name = '__bc_bake')
 
+
+        if settings.split_faces_by_materials:
+            split_faces_by_materials(bake_proxy)
+
+
         ## remove unused materials
         # Blender 5.0
         # merge_material_slots_with_the_same_materials can leave objects with 0 polygons without materials
@@ -2049,3 +2054,41 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
                     if node.label == prebake_label:
                         for other in get_baked_image_node().outputs[0].connections:
                             node.outputs[0].join(other)
+
+
+def split_faces_by_materials(object: bpy.types.Object):
+
+    copy = object.copy()
+    copy.name = object.name + '[copy]'
+    copy.data = object.data.copy()
+    copy.data.name = object.data.name + '[copy]'
+
+
+    with bpy_context.Focus(object, mode='EDIT'):
+
+        bpy.ops.mesh.reveal()
+        bpy.ops.mesh.select_mode(type='EDGE')
+
+        for slot in object.material_slots:
+
+            object.active_material_index = slot.slot_index
+
+            bpy.ops.mesh.select_all(action='DESELECT')
+            bpy.ops.object.material_slot_select()
+            bpy.ops.mesh.split()
+
+
+    def apply_data_transfer_modifier(from_object: bpy.types.Object, to_object: bpy.types.Object):
+
+        modifier: bpy.types.DataTransferModifier = to_object.modifiers.new('', type='DATA_TRANSFER')
+
+        modifier.object = from_object
+        modifier.use_loop_data = True
+        modifier.data_types_loops = {'CUSTOM_NORMAL'}
+
+        bpy_modifier.apply_modifier(modifier)
+
+
+    apply_data_transfer_modifier(copy, object)
+
+    bpy.data.batch_remove((copy, copy.data))
