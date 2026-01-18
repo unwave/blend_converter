@@ -243,23 +243,46 @@ for index, arg in enumerate(ARGS):
 
 
 
-def get_result_path(program: common.Program):
+def resolve_path(path):
 
-    if os.path.exists(program.result_path):
-        return program.result_path
-    elif os.path.exists(os.path.dirname(program.result_path)):
-        return os.path.dirname(program.result_path)
-    else:
+    if not path:
         return None
 
+    try:
 
-def open_path(path: str, blender_executable: str):
+        if os.path.exists(path):
+            return os.fspath(path)
 
-    if path.endswith('.blend'):
-        utils.open_blender_detached(blender_executable, path)
+        dir_name = os.path.dirname(path)
+
+        if os.path.exists(dir_name):
+            return dir_name
+
+    except Exception:
+        traceback.print_exc()
+
+
+def open_file(file, blender_executable: str, failure_message: str):
+
+    path = resolve_path(file)
+    if path:
+        utils.print_in_color(utils.get_foreground_color_code(0,191,255), path)
+        if path.endswith('.blend'):
+            utils.open_blender_detached(blender_executable, path)
+        else:
+            utils.os_open(path)
     else:
-        utils.os_open(path)
+        utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), failure_message)
 
+
+def show_file(file, failure_message: str):
+
+    path = resolve_path(file)
+    if path:
+        utils.print_in_color(utils.get_foreground_color_code(0,191,255), path)
+        utils.os_show(path)
+    else:
+        utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), failure_message)
 
 
 def run_program(module_path, programs_getter_name, program_name):
@@ -291,31 +314,17 @@ def run_program(module_path, programs_getter_name, program_name):
             if input("Are you sure you want to set the json as up to date? (y/n)").lower() == 'y':
                 program.write_report()
 
-
         if 'from' in ARGS:
-            utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.blend_path)
-            utils.os_show(program.blend_path)
+            show_file(program.blend_path, "The source does not exist.")
 
         if 'to' in ARGS:
-            path = get_result_path(program)
-            if path:
-                utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.result_path)
-                utils.os_show(path)
-            else:
-                utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), "The result does not exist yet.")
-
+            show_file(program.result_path, "The result does not exist.")
 
         if 'open:from' in ARGS:
-            utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.blend_path)
-            open_path(program.blend_path, program.blender_executable)
+            open_file(program.blend_path, program.blender_executable, "The source does not exist.")
 
         if 'open:to' in ARGS:
-            path = get_result_path(program)
-            if path:
-                utils.print_in_color(utils.get_foreground_color_code(0,191,255), program.result_path)
-                open_path(path, program.blender_executable)
-            else:
-                utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), "The result does not exist yet.")
+            open_file(program.result_path, program.blender_executable, "The result does not exist.")
 
 
         raise SystemExit(0)
@@ -329,10 +338,11 @@ def run_program(module_path, programs_getter_name, program_name):
 
 
     if 'show' in ARGS:
-        utils.os_show(program.result_path)
+        show_file(program.result_path, "The result does not exist.")
+
 
     if 'open' in ARGS:
-        open_path(program.result_path, program.blender_executable)
+        open_file(program.result_path, program.blender_executable, "The result does not exist.")
 
 
 for module_path, programs_getter_name, name in json.loads(programs)['programs']:
