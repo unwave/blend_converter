@@ -25,7 +25,7 @@ def get_bake_program(blend_dir: str, blender_executable: str):
 
     blend_path = common.File(utils.get_last_blend(blend_dir))
     result_dir = get_result_dir(blend_dir)
-    result_path = os.path.join(result_dir, blend_path.dir_name + '.gltf')
+    result_path = os.path.join(result_dir, blend_path.dir_name + '.glb')
 
     blender = Blender(blender_executable)
 
@@ -43,11 +43,20 @@ def get_bake_program(blend_dir: str, blender_executable: str):
         image_dir = os.path.join(result_dir, 'textures'),
         texel_density = 64,
         max_resolution = 128,
-        faster_ao_bake = True,
-        bake_original_topology=True,
     )
 
-    program.run(blender, bc_script.copy_and_bake_materials, objects, settings)
+
+    program.run(blender, bc_script.unwrap, objects)
+
+    program.run(blender, bc_script.scale_uv_to_world_per_uv_island, objects, tool_settings.DEFAULT_UV_LAYER_NAME)
+
+    program.run(blender, bc_script.scale_uv_to_world_per_uv_layout, objects, tool_settings.DEFAULT_UV_LAYER_NAME)
+
+    program.run(blender, bc_script.apply_modifiers, objects)
+
+    program.run(blender, bc_script.pack_copy_bake, objects, settings)
+
+    program.run(blender, bc_script.select_uv_layer, objects, tool_settings.DEFAULT_UV_LAYER_NAME)
 
     program.run(blender, bc_script.save_blend_as_copy, os.path.join(result_dir, f'{blend_path.stem}_debug.blend'))
 

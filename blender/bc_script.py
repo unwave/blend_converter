@@ -365,28 +365,6 @@ def get_meshable_objects(objects: Objects_Like):
     return bpy_utils.get_meshable_objects(get_objects(objects))
 
 
-
-@wraps(bpy_utils.copy_and_bake_materials if typing.TYPE_CHECKING else object)
-def copy_and_bake_materials(
-            objects: Objects_Like,
-            settings,
-            *,
-            bake_settings = None,
-            unwrap_settings = None,
-            pack_settings = None,
-            ministry_of_flat_settings = None,
-        ):
-
-    return bpy_utils.copy_and_bake_materials(
-        get_objects(objects),
-        tool_settings.Bake_Materials._from_dict(settings),
-        bake_settings = tool_settings.Bake._from_dict(bake_settings) if bake_settings else None,
-        unwrap_settings = tool_settings.Unwrap_UVs._from_dict(unwrap_settings) if unwrap_settings else None,
-        pack_settings = tool_settings.Pack_UVs._from_dict(pack_settings) if pack_settings else None,
-        ministry_of_flat_settings = tool_settings.Ministry_Of_Flat._from_dict(ministry_of_flat_settings) if ministry_of_flat_settings else None,
-    )
-
-
 @wraps(bpy_utils.pack_copy_bake if typing.TYPE_CHECKING else object)
 def pack_copy_bake(
             objects: Objects_Like,
@@ -495,3 +473,12 @@ def label_mix_shader_nodes(objects: Objects_Like):
 
 def do_nothing(*args, **kwargs):
     pass
+
+
+def select_uv_layer(objects: Objects_Like, name: str,):
+
+    for object in get_objects(objects):
+        if hasattr(object.data, 'uv_layers'):
+            index = object.data.uv_layers.find(name)
+            if index >= 0:
+                object.data.uv_layers.active_index = index
