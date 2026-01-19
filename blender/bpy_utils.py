@@ -1913,9 +1913,9 @@ def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '',
 
             modifiers_to_apply.append(modifier.name)
 
-
-        for name in modifiers_to_apply:
-            bpy_modifier.apply_modifier(object.modifiers[name])
+        with bpy_context.Focus(object):
+            for name in modifiers_to_apply:
+                bpy_modifier.apply_modifier(object.modifiers[name])
 
 
 
