@@ -1681,6 +1681,8 @@ def get_texel_density_for_uv_quality(object: bpy.types.Object, uv_layer_name: st
         total_uv_area = 0
         texel_density_weighted_median = 0
 
+    bm.free()
+
     return texel_density_weighted_median, total_uv_area, texel_density_deviation, area_ratios_deviation
 
 
