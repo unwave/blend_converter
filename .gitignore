@@ -8,8 +8,8 @@ build/
 .vscode/
 
 # Project Tool' files, a project manager application
-__project__.json
-__icon__.png
+__project__*
+__icon__*
 uf_*.json
 
 _result/
