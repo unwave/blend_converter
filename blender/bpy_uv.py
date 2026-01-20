@@ -345,183 +345,182 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
     with bpy_context.Focus(object):
 
-        object_copy = get_object_copy_for_uv_unwrap(object)
-        object_copy.name = "EXPORT_" + object_copy.name
+        object_copy = None
+        imported_object = None
 
-        with bpy_context.Focus(object_copy):
+        try:
 
+            object_copy = get_object_copy_for_uv_unwrap(object)
+            object_copy.name = "EXPORT_" + object_copy.name
 
-            with bpy_context.Focus(object_copy, 'EDIT'), bpy_context.State() as state:
-
-                bpy.ops.mesh.reveal()
-                bpy.ops.mesh.select_all(action='SELECT')
-
-                state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'BOUNDING_BOX_CENTER')
-                bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(1/0.1, 1/0.1, 1/0.1), mirror=False, use_proportional_edit=False, snap=False)
-
-                state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'INDIVIDUAL_ORIGINS')
-                bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(0.1, 0.1, 0.1), mirror=False, use_proportional_edit=False, snap=False)
+            with bpy_context.Focus(object_copy):
 
 
-            filepath_input = utils.ensure_unique_path(os.path.join(temp_dir, utils.ensure_valid_basename(object.name_full + '.obj')))
-            filepath_output = utils.ensure_unique_path(os.path.join(temp_dir, utils.ensure_valid_basename(object.name_full + '_unwrapped.obj')))
+                with bpy_context.Focus(object_copy, 'EDIT'), bpy_context.State() as state:
 
-            print('\tobj_export ', end='')
+                    bpy.ops.mesh.reveal()
+                    bpy.ops.mesh.select_all(action='SELECT')
+
+                    state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'BOUNDING_BOX_CENTER')
+                    bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(1/0.1, 1/0.1, 1/0.1), mirror=False, use_proportional_edit=False, snap=False)
+
+                    state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'INDIVIDUAL_ORIGINS')
+                    bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(0.1, 0.1, 0.1), mirror=False, use_proportional_edit=False, snap=False)
+
+
+                filepath_input = utils.ensure_unique_path(os.path.join(temp_dir, utils.ensure_valid_basename(object.name_full + '.obj')))
+                filepath_output = utils.ensure_unique_path(os.path.join(temp_dir, utils.ensure_valid_basename(object.name_full + '_unwrapped.obj')))
+
+                print('\tobj_export ', end='')
+                with utils.Capture_Stdout() as capture_stdout, utils.Capture_Stderr() as capture_stderr:
+                    try:
+                        try:
+                            bpy.ops.wm.obj_export(filepath=filepath_input, export_selected_objects=True, export_materials=False, export_uv=False, apply_modifiers=False)
+                        except AttributeError:
+                            bpy.ops.export_scene.obj(filepath=filepath_input, use_selection=True, use_materials=False, use_uvs=False, use_mesh_modifiers=False)
+                    except Exception as e:
+                        print_output(capture_stdout, capture_stderr)
+                        raise utils.Fallback('Fail to export obj.') from e
+
+
+            cmd = settings._get_cmd(filepath_input, filepath_output)
+
+            print('subprocess ', end='')
+            try:
+                process = subprocess.run(cmd, timeout=settings.timeout, text = True, capture_output=True, encoding='utf-8')
+            except subprocess.TimeoutExpired as e:
+                raise utils.Fallback(f"Timeout: {object.name_full}") from e
+            except FileNotFoundError as e:
+                raise utils.Fallback(str(e) + '\n' + str(cmd)) from e
+
+            returncode = process.returncode
+
+            if returncode == 1:
+                pass
+            elif returncode == 3221225786:
+                raise KeyboardInterrupt(f"STATUS_CONTROL_C_EXIT: {object.name_full}")
+            elif returncode == 3221225477:
+                raise utils.Fallback(f"0xc0000005 Access Violation Error: {object.name_full}")
+            else:
+                print()
+                utils.print_in_color(utils.get_color_code(0,0,0, 256,256,256), 'CMD:', utils.get_command_from_list(cmd))
+                utils.print_in_color(yellow_color, process.stdout)
+                utils.print_in_color(magenta_color, process.stderr)
+                raise utils.Fallback(f"Bad return code {returncode}: {object.name_full}")
+
+            if not os.path.exists(filepath_output):
+                raise utils.Fallback(f"Output .obj file does not exist: {filepath_output}")
+
+            bpy.ops.object.select_all(action='DESELECT')
+
+            print('obj_import ', end='')
             with utils.Capture_Stdout() as capture_stdout, utils.Capture_Stderr() as capture_stderr:
                 try:
                     try:
-                        bpy.ops.wm.obj_export(filepath=filepath_input, export_selected_objects=True, export_materials=False, export_uv=False, apply_modifiers=False)
+                        bpy.ops.wm.obj_import(filepath=filepath_output, validate_meshes = True)
                     except AttributeError:
-                        bpy.ops.export_scene.obj(filepath=filepath_input, use_selection=True, use_materials=False, use_uvs=False, use_mesh_modifiers=False)
+                        bpy.ops.import_scene.obj(filepath=filepath_output)
                 except Exception as e:
                     print_output(capture_stdout, capture_stderr)
-                    bpy.data.objects.remove(object_copy)
-                    raise utils.Fallback('Fail to export obj.') from e
+                    raise utils.Fallback('Fail to import obj.') from e
 
 
-        cmd = settings._get_cmd(filepath_input, filepath_output)
+            imported_object = bpy.context.selected_objects[0]
+            imported_object.name = "IMPORT_" + imported_object.name
 
-        print('subprocess ', end='')
-        try:
-            process = subprocess.run(cmd, timeout=settings.timeout, text = True, capture_output=True, encoding='utf-8')
-        except subprocess.TimeoutExpired as e:
-            bpy.data.objects.remove(object_copy)
-            raise utils.Fallback(f"Timeout: {object.name_full}") from e
-        except FileNotFoundError as e:
-            bpy.data.objects.remove(object_copy)
-            raise utils.Fallback(str(e) + '\n' + str(cmd)) from e
+            print('validate')
+            with utils.Capture_Stdout() as capture_stdout:
+                is_invalid_geometry = imported_object.data.validate(verbose=True)
 
-        returncode = process.returncode
+            validation_lines: typing.List[str] = list(capture_stdout.lines.queue)
 
-        if returncode == 1:
-            pass
-        elif returncode == 3221225786:
-            bpy.data.objects.remove(object_copy)
-            raise KeyboardInterrupt(f"STATUS_CONTROL_C_EXIT: {object.name_full}")
-        elif returncode == 3221225477:
-            bpy.data.objects.remove(object_copy)
-            raise utils.Fallback(f"0xc0000005 Access Violation Error: {object.name_full}")
-        else:
-            print()
-            utils.print_in_color(utils.get_color_code(0,0,0, 256,256,256), 'CMD:', utils.get_command_from_list(cmd))
-            utils.print_in_color(yellow_color, process.stdout)
-            utils.print_in_color(magenta_color, process.stderr)
-            bpy.data.objects.remove(object_copy)
-            raise utils.Fallback(f"Bad return code {returncode}: {object.name_full}")
+            if is_invalid_geometry:
+                raise utils.Fallback('\n'.join(validation_lines))
 
-        if not os.path.exists(filepath_output):
-            bpy.data.objects.remove(object_copy)
-            raise utils.Fallback(f"Output .obj file does not exist: {filepath_output}")
+            was_re_unwrapped = False
 
-        bpy.ops.object.select_all(action='DESELECT')
+            for line in validation_lines:
 
-        print('obj_import ', end='')
-        with utils.Capture_Stdout() as capture_stdout, utils.Capture_Stderr() as capture_stderr:
+                # CustomDataLayer type 49 has some invalid data
+                if 'CustomDataLayer' in line and 'invalid data' in line:
+                    if was_re_unwrapped:
+                        continue
+
+                    # TODO: it is better to find all verts that have (0,0) coords after the validation correction
+                    # pin all the rest and unwrap so the invalid uvs will take a better place
+
+                    # this really solves only bad overlapping, which ministry_of_flat does not produce
+
+                    utils.print_in_color(magenta_color, 'Failed validation. Re-unwrapping overlaps.')
+                    bpy.ops.object.editmode_toggle()
+                    bpy.ops.mesh.reveal()
+                    bpy.ops.uv.reveal()
+                    bpy.ops.mesh.select_all(action='SELECT')
+                    bpy.ops.uv.select_all(action='SELECT')
+                    aabb_pack(margin=0.1, merge_overlap=False)
+                    bpy.ops.uv.select_all(action='DESELECT')
+                    bpy.ops.uv.select_overlap()
+
+                    bpy_context.call_in_uv_editor(bpy.ops.uv.select_linked)
+                    bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, can_be_canceled = True)
+
+                    bpy.ops.uv.reveal()
+                    bpy.ops.object.editmode_toggle()
+
+                    was_re_unwrapped = True
+                elif line.strip():
+                    raise utils.Fallback(line)
+
+            bpy_utils.focus(object)
+
+            if not object.data.uv_layers:
+                object.data.uv_layers.new(do_init=False)
+
+            if uv_layer_name is None:
+                uv_layer_name = object.data.uv_layers.active.name
+
+            imported_object.data.uv_layers[0].name = uv_layer_name
+
+
+            def apply_modifier(modifier: bpy.types.Modifier):
+                object = modifier.id_data
+                print(modifier.name + "...")
+                bpy_context.call_for_object(object, bpy.ops.object.modifier_apply, modifier = modifier.name, single_user = True)
+
+
+            def apply_uv_data_transfer_modifier(from_object: bpy.types.Object, to_object: bpy.types.Object, uv_layer_name: str):
+
+                modifier: bpy.types.DataTransferModifier = to_object.modifiers.new('', type='DATA_TRANSFER')
+
+                modifier.object = from_object
+                modifier.use_loop_data = True
+                modifier.data_types_loops = {'UV'}
+                modifier.loop_mapping = 'NEAREST_POLYNOR'
+                modifier.layers_uv_select_src = uv_layer_name
+                modifier.show_expanded = False
+
+                apply_modifier(modifier)
+
             try:
-                try:
-                    bpy.ops.wm.obj_import(filepath=filepath_output, validate_meshes = True)
-                except AttributeError:
-                    bpy.ops.import_scene.obj(filepath=filepath_output)
-            except Exception as e:
-                print_output(capture_stdout, capture_stderr)
-                bpy.data.objects.remove(object_copy)
-                raise utils.Fallback('Fail to import obj.') from e
+                copy_uv(imported_object, object, uv_layer_name)
+            except ValueError:
+                traceback.print_exc()
 
+                with bpy_context.Focus([imported_object, object_copy, object]):
+                    apply_uv_data_transfer_modifier(imported_object, object_copy, uv_layer_name)
 
-        imported_object = bpy.context.selected_objects[0]
-        imported_object.name = "IMPORT_" + imported_object.name
+                    # loops that are failed to be transferred create overlaps
+                    re_unwrap_overlaps(object_copy, uv_layer_name)
 
-        print('validate')
-        with utils.Capture_Stdout() as capture_stdout:
-            is_invalid_geometry = imported_object.data.validate(verbose=True)
+                    copy_uv(object_copy, object, uv_layer_name)
 
-        validation_lines: typing.List[str] = list(capture_stdout.lines.queue)
-
-        if is_invalid_geometry:
-            bpy.data.objects.remove(object_copy)
-            bpy.data.objects.remove(imported_object)
-            raise utils.Fallback('\n'.join(validation_lines))
-
-        was_re_unwrapped = False
-
-        for line in validation_lines:
-
-            # CustomDataLayer type 49 has some invalid data
-            if 'CustomDataLayer' in line and 'invalid data' in line:
-                if was_re_unwrapped:
-                    continue
-
-                # TODO: it is better to find all verts that have (0,0) coords after the validation correction
-                # pin all the rest and unwrap so the invalid uvs will take a better place
-
-                # this really solves only bad overlapping, which ministry_of_flat does not produce
-
-                utils.print_in_color(magenta_color, 'Failed validation. Re-unwrapping overlaps.')
-                bpy.ops.object.editmode_toggle()
-                bpy.ops.mesh.reveal()
-                bpy.ops.uv.reveal()
-                bpy.ops.mesh.select_all(action='SELECT')
-                bpy.ops.uv.select_all(action='SELECT')
-                aabb_pack(margin=0.1, merge_overlap=False)
-                bpy.ops.uv.select_all(action='DESELECT')
-                bpy.ops.uv.select_overlap()
-
-                bpy_context.call_in_uv_editor(bpy.ops.uv.select_linked)
-                bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, can_be_canceled = True)
-
-                bpy.ops.uv.reveal()
-                bpy.ops.object.editmode_toggle()
-
-                was_re_unwrapped = True
-            elif line.strip():
-                bpy.data.objects.remove(imported_object)
-                raise utils.Fallback(line)
-
-        bpy_utils.focus(object)
-
-        if not object.data.uv_layers:
-            object.data.uv_layers.new(do_init=False)
-
-        if uv_layer_name is None:
-            uv_layer_name = object.data.uv_layers.active.name
-
-        imported_object.data.uv_layers[0].name = uv_layer_name
-
-
-        def apply_modifier(modifier: bpy.types.Modifier):
-            object = modifier.id_data
-            print(modifier.name + "...")
-            bpy_context.call_for_object(object, bpy.ops.object.modifier_apply, modifier = modifier.name, single_user = True)
-
-
-        def apply_uv_data_transfer_modifier(from_object: bpy.types.Object, to_object: bpy.types.Object, uv_layer_name: str):
-
-            modifier: bpy.types.DataTransferModifier = to_object.modifiers.new('', type='DATA_TRANSFER')
-
-            modifier.object = from_object
-            modifier.use_loop_data = True
-            modifier.data_types_loops = {'UV'}
-            modifier.loop_mapping = 'NEAREST_POLYNOR'
-            modifier.layers_uv_select_src = uv_layer_name
-            modifier.show_expanded = False
-
-            apply_modifier(modifier)
-
-        try:
-            copy_uv(imported_object, object, uv_layer_name)
-        except ValueError:
-            traceback.print_exc()
-
-            with bpy_context.Focus([imported_object, object_copy, object]):
-                apply_uv_data_transfer_modifier(imported_object, object_copy, uv_layer_name)
-
-                # loops that are failed to be transferred create overlaps
-                re_unwrap_overlaps(object_copy, uv_layer_name)
-
-                copy_uv(object_copy, object, uv_layer_name)
         finally:
-            bpy.data.objects.remove(object_copy)
-            bpy.data.objects.remove(imported_object)
+
+            if object_copy is not None:
+                bpy.data.batch_remove((object_copy.data, object_copy))
+
+            if imported_object is not None:
+                bpy.data.batch_remove((imported_object.data, imported_object))
 
 
 def re_unwrap_overlaps(object: bpy.types.Object, uv_layer_name: str):
