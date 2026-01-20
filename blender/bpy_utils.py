@@ -476,47 +476,6 @@ def get_compatible_armature_actions(objects: typing.List[bpy.types.Object]) -> t
 
     return actions
 
-
-def create_uvs(objects: typing.List[bpy.types.Object], resolution: int, material_keys: typing.Optional[typing.List[str]] = None):
-    print(f"{create_uvs.__name__}...")
-
-    settings = tool_settings.Pack_UVs(resolution=resolution)
-
-    objects = get_unique_mesh_objects(objects)
-
-    with bpy_context.State() as state:
-
-        for object in objects:
-            if object.animation_data:
-                for driver in object.animation_data.drivers:
-                    state.set(driver, 'mute', True)
-
-        for object in objects:
-            for modifier in object.modifiers:
-                state.set(modifier, 'show_viewport', False)
-
-        bpy_uv.ensure_uv_layer(objects, settings.uv_layer_name)
-
-        bpy_uv.unwrap_with_fallback(objects)
-
-        if settings.merge:
-            if material_keys:
-                for material_key in material_keys:
-                    settings.material_key = material_key
-                    bpy_uv.pack(objects, settings)
-            else:
-                bpy_uv.pack(objects, settings)
-
-        else:
-            for material, _objects in group_objects_by_material(objects).items():
-
-                if material_keys and not any(material.get(key) for key in material_keys):
-                    continue
-
-                bpy_uv.pack(_objects, settings)
-
-        bpy_uv.ensure_pixel_per_island(objects, settings)
-
 class Material_Bake_Type:
     PREFIX = '__bc_'
     HAS_BASE_COLOR = PREFIX + 'has_base_color'
@@ -608,33 +567,6 @@ def split_into_alpha_and_non_alpha_groups(objects: typing.List[bpy.types.Object]
             material[opaque_material_key] = True
 
     return alpha_material_key, opaque_material_key
-
-
-def bake_materials(objects: typing.List[bpy.types.Object], image_dir: str, resolution: int, **bake_kwargs):
-
-    with bpy_context.Global_Optimizations(), bpy_context.State() as state:
-
-        # this can help to reduce `Dependency cycle detected` spam in rigs
-        for o in bpy.data.objects:
-            if o.type == 'ARMATURE':
-                state.set(o.pose, 'ik_solver', 'LEGACY')
-
-
-        convert_materials_to_principled(objects)
-
-        set_out_of_range_material_indexes_to_zero(objects)
-
-        alpha_material_key, opaque_material_key = split_into_alpha_and_non_alpha_groups(objects)
-
-
-        create_uvs(objects, resolution, (alpha_material_key, opaque_material_key))
-
-
-        bake_settings = tool_settings.Bake(image_dir = image_dir, resolution = resolution, **bake_kwargs)
-        bake_object_by_material_key(objects, alpha_material_key, opaque_material_key, bake_settings)
-
-
-        merge_material_slots_with_the_same_materials(objects)
 
 
 def read_homefile(blend_file, load_ui = True):
@@ -1232,32 +1164,6 @@ def merge_material_slots_with_the_same_materials(objects: typing.List[bpy.types.
                     polygon.material_index = index_to_new_index[index]
 
 
-def bake_object_by_material_key(objects: typing.List[bpy.types.Object], alpha_material_key: str, opaque_material_key: str, bake_settings: 'tool_settings.Bake'):
-
-    for material_key in (alpha_material_key, opaque_material_key):
-
-        material_group = [m for m in bpy.data.materials if m.get(material_key)]
-        if not material_group:
-            continue
-
-        bake_types = [[tool_settings_bake.AO_Diffuse(), tool_settings_bake.Roughness(), tool_settings_bake.Metallic()]]
-
-        if any(material[Material_Bake_Type.HAS_EMISSION] for material in material_group):
-            bake_types.append(tool_settings_bake.Emission())
-
-        if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
-            bake_types.append(tool_settings_bake.Normal(uv_layer=bake_settings.uv_layer_name))
-
-        if material_key == alpha_material_key:
-            bake_types.append([tool_settings_bake.Base_Color(), tool_settings_bake.Alpha()])
-        else:
-            bake_types.append(tool_settings_bake.Base_Color())
-
-        bake_settings.material_key = material_key
-        bake_settings.bake_types = bake_types
-        bpy_bake.bake(objects, bake_settings)
-
-
 def set_out_of_range_material_indexes_to_zero(objects: typing.List[bpy.types.Object]):
 
     for object in get_unique_mesh_objects(objects):
@@ -1585,31 +1491,6 @@ def move_objects_to_new_collection(objects: typing.List[bpy.types.Object], colle
         baked_copy_collection.objects.link(object)
 
     return layer_collection
-
-
-def unwrap_unique_meshes(
-            objects: typing.List[bpy.types.Object],
-            settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
-            ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None
-        ):
-
-    settings = tool_settings.Unwrap_UVs()._update(settings)
-
-    objects = get_unique_mesh_objects(objects)
-
-    with bpy_context.State() as state:
-
-        for object in objects:
-            for modifier in object.modifiers:
-                state.set(modifier, 'show_viewport', False)
-
-        for object in objects:
-            state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
-
-        with bpy_context.Empty_Scene():
-            bpy_uv.unwrap_with_fallback(objects, settings, ministry_of_flat_settings)
-
-            bpy_uv.scale_uv_to_world_per_uv_layout(objects)
 
 
 def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake_Materials, *,

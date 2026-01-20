@@ -289,10 +289,6 @@ def merge_objects(objects: Objects_Like = None, object_name: str = None):
     return bpy_utils.merge_objects(objects=get_objects_fallback(objects), name=object_name)
 
 
-def bake_materials(objects: Objects_Like, image_dir: str, resolution: int, **bake_kwargs):
-    bpy_utils.bake_materials(get_objects(objects), image_dir, resolution, **bake_kwargs)
-
-
 def remove_all_node_groups_from_materials():
     """
     the gltf exporter's method of nodes inspection takes an absurd amount of time
