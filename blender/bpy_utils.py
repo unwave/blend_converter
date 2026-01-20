@@ -1863,7 +1863,7 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         ## delete temporal objects
 
-        bpy.data.objects.remove(bake_proxy)
+        bpy.data.batch_remove((bake_proxy.data, bake_proxy))
 
         if settings.convert_materials:
             bpy.data.batch_remove(set(texture_coordinates_collection.objects))

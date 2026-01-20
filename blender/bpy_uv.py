@@ -1583,7 +1583,7 @@ def unwrap_ministry_of_flat_with_fallback(
 
         blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_UV_UNWRAP)
 
-        bpy.data.objects.remove(object_copy)
+        bpy.data.batch_remove((object_copy.data, object_copy))
 
         if settings.mark_seams_from_islands:
             mark_seams_from_islands(object, settings.uv_layer_name)
@@ -2481,7 +2481,7 @@ def brute_force_unwrap(
             blend_inspector.inspect_blend(blend_inspector.COMMON.INSPECT_UV_UNWRAP)
 
 
-        bpy.data.objects.remove(object_copy)
+        bpy.data.batch_remove((object_copy.data, object_copy))
 
 
     if settings.mark_seams_from_islands:
