@@ -823,6 +823,10 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
 
     objects = bpy_utils.get_unique_mesh_objects(objects)
 
+    # bpy.ops.uv.reveal.poll() will fail if the active object has not polygons
+    # TODO: objects in EDIT mode have outdated data.polygons
+    objects = [o for o in objects if o.data.polygons]
+
     if not objects:
         print("No valid objects to pack: ", [o.name_full for o in objects])
         return
