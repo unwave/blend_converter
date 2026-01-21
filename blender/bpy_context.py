@@ -1251,9 +1251,12 @@ def set_mode(objects: typing.List[bpy.types.Object], mode: str, view_layer: 'bpy
             if object.mode != mode:
                 view_layer.objects.active = object
 
+        error = None
 
-        result = bpy.ops.object.mode_set(mode=mode)
-        assert not 'CANCELLED' in result
+        try:
+            result = bpy.ops.object.mode_set(mode=mode)
+        except RuntimeError as e:
+            error = e
 
         if all(object.mode == mode for object in objects_of_type):
             continue
@@ -1265,8 +1268,12 @@ def set_mode(objects: typing.List[bpy.types.Object], mode: str, view_layer: 'bpy
             raise Exception(text + "\n\t" + f"Multiple data users: {info}")
         elif any(not o.visible_get(view_layer=view_layer) for o in objects_of_type):
             raise Exception(text + "\n\t" + f"Objects not visible: {[o.name_full for o in objects_of_type if not o.visible_get(view_layer=view_layer)]}")
+        elif not error and 'CANCELLED' in result:
+            raise Exception(text + "\n\t" + "The operator has ben cancelled.")
+        elif "Unable to execute 'Edit Mode', error changing modes" in str(error):
+            raise Exception(text + "\n\t" + str(error).strip() + "\n\t" + "Try to ensure the objects are local.") from error
         else:
-            raise Exception(text + "\n\t" + "Unknown reason.")
+            raise Exception(text + "\n\t" + "Unknown reason.") from error
 
 
 class Focus:
