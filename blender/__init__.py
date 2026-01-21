@@ -125,10 +125,15 @@ def run_blender(
 
     while blender.poll() is None:
 
-        if process.memory_info().vms > memory_limit_in_bytes:
-            process.kill()
+        try:
+            if process.memory_info().vms > memory_limit_in_bytes:
+                utils.kill_process(process)
 
-            raise Exception(f"Memory limit exceeded: {memory_limit_in_bytes/bytes_in_gb} Gb")
+                raise Exception(f"Memory limit exceeded: {memory_limit_in_bytes/bytes_in_gb} Gb")
+
+        except psutil.NoSuchProcess as e:
+            print(e)
+            break
 
         time.sleep(1)
 

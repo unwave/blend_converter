@@ -1124,3 +1124,46 @@ class Console_Shown:
         error_code = ctypes.get_last_error()
         if error_code:
             print(ctypes.WinError(error_code), file=sys.stderr)
+
+
+if typing.TYPE_CHECKING:
+    import multiprocessing
+    import psutil
+
+
+def kill_process(process: 'typing.Union[multiprocessing.Process, psutil.Process]'):
+
+    import multiprocessing
+    import psutil
+
+    print(f"Killing process: {repr(process)}")
+
+    try:
+
+        if isinstance(process, multiprocessing.Process):
+            parent = psutil.Process(process.pid)
+        else:
+            parent = process
+
+        children = parent.children(recursive=True)
+
+        for child in children:
+            try:
+                child.terminate()
+            except psutil.Error as e:
+                print(e)
+
+        try:
+            parent.terminate()
+        except psutil.Error as e:
+            print(e)
+
+        gone, alive = psutil.wait_procs(children + [parent], timeout=3)
+        for process in alive:
+            try:
+                process.kill()
+            except psutil.Error as e:
+                print(e)
+
+    except psutil.Error as e:
+        print(e)

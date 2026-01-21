@@ -26,23 +26,6 @@ UPDATE_DELAY = 2
 LOG_DIR = os.path.join(utils.BLEND_CONVERTER_USER_DIR, 'logs')
 
 
-def kill_process(process: multiprocessing.Process):
-
-    print(f"Killing process: {repr(process)}")
-
-    try:
-        parent_process = psutil.Process(process.pid)
-    except ProcessLookupError:
-        import traceback
-        traceback.print_exc()
-        return
-
-    for child in parent_process.children(recursive=True):
-        child.kill()
-
-    parent_process.kill()
-
-
 class Program_Entry:
 
 
@@ -190,12 +173,12 @@ class Program_Entry:
         self.process = process
         process.start()
 
-        exit_func = atexit.register(lambda: kill_process(process))
+        exit_func = atexit.register(lambda: utils.kill_process(process))
 
         process.join(timeout = self.timeout)
 
         if process.exitcode == None:
-            kill_process(process)
+            utils.kill_process(process)
 
         is_superseded = thread_identity != self.thread_identity
 
@@ -246,7 +229,7 @@ class Program_Entry:
             self.thread_identity = uuid.uuid4()
 
             if self.process:
-                kill_process(self.process)
+                utils.kill_process(self.process)
 
             threading.Thread(target=self._run, kwargs=dict(callback=callback, thread_identity = self.thread_identity), daemon = True).start()
 
@@ -257,7 +240,7 @@ class Program_Entry:
 
         with self.lock:
             if self.process:
-                kill_process(self.process)
+                utils.kill_process(self.process)
 
 
 class Blend_Event_Handler(watchdog_events.PatternMatchingEventHandler):
