@@ -46,7 +46,7 @@ def kill_process(process: multiprocessing.Process):
 class Program_Entry:
 
 
-    def __init__(self, program: common.Program, from_module_file: str, programs_getter_name: str, dictionary_key: str):
+    def __init__(self, program: common.Program, from_module_file: str, programs_getter_name: str, keyword_arguments: dict):
 
         self.program = program
 
@@ -66,8 +66,8 @@ class Program_Entry:
         self.is_manual_update = False
 
 
-        self.dictionary_key = dictionary_key
-        """ Key of the program in the programs dictionary. """
+        self.keyword_arguments = keyword_arguments
+        """ The program keyword arguments. """
 
         self.from_module_file = from_module_file
         """ A module file which the common.Program was collected from. """
@@ -297,23 +297,45 @@ def import_files(files: typing.List[str]):
     return modules
 
 
-def get_program_entries(file_and_getter_pairs):
+def get_program_entries(program_definitions: typing.List[typing.Tuple[str, str, str]]):
 
     entries = []
 
-    modules = import_files([p[0] for p in file_and_getter_pairs])
+    path_to_module_map = import_files([p[0] for p in program_definitions])
 
-    for file_name, getter_name in file_and_getter_pairs:
+    for file_name, program_getter_name, arguments_getter_name in program_definitions:
 
-        module = modules[os.path.realpath(file_name)]
+        module = path_to_module_map[os.path.realpath(file_name)]
 
-        key_to_program: dict = getattr(module, getter_name)()
+        program_getter = getattr(module, program_getter_name)
+        if not isinstance(program_getter, typing.Callable):
+            raise Exception(
+                f"A program_getter must be a function, got: {repr(program_getter)}"
+                "\n\t" f"file_name = {file_name}"
+                "\n\t" f"program_getter_name = {program_getter_name}"
+            )
 
-        for key, program in key_to_program.items():
-            if isinstance(program, common.Program):
-                entries.append(Program_Entry(program, module.__file__, getter_name, key))
-            else:
-                utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"`{key}` is not a common.Program: {repr(program)}", file=sys.stderr)
+        arguments_getter = getattr(module, arguments_getter_name)
+        if not isinstance(arguments_getter, typing.Callable):
+            raise Exception(
+                f"An arguments_getter must be a function, got: {repr(arguments_getter)}"
+                "\n\t" f"file_name = {file_name}"
+                "\n\t" f"arguments_getter_name = {arguments_getter_name}"
+            )
+
+        for kwargs in arguments_getter():
+
+            program = program_getter(**kwargs)
+
+            if not isinstance(program, common.Program):
+                raise Exception(
+                    f"A program_getter function must return a common.Program, got: {repr(program)}"
+                    "\n\t" f"file_name = {file_name}"
+                    "\n\t" f"program_getter_name = {program_getter_name}"
+                    "\n\t" f"kwargs = {kwargs}"
+                )
+
+            entries.append(Program_Entry(program, module.__file__, program_getter_name, kwargs))
 
     return entries
 
@@ -365,11 +387,11 @@ class Updater:
 
 
     @classmethod
-    def from_files(cls, file_and_getter_pairs: typing.List[typing.Tuple[str, str]]):
+    def from_files(cls, program_definitions: typing.List[typing.Tuple[str, str, str]]):
 
         updater = cls()
 
-        updater.entries = get_program_entries(file_and_getter_pairs)
+        updater.entries = get_program_entries(program_definitions)
 
         updater.poke_all()
 

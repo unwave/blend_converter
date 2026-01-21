@@ -328,7 +328,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             programs.append([
                 entry.from_module_file,
                 entry.programs_getter_name,
-                entry.dictionary_key,
+                entry.keyword_arguments,
             ])
 
         command = utils.get_command_from_list([
@@ -826,12 +826,12 @@ class BC_App(wx.App):
 class Main_Frame(wxp_utils.Generic_Frame):
 
 
-    def __init__(self, file_and_getter_pairs: typing.List[typing.Tuple[str, str]], columns: typing.Optional[typing.Iterable[typing.Tuple[str, int, typing.Callable[[int], str]]]] = None):
+    def __init__(self, program_definitions: typing.List[typing.Tuple[str, str, str]], columns: typing.Optional[typing.Iterable[typing.Tuple[str, int, typing.Callable[[int], str]]]] = None):
 
-        self.updater = updater.Updater.from_files(file_and_getter_pairs)
+        self.updater = updater.Updater.from_files(program_definitions)
 
         if not self.updater.entries:
-            raise Exception(f"No programs provided in files: {file_and_getter_pairs}")
+            raise Exception(f"No programs provided in files: {program_definitions}")
 
         blender_executable = collections.Counter([entry.program.blender_executable for entry in self.updater.entries]).most_common(1)[0][0]
 
@@ -881,12 +881,12 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     @classmethod
-    def get_app(cls, file_and_getter_pairs: typing.List[typing.Tuple[str, str]], columns = None):
+    def get_app(cls, program_definitions: typing.List[typing.Tuple[str, str, str]], columns = None):
 
         print(sys.argv)
 
         app = BC_App()
-        frame = cls(file_and_getter_pairs, columns = columns)
+        frame = cls(program_definitions, columns = columns)
         app.main_frame = frame
 
         is_console_shown = False

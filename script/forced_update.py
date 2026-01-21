@@ -1,17 +1,15 @@
 import sys
 import os
-
-programs = sys.argv[1]
-
-ARGS = sys.argv[2:]
-
-import sys
 import importlib.util
-import os
 import typing
 import re
 import json
 import traceback
+
+
+PROGRAMS = sys.argv[1]
+
+ARGS = sys.argv[2:]
 
 
 def import_module(module_path: str):
@@ -285,9 +283,9 @@ def show_file(file, failure_message: str):
         utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), failure_message)
 
 
-def run_program(module_path, programs_getter_name, program_name):
+def run_program(module_path, programs_getter_name, kwargs):
 
-    program: common.Program = getattr(import_module(module_path), programs_getter_name)()[program_name]
+    program: common.Program = getattr(import_module(module_path), programs_getter_name)(**kwargs)
 
     program._profile = _profile
     program._debug = _debug
@@ -345,16 +343,16 @@ def run_program(module_path, programs_getter_name, program_name):
         open_file(program.result_path, program.blender_executable, "The result does not exist.")
 
 
-for module_path, programs_getter_name, name in json.loads(programs)['programs']:
+for module_path, programs_getter_name, kwargs in json.loads(PROGRAMS)['programs']:
 
     try:
-        run_program(module_path, programs_getter_name, name)
+        run_program(module_path, programs_getter_name, kwargs)
     except Exception:
 
         error_type, error_value, error_tb = sys.exc_info()
 
         print()
-        utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"{module_path}::{programs_getter_name}::{name}", file=sys.stderr)
+        utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"{module_path}::{programs_getter_name}::{kwargs}", file=sys.stderr)
         utils.print_in_color(utils.get_color_code(180,0,0,0,0,0,), ''.join(traceback.format_tb(error_tb)), file=sys.stderr)
         utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), ''.join(traceback.format_exception_only(error_type, error_value)), file=sys.stderr)
         print()
