@@ -350,7 +350,11 @@ def reset_ui_layout():
 
     filepath = bpy.data.filepath
     bpy.ops.wm.read_homefile(app_template="")
-    bpy.ops.wm.open_mainfile(filepath = filepath, load_ui=False)
+
+    try:
+        bpy.ops.wm.open_mainfile(filepath = filepath, load_ui=False)
+    except RuntimeError as e:
+        print(e)
 
 
 def get_visible_objects():
