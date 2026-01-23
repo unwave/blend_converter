@@ -104,8 +104,11 @@ class Profiled:
         if os.name == 'nt':
             kwargs = dict(creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
 
+        env = os.environ.copy()
+        env['PYTHONWARNINGS'] = '0'
+
         try:
-            subprocess.Popen(['python', '-m', 'snakeviz', self.profile_path], start_new_session = True, **kwargs, shell=True, text=True)
+            subprocess.Popen(['python', '-m', 'snakeviz', self.profile_path], start_new_session = True, **kwargs, env=env)
         except Exception as e:
             print(e)
 
