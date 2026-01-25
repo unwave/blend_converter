@@ -850,10 +850,9 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         def refresh():
             if self.__nonzero__():
-                self.Refresh()
                 self.result_panel.refresh()
 
-        updater.update_ui = refresh
+        updater.update_ui = lambda: wx.CallAfter(refresh)
 
         updater.stdout_line_printed = lambda entry: wx.PostEvent(self, Event_Stdout_Line_Printed(entry=entry))
         updater.stderr_line_printed = lambda entry: wx.PostEvent(self, Event_Stderr_Line_Printed(entry=entry))
