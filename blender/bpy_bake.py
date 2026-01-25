@@ -22,6 +22,7 @@ from . import bpy_utils
 from . import bpy_uv
 from . import bake_settings
 from . import blend_inspector
+from . import communication
 
 
 
@@ -954,7 +955,8 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
 
     if settings.merge_materials and not settings.material_key:
 
-        images = bake_images(objects, uv_layer_name, settings)
+        with communication.All_Cores():
+            images = bake_images(objects, uv_layer_name, settings)
         settings._images.extend(images)
 
         if settings.create_materials:
@@ -1008,7 +1010,8 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             f"For objects: {[o.name_full for o in objects_in_group]}"
         )
 
-        images = bake_images(objects_in_group, uv_layer_name, settings)
+        with communication.All_Cores():
+            images = bake_images(objects_in_group, uv_layer_name, settings)
         settings._images.extend(images)
 
         if settings.create_materials:
@@ -1038,7 +1041,8 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
 
             print_bold('\nMaterial Baking: ', material.name_full, '\nfor objects:', [o.name_full for o in _objects])
 
-            images = bake_images(_objects, uv_layer_name, settings)
+            with communication.All_Cores():
+                images = bake_images(_objects, uv_layer_name, settings)
             settings._images.extend(images)
 
             if settings.create_materials:

@@ -11,6 +11,7 @@ import atexit
 import re
 import importlib
 import traceback
+import socket
 
 from watchdog import events as watchdog_events
 from watchdog import observers as watchdog_observers
@@ -18,10 +19,13 @@ import psutil
 
 from . import common
 from . import utils
+from .blender import communication
+from . import update_process
 
 UPDATE_DELAY = 2
 """ For update debouncing. """
 
+SENTINEL = object()
 
 LOG_DIR = os.path.join(utils.BLEND_CONVERTER_USER_DIR, 'logs')
 
@@ -30,6 +34,8 @@ class Program_Entry:
 
 
     def __init__(self, program: common.Program, from_module_file: str, programs_getter_name: str, keyword_arguments: dict):
+
+        self.entry_id = uuid.uuid1().hex
 
         self.program = program
 
@@ -41,8 +47,6 @@ class Program_Entry:
         self.stderr_file = os.path.join(LOG_DIR, f"{report_stem}_stderr_{uuid.uuid1().hex}.txt")
 
         self.status: typing.Literal['ok', 'needs_update', 'updating', 'error', 'does_not_exist', 'waiting_for_dependency', 'unknown'] = 'unknown'
-
-        self.process: typing.Optional[multiprocessing.Process] = None
 
         self.is_live_update = True
 
@@ -61,7 +65,7 @@ class Program_Entry:
 
         # self.path_list = os.path.realpath(program.blend_path).split(os.path.sep)
 
-        self.lock = multiprocessing.Lock()
+        self.lock = threading.RLock()
 
         self.timeout: typing.Optional[float] = program.timeout
 
@@ -70,6 +74,10 @@ class Program_Entry:
 
         self.stdout_lines = []
         self.stderr_lines = []
+
+        self.updater_response_queue: 'multiprocessing.Queue[dict]' = multiprocessing.Queue()
+
+        self.psutil_process: psutil.Process = None
 
 
     def poke(self, has_non_updated_dependency: bool):
@@ -94,63 +102,7 @@ class Program_Entry:
         return (time.time() - self.poke_time) > UPDATE_DELAY
 
 
-    def update_job(self):
-        """ This function is run in `multiprocessing.Process` """
-
-        from . import utils
-        utils.print_in_color = utils.dummy_print_in_color
-
-        os.makedirs(os.path.dirname(self.stdout_file), exist_ok=True)
-        os.makedirs(os.path.dirname(self.stderr_file), exist_ok=True)
-
-        def stdout_capture_job():
-
-            with open(self.stdout_file, 'w', encoding='utf-8') as f:
-
-                f.reconfigure(line_buffering = True)
-
-                for line in iter(stdout_capture.lines.get, None):
-
-                    self.stdout_queue.put_nowait(line)
-                    f.write(f"[{time.strftime('%H:%M:%S %Y-%m-%d')}]: {line.rstrip()}\n")
-
-        def stderr_capture_job():
-
-            with open(self.stderr_file, 'w', encoding='utf-8') as f:
-
-                f.reconfigure(line_buffering = True)
-
-                for line in iter(stderr_capture.lines.get, None):
-                    self.stderr_queue.put_nowait(line)
-                    f.write(f"[{time.strftime('%H:%M:%S %Y-%m-%d')}]: {line.rstrip()}\n")
-
-        stdout_capture_thread = threading.Thread(target=stdout_capture_job, daemon=True)
-        stderr_capture_thread = threading.Thread(target=stderr_capture_job, daemon=True)
-
-        error = None
-
-        with utils.Capture_Stdout(line_buffering = True) as stdout_capture, utils.Capture_Stderr(line_buffering = True) as stderr_capture:
-
-            stderr_capture_thread.start()
-            stdout_capture_thread.start()
-
-            try:
-                self.program.execute()
-            except BaseException as e:
-                error = e
-                if str(e) != 'BLENDER':
-                    traceback.print_exc()
-
-        stdout_capture.lines.put_nowait(None)
-        stdout_capture_thread.join()
-        stderr_capture.lines.put_nowait(None)
-        stderr_capture_thread.join()
-
-        if error:
-            raise SystemExit(1)
-
-
-    def _run(self, callback: typing.Callable, thread_identity: uuid.UUID):
+    def _run(self, *, callback: typing.Callable, thread_identity: uuid.UUID, updater_command_queue: 'multiprocessing.Queue[dict]' = None):
 
         def read_stdout():
             for line in iter(self.stdout_queue.get, None):
@@ -169,23 +121,38 @@ class Program_Entry:
         read_stdout_thread.start()
         read_stderr_thread.start()
 
-        process = multiprocessing.Process(target=self.update_job, daemon=True)
-        self.process = process
-        process.start()
 
-        exit_func = atexit.register(lambda: utils.kill_process(process))
+        with self.lock:
+            process = multiprocessing.Process(
+                target = update_process.run,
+                kwargs = dict(
+                    stdout_file = self.stdout_file,
+                    stderr_file = self.stderr_file,
+                    stdout_queue = self.stdout_queue,
+                    stderr_queue = self.stderr_queue,
+                    entry_id = self.entry_id,
+                    updater_command_queue = updater_command_queue,
+                    updater_response_queue = self.updater_response_queue,
+                    program = self.program,
+                ),
+                daemon=True,
+            )
+            process.start()
+
+            self.psutil_process = psutil.Process(process.pid)
+
+
+        exit_func = atexit.register(self.terminate)
 
         process.join(timeout = self.timeout)
 
         if process.exitcode == None:
-            utils.kill_process(process)
+            self.terminate()
 
         is_superseded = thread_identity != self.thread_identity
 
         if is_superseded:
             self.stderr_queue.put_nowait(f"THE UPDATE HAS BEEN SUPERSEDED: {thread_identity}")
-        else:
-            self.process = None
 
         atexit.unregister(exit_func)
 
@@ -216,7 +183,7 @@ class Program_Entry:
         update_ui()
 
 
-    def update(self, callback: typing.Optional[typing.Callable]):
+    def update(self, *, updater_command_queue: 'multiprocessing.Queue[dict]' = None, callback: typing.Optional[typing.Callable] = None):
 
         with self.lock:
 
@@ -224,14 +191,11 @@ class Program_Entry:
 
             self.status = 'updating'
 
-            self.is_dirty = False
-
             self.thread_identity = uuid.uuid4()
 
-            if self.process:
-                utils.kill_process(self.process)
+            self.terminate()
 
-            threading.Thread(target=self._run, kwargs=dict(callback=callback, thread_identity = self.thread_identity), daemon = True).start()
+            threading.Thread(target=self._run, kwargs=dict(callback=callback, thread_identity = self.thread_identity, updater_command_queue = updater_command_queue), daemon = True).start()
 
             update_ui()
 
@@ -239,8 +203,55 @@ class Program_Entry:
     def terminate(self):
 
         with self.lock:
-            if self.process:
-                utils.kill_process(self.process)
+
+            if self.psutil_process is None:
+                return
+
+            utils.kill_process(self.psutil_process)
+
+
+    def suspend(self):
+
+        with self.lock:
+
+            if self.psutil_process is None:
+                return
+
+            if not self.psutil_process.is_running():
+                return
+
+            try:
+
+                for child in self.psutil_process.children(recursive=True):
+                    try:
+                        child.suspend()
+                    except psutil.Error as e:
+                        print(e)
+
+            except psutil.Error as e:
+                print(e)
+
+
+    def resume(self):
+
+        with self.lock:
+
+            if self.psutil_process is None:
+                return
+
+            if not self.psutil_process.is_running():
+                return
+
+            try:
+
+                for child in self.psutil_process.children(recursive=True):
+                    try:
+                        child.resume()
+                    except psutil.Error as e:
+                        print(e)
+
+            except psutil.Error as e:
+                print(e)
 
 
 class Blend_Event_Handler(watchdog_events.PatternMatchingEventHandler):
@@ -343,6 +354,10 @@ class Updater:
         self.shared_failure_tags = set()
         """ See `set_shared_failure_by_tag`. """
 
+        self.updater_command_queue: 'multiprocessing.Queue[dict]' = multiprocessing.Queue()
+
+        threading.Thread(target = self.command_queue_runner, daemon=True).start()
+
 
     def init_observer(self):
 
@@ -422,7 +437,7 @@ class Updater:
 
 
     def total_max_parallel_executions_exceeded(self):
-        return sum(entry.status == 'updating' for entry in self.entries) >= self.total_max_parallel_executions
+        return sum(entry.status in ('updating', 'suspended') for entry in self.entries) >= self.total_max_parallel_executions
 
 
     def despatching(self):
@@ -466,7 +481,7 @@ class Updater:
                     continue
 
                 entry.is_manual_update = False
-                entry.update(self.poke_waiting_for_dependency)
+                entry.update(updater_command_queue = self.updater_command_queue, callback = self.poke_waiting_for_dependency)
 
 
             if self.is_paused:
@@ -494,7 +509,7 @@ class Updater:
                 if not entry.poke_timeout:
                     continue
 
-                entry.update(self.poke_waiting_for_dependency)
+                entry.update(updater_command_queue = self.updater_command_queue, callback = self.poke_waiting_for_dependency)
 
 
     def terminate_observer(self):
@@ -509,7 +524,7 @@ class Updater:
 
     def max_executions_per_tag_exceeded(self, tags: typing.Iterable[str]):
 
-        updating_entries = [entry for entry in self.entries if entry.status == 'updating']
+        updating_entries = [entry for entry in self.entries if entry.status in ('updating', 'suspended')]
 
         execution_limiting_tags = [tag for tag in tags if tag in self.max_parallel_execution_per_tag]
         if not execution_limiting_tags:
@@ -525,6 +540,68 @@ class Updater:
     def set_shared_failure_by_tag(self, tag: str):
         """ If a program with the tag gets an `error` status then all the programs with that tag also get the `error` status. """
         self.shared_failure_tags.add(tag)
+
+
+    def command_queue_runner(self):
+
+
+        for item in iter(self.updater_command_queue.get, SENTINEL):
+
+            print("[updater got]:", item)
+
+            command = item.get(communication.Command_Key.COMMAND)
+
+            if command == communication.Command.REQUEST_ALL_CORES:
+
+                for entry in self.entries:
+
+                    if entry.status != 'updating':
+                        continue
+
+                    if entry.entry_id == item['entry_id']:
+                        continue
+
+                    entry.suspend()
+                    entry.status = 'suspended'
+
+
+                running_entry = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
+                print('Acquired cores:', running_entry.program.blend_path)
+                update_ui()
+
+
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listening_socket:
+
+                    host = 'localhost'
+                    listening_socket.bind((host, 0))
+                    port = listening_socket.getsockname()[1]
+
+                    running_entry.updater_response_queue.put({communication.Command_Key.RESULT: True, "address": (host, port)})
+
+                    listening_socket.listen()
+
+                    client_socket, addr = listening_socket.accept()
+                    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
+
+                    try:
+                        client_socket.recv(1)
+                    except ConnectionResetError as e:
+                        print(e)
+
+                    for entry in self.entries:
+
+                        if entry.status != 'suspended':
+                            continue
+
+                        if entry.entry_id == running_entry.entry_id:
+                            continue
+
+                        entry.resume()
+                        entry.status = 'updating'
+
+
+                print('Released cores:', running_entry.program.blend_path)
+                update_ui()
 
 
 def update_ui():

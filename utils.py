@@ -1140,23 +1140,17 @@ class Console_Shown:
 
 
 if typing.TYPE_CHECKING:
-    import multiprocessing
     import psutil
 
 
-def kill_process(process: 'typing.Union[multiprocessing.Process, psutil.Process]'):
+def kill_process(parent: 'psutil.Process'):
 
-    import multiprocessing
     import psutil
-
-    print(f"Killing process: {repr(process)}")
 
     try:
 
-        if isinstance(process, multiprocessing.Process):
-            parent = psutil.Process(process.pid)
-        else:
-            parent = process
+        if not parent.is_running():
+            return
 
         children = parent.children(recursive=True)
 

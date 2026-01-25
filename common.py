@@ -305,7 +305,7 @@ class Program:
             raise Exception(f"Unexpected value {repr(value)} or type {type(value)}")
 
 
-    def execute(self):
+    def execute(self, entry_command_queue = None, updater_response_queue = None):
 
         start_time = time.perf_counter()
         print("EXECUTION START:", time.strftime('%H:%M:%S %Y-%m-%d'), flush=True)
@@ -317,6 +317,9 @@ class Program:
             instructions_sorted = utils.list_by_key(self.instructions, lambda instruction: instruction.executor)
 
             for executor, instructions in instructions_sorted.items():
+
+                executor.entry_command_queue = entry_command_queue
+                executor.updater_response_queue = updater_response_queue
 
                 substituted_instructions = []
                 for instruction in instructions:

@@ -167,6 +167,8 @@ else:
 from blend_converter import utils
 from blend_converter.blender import blend_inspector
 
+from blend_converter.blender import communication
+
 return_values = {}
 ARGS = get_args()
 
@@ -260,11 +262,12 @@ if __name__ == '__main__':
 
         setattr(builtins, 'breakpoint', dummy_breakpoint)
 
-    if ARGS['profile']:
-        with Profiled() as prof:
-            prof.profile.runcall(process)
-    else:
-        process()
+    with communication.Connection((ARGS['host'], ARGS['port'])):
+        if ARGS['profile']:
+            with Profiled() as prof:
+                prof.profile.runcall(process)
+        else:
+            process()
 
     with open(ARGS['return_values_file'], 'w', encoding='utf-8') as return_values_file:
         json.dump(return_values, return_values_file, indent = 4, ensure_ascii = False, default = lambda x: repr(x))

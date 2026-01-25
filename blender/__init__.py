@@ -4,9 +4,19 @@ import typing
 import time
 import sys
 import subprocess
+import queue
+import traceback
+import threading
+import socket
+import multiprocessing
+
 
 from .. import utils
 from .. import common
+
+
+
+SENTINEL = object()
 
 
 BLENDER_SCRIPT_RUNNER = os.path.join(common.ROOT_DIR, 'blender', 'scripts', 'process_scripts.py')
@@ -32,10 +42,13 @@ def remove_code(value):
 class Blender:
 
 
-    def __init__(self, binary_path: str, memory_limit_in_gigabytes = 8, stdout = None):
+    entry_command_queue: 'queue.Queue[dict]' = None
+    updater_response_queue: 'multiprocessing.Queue[dict]' = None
+
+
+    def __init__(self, binary_path: str, memory_limit_in_gigabytes = 8):
 
         self.binary_path = binary_path
-        self.stdout = None
         self.memory_limit = memory_limit_in_gigabytes
 
 
@@ -48,7 +61,9 @@ class Blender:
             profile: bool,
         ):
 
-        args = json.dumps(dict(
+
+        ## convert to json compatible representation
+        arguments = json.dumps(dict(
                 instructions = instructions,
                 return_values_file = return_values_file,
                 inspect_identifiers = list(inspect_identifiers),
@@ -56,21 +71,18 @@ class Blender:
                 debug = debug,
                 profile = profile,
         ), default = lambda x: x._to_dict())
+        arguments = json.loads(arguments)
 
 
-        args = json.loads(args)
+        ## fix "The filename or extension is too long"
+        remove_code(arguments)
 
-        remove_code(args)
 
-        command = [
-            '--python',
-            BLENDER_SCRIPT_RUNNER,
-            '--',
-            '-json_args',
-            json.dumps(args),
-        ]
-
-        run_blender(self.binary_path, command, memory_limit = self.memory_limit, stdout = self.stdout)
+        self.run_blender(
+            executable =  self.binary_path,
+            arguments = arguments,
+            memory_limit = self.memory_limit,
+        )
 
 
     def _to_dict(self):
@@ -81,63 +93,160 @@ class Blender:
         )
 
 
-def run_blender(
-        executable: typing.Union[str, typing.List[str]],
-        arguments: typing.List[str],
-        argv: typing.Optional[typing.List[str]] = None,
-        stdout = None,
-        use_system_env = False,
-        memory_limit = 8,
-    ):
+    def run_blender(self, *,
+            executable: typing.Union[str, typing.List[str]],
+            arguments: dict,
+            use_system_env = False,
+            memory_limit = 8,
+        ):
 
-    if not isinstance(executable, list):
-        executable = [executable]
 
-    env = os.environ.copy()
-    env['PYTHONPATH'] = ''
-    env['PYTHONUNBUFFERED'] = '1'
-    env['PYTHONWARNINGS'] = 'error'
+        if not isinstance(executable, list):
+            executable = [executable]
 
-    command = [
-        *executable,
+        env = os.environ.copy()
+        env['PYTHONPATH'] = ''
+        env['PYTHONUNBUFFERED'] = '1'
+        env['PYTHONWARNINGS'] = 'error'
 
-        '-b',
-        '-noaudio',
-        *(['--python-use-system-env'] if use_system_env else []),
-        '--factory-startup',
-        '--python-exit-code',
-        '1',
+        command = [
+            *executable,
 
-        *arguments,
-    ]
+            '-b',
+            '-noaudio',
+            *(['--python-use-system-env'] if use_system_env else []),
+            '--factory-startup',
+            '--python-exit-code',
+            '1',
 
-    if argv:
-        command.extend(argv)
+            '--python',
+            BLENDER_SCRIPT_RUNNER,
+        ]
 
-    bytes_in_gb = 1024 ** 3
-    memory_limit_in_bytes = memory_limit * bytes_in_gb
 
-    import psutil
+        bytes_in_gb = 1024 ** 3
+        memory_limit_in_bytes = memory_limit * bytes_in_gb
 
-    blender = subprocess.Popen(command, stdout = stdout, text = True, env = env)
+        import psutil
 
-    process = psutil.Process(blender.pid)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listening_socket:
 
-    while blender.poll() is None:
 
-        try:
-            if process.memory_info().vms > memory_limit_in_bytes:
-                utils.kill_process(process)
+            host = 'localhost'
+            listening_socket.bind((host, 0))
+            port = listening_socket.getsockname()[1]
 
-                raise Exception(f"Memory limit exceeded: {memory_limit_in_bytes/bytes_in_gb} Gb")
+            arguments['host'] = host
+            arguments['port'] = port
 
-        except psutil.NoSuchProcess as e:
-            print(e)
-            break
+            command.extend(['--', '-json_args', json.dumps(arguments)])
 
-        time.sleep(1)
 
-    if blender.returncode != 0:
+            with subprocess.Popen(command, text = True, env = env) as blender:
 
-        utils.print_in_color(utils.CONSOLE_COLOR.RED, "Blender has exited with an error.", file=sys.stderr)
-        raise SystemExit('BLENDER')
+
+                listening_socket.listen()
+
+                self.client_socket, _ = listening_socket.accept()
+                self.client_socket.settimeout(None)
+                self.client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                self.client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
+
+                self.message_queue = queue.Queue()
+
+                message_processing = threading.Thread(target=self.message_processing, daemon=True)
+                message_processing.start()
+                message_receiving = threading.Thread(target=self.message_receiving, daemon=True)
+                message_receiving.start()
+
+                process = psutil.Process(blender.pid)
+                process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+
+
+                while process.is_running():
+
+                    try:
+                        if process.memory_info().vms > memory_limit_in_bytes:
+                            utils.kill_process(process)
+
+                            raise Exception(f"Memory limit exceeded: {memory_limit_in_bytes/bytes_in_gb} Gb")
+
+                    except psutil.NoSuchProcess as e:
+                        print(e)
+                        break
+
+                    time.sleep(1)
+
+
+                self.client_socket.close()
+                message_receiving.join()
+
+                self.message_queue.put(SENTINEL)
+                message_processing.join()
+
+
+
+        if blender.returncode != 0:
+
+            utils.print_in_color(utils.CONSOLE_COLOR.RED, "Blender has exited with an error.", file=sys.stderr)
+            raise SystemExit('BLENDER')
+
+
+    def message_processing(self):
+
+        for message in iter(self.message_queue.get, SENTINEL):
+
+            try:
+                data: dict = json.loads(message)
+            except json.decoder.JSONDecodeError:
+                traceback.print_exc()
+                print(message)
+                continue
+
+            print('[blender executor got]:', data, flush=True)
+
+            if self.entry_command_queue is None:
+                self.send({"disabled": True})
+                continue
+
+            data['pid'] = os.getpid()
+
+            self.entry_command_queue.put(data)
+            self.send(self.updater_response_queue.get())
+
+
+    def send(self, data: dict):
+        print('[blender executor sent]:', data, flush=True)
+        self.client_socket.sendall(json.dumps(data).encode() + b'\0')
+
+
+    def message_receiving(self):
+
+        truncated_message = None
+
+        while self.client_socket:
+
+            try:
+                raw = self.client_socket.recv(1024 * 8)
+            except OSError as e:
+                print(e)
+                return
+
+            if raw == b'':
+                self.client_socket.close()
+                if truncated_message:
+                    print("[blender executor leftover]:", truncated_message, file = sys.stderr)
+                return
+
+            messages = raw.split(b'\0')
+
+            if truncated_message is not None:
+                messages[0] = truncated_message + messages[0]
+
+            if messages[-1] == b'':
+                truncated_message = None
+            else:
+                truncated_message = messages[-1]
+
+            for message in messages[:-1]:
+                self.message_queue.put(message)
