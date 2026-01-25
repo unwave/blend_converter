@@ -1507,7 +1507,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
                 node.inputs['Emission Strength'].set_default_value(0)
             else:
                 emission_socket = node.inputs[Socket_Identifier.EMISSION]
-                emission_source_socket = emission_socket.connections[0]
+                emission_source_socket = emission_socket.as_output()
 
                 mix_node = emission_socket.new('ShaderNodeVectorMath', operation = 'MULTIPLY')
                 mix_node[0] = emission_source_socket
