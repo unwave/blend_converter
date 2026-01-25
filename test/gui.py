@@ -1,7 +1,22 @@
-if __name__ == '__main__':
+def main():
+
     from blend_converter.gui import updater_ui
     app = updater_ui.Main_Frame.get_app([(__file__, 'get_bake_program', 'get_keyword_arguments')])
+
+    import os
+    cpu_count = os.cpu_count()
+
+    # import psutil
+    # cpu_count = psutil.cpu_count(logical=False)
+
+    app.main_frame.updater.total_max_parallel_executions = cpu_count
+    app.main_frame.updater.default_max_parallel_executions = cpu_count
+
     app.MainLoop()
+
+
+if __name__ == '__main__':
+    main()
 
 
 from simple_programs import get_bake_program
