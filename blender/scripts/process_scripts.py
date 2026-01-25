@@ -179,6 +179,7 @@ blend_inspector.add_value(**ARGS['inspect_values'])
 if any(arg.startswith('inspect:func') for arg in ARGS['inspect_identifiers']):
     blend_inspector.make_top_functions_inspectable()
 
+utils.disable_buffering()
 
 def process():
 

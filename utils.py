@@ -1174,3 +1174,27 @@ def kill_process(parent: 'psutil.Process'):
 
     except psutil.Error as e:
         print(e)
+
+
+def disable_buffering():
+
+    if os.name != 'nt':
+        return
+
+    import ctypes
+
+    lib = ctypes.CDLL('ucrtbase')
+
+    lib.__acrt_iob_func.argtypes = [ctypes.c_uint]
+    lib.__acrt_iob_func.restype = ctypes.c_void_p
+
+    lib.setvbuf.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_size_t]
+    lib.setvbuf.restype = ctypes.c_int
+
+    _IONBF = 4
+
+    for index in (sys.stdout.fileno(), sys.stderr.fileno()):
+
+        pointer = lib.__acrt_iob_func(index)
+
+        lib.setvbuf(pointer, None, _IONBF, 0)
