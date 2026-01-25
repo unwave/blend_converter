@@ -54,10 +54,13 @@ def show_test_blends():
 
 def test_gui():
 
+    import sys
     import os
+    import subprocess
+
     from . import common
 
-    os.startfile(os.path.join(common.ROOT_DIR, 'test', 'gui.py'))
+    subprocess.Popen([sys.executable, os.path.join(common.ROOT_DIR, 'test', 'gui.py')])
 
 
 
