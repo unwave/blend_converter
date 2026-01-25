@@ -1039,15 +1039,19 @@ class Main_Frame(wxp_utils.Generic_Frame):
             self.on_updater_pause_toggle()
 
         for entry in self.updater.entries:
-            entry.terminate()
             entry.is_manual_update = False
+            entry.terminate()
 
         self.updater.poke_all()
 
 
     def on_restart(self, event = None):
 
+        if not self.updater.is_paused:
+            self.on_updater_pause_toggle()
+
         for entry in self.updater.entries:
+            entry.is_manual_update = False
             entry.terminate()
 
         # TODO: does not work for argv with spaces
