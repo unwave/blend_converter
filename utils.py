@@ -615,6 +615,19 @@ def reload_library():
 
 
 class Capture_Output:
+    """
+    It is unsafe to use `threading.Thread` in Blender.
+    At least for Blender 2.79 - 5.0.1.
+    Even the threads which do not use anything from the `bpy` module.
+    Even within a single script execution.
+    https://projects.blender.org/blender/blender/issues/153324
+    It crashed with `write_through=True` more consistently.
+    The crash happens during an operator call with a context override.
+
+    `os.dup2` is atomic but the change between `sys.stdout` or `sys.stderr` underlying files descriptors is not.
+    If at any point the file descriptor of `sys.stdout` or `sys.stderr` becomes invalid, which happens with `os.dup2`,
+    there is a chance that `print()`, called from a thread, will fail with "OSError: [WinError 1] Incorrect function".
+    """
 
     _std_output_name: str
 
@@ -648,14 +661,14 @@ class Capture_Output:
         self.read_pipe_textwrapper = os.fdopen(self.pipe_read_fileno, encoding='utf-8')
         self.pipe_reading.start()
 
-        os.dup2(self.pipe_write_fileno, self.file_descriptor)
-
         self.write_pipe_textwrapper = os.fdopen(self.pipe_write_fileno, 'w', encoding='utf-8')
 
         if self.line_buffering is not None:
             self.write_pipe_textwrapper.reconfigure(line_buffering = self.line_buffering)
 
         setattr(sys, self._std_output_name, self.write_pipe_textwrapper)
+
+        os.dup2(self.pipe_write_fileno, self.file_descriptor)
 
         if self.use_set_other:
             self.set_other(self.prev_std_output, self.write_pipe_textwrapper)
