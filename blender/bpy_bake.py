@@ -773,17 +773,6 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                     continue
 
 
-                def capturing():
-                    last_updated = 0
-
-                    for _ in iter(capture.lines.get, None):
-
-                        current_time = time.time()
-                        if current_time - last_updated > 2:
-                            print(f"Baking in progress: {time.strftime('%H:%M:%S %Y-%m-%d')}", flush=True, file=sys.stderr)
-                            last_updated = current_time
-
-
                 if bpy.context.scene.cycles.bake_type in ('COMBINED', 'DIFFUSE', 'GLOSSY', 'TRANSMISSION'):
                     kwargs = dict(
                         type = bpy.context.scene.cycles.bake_type,
@@ -795,17 +784,16 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
 
                 if not settings.fake_bake:
 
-                    print()
-                    print('Baking...')
+                    print(f"Bake started: {time.strftime('%H:%M:%S %Y-%m-%d')}")
 
-                    with utils.Capture_Stdout() as capture:
-                        threading.Thread(target=capturing, daemon=True).start()
+                    with utils.Capture_Stdout():
+
                         if bpy.context.view_layer.objects.active in objects:
                             active_object = bpy.context.view_layer.objects.active
                         else:
                             active_object = objects[0]
+
                         the_bake(active_object, objects, kwargs)
-                        capture.lines.put(None)
 
 
                 blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BAKE_AFTER)
