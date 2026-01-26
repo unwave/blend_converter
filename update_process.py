@@ -1,13 +1,34 @@
 import os
-import time
 import threading
 import queue
 import traceback
 import multiprocessing
 
+from datetime import datetime, timezone
 
 from . import utils
 from . import common
+
+
+def capturing(*, file_path: str, capture_queue: queue.Queue, output_queue: multiprocessing.Queue):
+
+    with open(file_path, 'w', encoding='utf-8') as f:
+
+        f.reconfigure(line_buffering = True)
+
+        for line in iter(capture_queue.get, None):
+
+            output_queue.put(line)
+
+            time = datetime.now(timezone.utc).astimezone().isoformat(' ', 'milliseconds')
+            f.write(f"[{time}]: {line}")
+
+
+def propagate_command_queue(*, entry_id: str, entry_command_queue: queue.Queue, updater_command_queue: multiprocessing.Queue):
+
+    for item in iter(entry_command_queue.get, None):
+        item['entry_id'] = entry_id
+        updater_command_queue.put(item)
 
 
 def run(*,
@@ -29,48 +50,51 @@ def run(*,
     os.makedirs(os.path.dirname(stderr_file), exist_ok=True)
 
 
-    def stdout_capture_job():
-
-        with open(stdout_file, 'w', encoding='utf-8') as f:
-
-            f.reconfigure(line_buffering = True)
-
-            for line in iter(stdout_capture.lines.get, None):
-
-                stdout_queue.put(line)
-                f.write(f"[{time.strftime('%H:%M:%S %Y-%m-%d')}]: {line.rstrip()}\n")
-
-    def stderr_capture_job():
-
-        with open(stderr_file, 'w', encoding='utf-8') as f:
-
-            f.reconfigure(line_buffering = True)
-
-            for line in iter(stderr_capture.lines.get, None):
-                stderr_queue.put_nowait(line)
-                f.write(f"[{time.strftime('%H:%M:%S %Y-%m-%d')}]: {line.rstrip()}\n")
-
-
-    def propagate_command_queue():
-
-        for item in iter(entry_command_queue.get, None):
-            item['entry_id'] = entry_id
-            updater_command_queue.put(item)
-
-
-    stdout_capture_thread = threading.Thread(target=stdout_capture_job, daemon=True)
-    stderr_capture_thread = threading.Thread(target=stderr_capture_job, daemon=True)
-
     entry_command_queue = queue.Queue()
-    propagate_command_queue_thread = threading.Thread(target=propagate_command_queue, daemon=True)
+
+    propagate_command_queue_thread = threading.Thread(
+        target = propagate_command_queue,
+        kwargs = dict(
+            entry_id = entry_id,
+            entry_command_queue = entry_command_queue,
+            updater_command_queue = updater_command_queue,
+        ),
+        daemon = True
+    )
+
     propagate_command_queue_thread.start()
+
 
     error = None
 
-    with utils.Capture_Stdout(line_buffering = True) as stdout_capture, utils.Capture_Stderr(line_buffering = True) as stderr_capture:
+    with (
+            utils.Capture_Stdout(line_buffering = True) as stdout_capture,
+            utils.Capture_Stderr(line_buffering = True) as stderr_capture
+        ):
 
-        stderr_capture_thread.start()
-        stdout_capture_thread.start()
+
+        stdout_capturing = threading.Thread(
+            target = capturing,
+            kwargs = dict(
+                file_path = stdout_file,
+                capture_queue = stdout_capture.lines,
+                output_queue = stdout_queue
+            ),
+            daemon = True
+        )
+
+        stderr_capturing = threading.Thread(
+            target = capturing,
+            kwargs = dict(
+                file_path = stderr_file,
+                capture_queue = stderr_capture.lines,
+                output_queue = stderr_queue
+            ),
+            daemon = True
+        )
+
+        stderr_capturing.start()
+        stdout_capturing.start()
 
         try:
             program.execute(entry_command_queue = entry_command_queue, updater_response_queue = updater_response_queue)
@@ -79,13 +103,15 @@ def run(*,
             if str(e) != 'BLENDER':
                 traceback.print_exc()
 
-    stdout_capture.lines.put_nowait(None)
-    stdout_capture_thread.join()
-    stderr_capture.lines.put_nowait(None)
-    stderr_capture_thread.join()
 
-    entry_command_queue.put_nowait(None)
+    stdout_capture.lines.put(None)
+    stdout_capturing.join()
+    stderr_capture.lines.put(None)
+    stderr_capturing.join()
+
+    entry_command_queue.put(None)
     propagate_command_queue_thread.join()
+
 
     if error:
         raise SystemExit(1)
