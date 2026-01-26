@@ -9,7 +9,7 @@ import time
 import traceback
 import typing
 
-from . import common
+from .. import common
 
 SENTINEL = object()
 

@@ -16,7 +16,7 @@ def get_bake_program(blend_dir: str, blender_executable: str):
 
     from blend_converter.blender.formats.blend import open_mainfile, save_as_mainfile
     from blend_converter.blender import bc_script
-    from blend_converter.blender import Blender
+    from blend_converter.blender.executor import Blender
     from blend_converter import common
     from blend_converter import utils
     from blend_converter import tool_settings

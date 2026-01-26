@@ -70,7 +70,7 @@ if __name__ == '__main__':
     bullet_physics: str = ARGS['bullet_physics']
 
     from blend_converter import common
-    from blend_converter.blender import Blender
+    from blend_converter.blender.executor import Blender
     from blend_converter.blender import bc_script
     from blend_converter.blender.formats.blend import open_mainfile
 

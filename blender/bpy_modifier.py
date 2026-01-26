@@ -5,6 +5,8 @@ import bpy
 import math
 import os
 
+from .. import utils
+
 from . import bpy_context
 from . import bpy_node
 from . import bpy_mesh
@@ -253,7 +255,6 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
     Tries to resolve issues in case of a topology mismatch.
     """
 
-    from . import utils
     utils.debug_print(object.name_full, modifier_name)
 
 

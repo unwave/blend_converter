@@ -9,7 +9,7 @@ import re
 import functools
 import inspect
 
-from . import utils
+from .. import utils
 
 _identifiers = set()
 
