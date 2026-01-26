@@ -1375,7 +1375,10 @@ class Focus:
         for object in affected_objects:
             object.select_set(object in self.focused_objects, view_layer=view_layer)
 
-        view_layer.objects.active = self.focused_objects[0]
+        if self.focused_objects:
+            view_layer.objects.active = self.focused_objects[0]
+        else:
+            view_layer.objects.active = None
 
         return self
 
