@@ -167,7 +167,11 @@ def _convert_to_mesh(objects: typing.List[bpy.types.Object]):
 def convert_to_mesh(objects: T_Objects) -> T_Objects:
     """ Convert objects to mesh objects using `bpy.ops.object.convert`. """
     if isinstance(objects, typing.Iterable):
-        return _convert_to_mesh(objects)
+        if objects:
+            return _convert_to_mesh(objects)
+        else:
+            utils.print_in_color(utils.get_color_code(245, 115, 30, 10, 10, 10), "No objects to convert to mesh were provided.")
+            return []
     else:
         return _convert_to_mesh([objects])[0]
 
@@ -343,6 +347,8 @@ def join_objects(objects: typing.List[bpy.types.Object], *, join_into: typing.Op
         if not join_into in objects:
             objects = list(objects) + [join_into]
     else:
+        if not objects:
+            raise Exception("No objects to join were provided.")
         join_into = objects[0]
 
 
@@ -1502,6 +1508,11 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
             bake_settings: typing.Optional[tool_settings.Bake] = None,
             pack_settings: typing.Optional[tool_settings.Pack_UVs] = None,
         ):
+
+
+    if not objects:
+        utils.print_in_color(utils.get_color_code(245, 115, 30, 10, 10, 10), "No objects were provided for baking.")
+        return []
 
 
     incompatible_objects = set(objects) - set(get_meshable_objects(objects))
