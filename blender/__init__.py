@@ -179,34 +179,46 @@ class Blender:
 
                 start_time = time.monotonic()
                 suspension_time = 0
+                elapsed = 0
                 INTERVAL = 1
 
-                while process.is_running():
 
-                    try:
+                def checking():
 
-                        # the executor's parent process should not be suspended
-                        if process.status() == psutil.STATUS_STOPPED:
-                            suspension_time += INTERVAL
+                    nonlocal suspension_time
+                    nonlocal elapsed
 
-                        elapsed = (time.monotonic() - start_time) - suspension_time
+                    while process.is_running():
 
-                        if self.timeout and elapsed > self.timeout:
+                        try:
 
-                            utils.kill_process(process)
-                            raise Exception(f"Timeout: {self.timeout}")
+                            # the executor's parent process should not be suspended
+                            if process.status() == psutil.STATUS_STOPPED:
+                                suspension_time += INTERVAL
+
+                            elapsed = (time.monotonic() - start_time) - suspension_time
+
+                            if self.timeout and elapsed > self.timeout:
+
+                                utils.kill_process(process)
+                                raise Exception(f"Timeout: {self.timeout}")
 
 
-                        if process.memory_info().vms > memory_limit_in_bytes:
+                            if process.memory_info().vms > memory_limit_in_bytes:
 
-                            utils.kill_process(process)
-                            raise Exception(f"Memory limit exceeded: {memory_limit_in_bytes/bytes_in_gb} Gb")
+                                utils.kill_process(process)
+                                raise Exception(f"Memory limit exceeded: {memory_limit_in_bytes/bytes_in_gb} Gb")
 
-                    except psutil.NoSuchProcess as e:
-                        print(e)
-                        break
+                        except psutil.NoSuchProcess as e:
+                            print(e)
+                            break
 
-                    time.sleep(INTERVAL)
+                        time.sleep(INTERVAL)
+
+
+                threading.Thread(target=checking, daemon=True).start()
+
+                blender.wait()
 
 
                 self.client_socket.close()
