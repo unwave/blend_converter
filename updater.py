@@ -67,13 +67,13 @@ class Program_Entry:
 
         self.lock = threading.RLock()
 
-        self.stdout_queue = multiprocessing.Queue()
-        self.stderr_queue = multiprocessing.Queue()
+        self.stdout_queue = multiprocessing.SimpleQueue()
+        self.stderr_queue = multiprocessing.SimpleQueue()
 
         self.stdout_lines = []
         self.stderr_lines = []
 
-        self.updater_response_queue: 'multiprocessing.Queue[dict]' = multiprocessing.Queue()
+        self.updater_response_queue: 'multiprocessing.SimpleQueue[dict]' = multiprocessing.SimpleQueue()
 
         self.psutil_process: psutil.Process = None
 
@@ -100,7 +100,7 @@ class Program_Entry:
         return (time.time() - self.poke_time) > UPDATE_DELAY
 
 
-    def _run(self, *, callback: typing.Callable, thread_identity: uuid.UUID, updater_command_queue: 'multiprocessing.Queue[dict]' = None):
+    def _run(self, *, callback: typing.Callable, thread_identity: uuid.UUID, updater_command_queue: 'multiprocessing.SimpleQueue[dict]' = None):
 
         def read_stdout():
             for line in iter(self.stdout_queue.get, None):
@@ -150,14 +150,14 @@ class Program_Entry:
         is_superseded = thread_identity != self.thread_identity
 
         if is_superseded:
-            self.stderr_queue.put_nowait(f"THE UPDATE HAS BEEN SUPERSEDED: {thread_identity}")
+            self.stderr_queue.put(f"THE UPDATE HAS BEEN SUPERSEDED: {thread_identity}")
 
         atexit.unregister(exit_func)
 
-        self.stdout_queue.put_nowait(None)
+        self.stdout_queue.put(None)
         read_stdout_thread.join()
 
-        self.stderr_queue.put_nowait(None)
+        self.stderr_queue.put(None)
         read_stderr_thread.join()
 
         if is_superseded:
@@ -178,7 +178,7 @@ class Program_Entry:
         update_ui()
 
 
-    def update(self, *, updater_command_queue: 'multiprocessing.Queue[dict]' = None, callback: typing.Optional[typing.Callable] = None):
+    def update(self, *, updater_command_queue: 'multiprocessing.SimpleQueue[dict]' = None, callback: typing.Optional[typing.Callable] = None):
 
         with self.lock:
 
@@ -251,7 +251,7 @@ class Program_Entry:
 
 class Blend_Event_Handler(watchdog_events.PatternMatchingEventHandler):
 
-    def __init__(self, queue: queue.Queue,  *args, **kwargs):
+    def __init__(self, queue: queue.SimpleQueue,  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.queue = queue
 
@@ -349,14 +349,14 @@ class Updater:
         self.shared_failure_tags = set()
         """ See `set_shared_failure_by_tag`. """
 
-        self.updater_command_queue: 'multiprocessing.Queue[dict]' = multiprocessing.Queue()
+        self.updater_command_queue: 'multiprocessing.SimpleQueue[dict]' = multiprocessing.SimpleQueue()
 
         threading.Thread(target = self.command_queue_runner, daemon=True).start()
 
 
     def init_observer(self):
 
-        self.queue = queue.Queue()
+        self.queue = queue.SimpleQueue()
         self.event_handler = Blend_Event_Handler(self.queue, patterns=['*.blend'])
 
         self.observer = watchdog_observers.Observer()

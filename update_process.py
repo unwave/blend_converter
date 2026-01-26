@@ -10,7 +10,7 @@ from . import utils
 from . import common
 
 
-def capturing(*, file_path: str, capture_queue: queue.Queue, output_queue: multiprocessing.Queue):
+def capturing(*, file_path: str, capture_queue: queue.SimpleQueue, output_queue: multiprocessing.SimpleQueue):
 
     with open(file_path, 'w', encoding='utf-8') as f:
 
@@ -24,7 +24,7 @@ def capturing(*, file_path: str, capture_queue: queue.Queue, output_queue: multi
             f.write(f"[{time}]: {line}")
 
 
-def propagate_command_queue(*, entry_id: str, entry_command_queue: queue.Queue, updater_command_queue: multiprocessing.Queue):
+def propagate_command_queue(*, entry_id: str, entry_command_queue: queue.SimpleQueue, updater_command_queue: multiprocessing.SimpleQueue):
 
     for item in iter(entry_command_queue.get, None):
         item['entry_id'] = entry_id
@@ -34,11 +34,11 @@ def propagate_command_queue(*, entry_id: str, entry_command_queue: queue.Queue, 
 def run(*,
             stdout_file: str,
             stderr_file: str,
-            stdout_queue: multiprocessing.Queue,
-            stderr_queue: multiprocessing.Queue,
+            stdout_queue: multiprocessing.SimpleQueue,
+            stderr_queue: multiprocessing.SimpleQueue,
             entry_id: str,
-            updater_command_queue: multiprocessing.Queue,
-            updater_response_queue: multiprocessing.Queue,
+            updater_command_queue: multiprocessing.SimpleQueue,
+            updater_response_queue: multiprocessing.SimpleQueue,
             program: common.Program,
         ):
 
@@ -50,7 +50,7 @@ def run(*,
     os.makedirs(os.path.dirname(stderr_file), exist_ok=True)
 
 
-    entry_command_queue = queue.Queue()
+    entry_command_queue = queue.SimpleQueue()
 
     propagate_command_queue_thread = threading.Thread(
         target = propagate_command_queue,

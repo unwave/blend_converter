@@ -42,8 +42,8 @@ def remove_code(value):
 class Blender:
 
 
-    entry_command_queue: 'queue.Queue[dict]' = None
-    updater_response_queue: 'multiprocessing.Queue[dict]' = None
+    entry_command_queue: 'queue.SimpleQueue[dict]' = None
+    updater_response_queue: 'multiprocessing.SimpleQueue[dict]' = None
 
 
     def __init__(self, binary_path: str, memory_limit = 8, timeout = 0):
@@ -166,7 +166,7 @@ class Blender:
                 self.client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                 self.client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
 
-                self.message_queue = queue.Queue()
+                self.message_queue = queue.SimpleQueue()
 
                 message_processing = threading.Thread(target=self.message_processing, daemon=True)
                 message_processing.start()
