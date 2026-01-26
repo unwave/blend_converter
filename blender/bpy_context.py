@@ -1336,6 +1336,16 @@ class Focus:
 
         for object in affected_objects:
 
+            fcurve_mute_state = []
+
+            if object.animation_data:
+
+                for fcurve in object.animation_data.drivers:
+                    if fcurve.data_path in ('hide_viewport', 'hide_select'):
+                        fcurve_mute_state.append(fcurve.mute)
+                        fcurve.mute = True
+
+
             self.visibility_states.append((
                 object.mode,
                 object.visible_get(view_layer = view_layer),
@@ -1343,6 +1353,7 @@ class Focus:
                 object.hide_get(view_layer = view_layer),
                 object.hide_viewport,
                 object.hide_select,
+                fcurve_mute_state,
             ))
 
             self.references.append(object)
@@ -1355,7 +1366,6 @@ class Focus:
 
         for object in self.focused_objects:
             if not object.visible_get(view_layer=view_layer):
-                # TODO: objects can be hidden by drivers
                 # TODO: what it we want to work with the object hidden
                 raise Exception(f"Fail to focus object: not visible: {object.name_full}")
 
@@ -1401,6 +1411,23 @@ class Focus:
             object.hide_set(state[3], view_layer = view_layer)
             object.hide_viewport = state[4]
             object.hide_select = state[5]
+
+
+            if object.animation_data:
+
+                try:
+                    index = 0
+
+                    for fcurve in object.animation_data.drivers:
+                        if fcurve.data_path in ('hide_viewport', 'hide_select'):
+                            fcurve.mute = state[6][index]
+                            index += 1
+
+                    assert index == len(state[6])
+
+                except (AssertionError, IndexError) as e:
+                    raise Exception(f"Muted visibility drivers mismatch: {object.name_full}") from e
+
 
         bpy.data.collections.remove(visible_collection)
 
