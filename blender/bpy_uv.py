@@ -331,11 +331,11 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         raise utils.Fallback('UV unwrapping is skipped!')
 
 
-    def print_output(capture_stdout, capture_stderr, stderr_color = utils.get_color_code(255, 94, 14, 0,0,0)):
-        for line in capture_stdout.lines.queue:
+    def print_output(capture_stdout: utils.Capture_Output, capture_stderr: utils.Capture_Output, stderr_color = utils.get_color_code(255, 94, 14, 0,0,0)):
+        for line in capture_stdout.exhaust():
             print(line, end='')
         print()
-        for line in capture_stderr.lines.queue:
+        for line in capture_stderr.exhaust():
             utils.print_in_color(stderr_color, line, end='')
 
 
@@ -432,7 +432,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
             with utils.Capture_Stdout() as capture_stdout:
                 is_invalid_geometry = imported_object.data.validate(verbose=True)
 
-            validation_lines: typing.List[str] = list(capture_stdout.lines.queue)
+            validation_lines: typing.List[str] = capture_stdout.exhaust()
 
             if is_invalid_geometry:
                 raise utils.Fallback('\n'.join(validation_lines))
@@ -2245,7 +2245,7 @@ def brute_force_unwrap(
             # Warning: Unwrap failed to solve 1 of 1 island(s), edge seams may need to be added
             # When this happens it just re-packs the existing uv layout leading to a wrong conclusion
 
-            for line in capture.lines.queue:
+            for line in capture.exhaust():
                 print(line)
                 match = re.search(r'(\d+) of (\d+)', line)
                 if match and int(match.group(1)) == int(match.group(2)):
@@ -2267,7 +2267,7 @@ def brute_force_unwrap(
             # Warning: Unwrap failed to solve 1 of 1 island(s), edge seams may need to be added
             # When this happens it just re-packs the existing uv layout leading to a wrong conclusion
 
-            for line in capture.lines.queue:
+            for line in capture.exhaust():
                 print(line)
                 match = re.search(r'(\d+) of (\d+)', line)
                 if match and int(match.group(1)) == int(match.group(2)):

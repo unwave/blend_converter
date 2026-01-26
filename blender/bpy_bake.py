@@ -805,7 +805,7 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                         else:
                             active_object = objects[0]
                         the_bake(active_object, objects, kwargs)
-                        capture.lines.put_nowait(None)
+                        capture.lines.put(None)
 
 
                 blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BAKE_AFTER)

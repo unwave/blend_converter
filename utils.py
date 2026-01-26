@@ -633,7 +633,7 @@ class Capture_Output:
 
 
     def __init__(self, is_dummy = False, use_set_other = True, line_buffering: typing.Optional[bool] = None):
-        self.lines = queue.Queue()
+        self.lines = queue.SimpleQueue()
         self.is_dummy = is_dummy
         self.use_set_other = use_set_other
 
@@ -744,7 +744,7 @@ class Capture_Output:
 
     def read_pipe(self):
         for line in self.read_pipe_textwrapper:
-            self.lines.put_nowait(line)
+            self.lines.put(line)
 
 
     def copy_text_io_wrapper(self, fd: int, prev: io.TextIOWrapper):
@@ -799,6 +799,12 @@ class Capture_Output:
                 if hasattr(handler, 'stream'):
                     if handler.stream is prev_output:
                         handler.stream = output
+
+
+    def exhaust(self):
+        self.flush()
+        self.lines.put(None)
+        return list(iter(self.lines.get, None))
 
 
 class Capture_Stdout(Capture_Output):
