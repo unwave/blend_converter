@@ -16,7 +16,7 @@ class BLENDCONVERTER_PT_tools(bpy.types.Panel):
 
         column = self.layout.column()
 
-        column.label(text='merge_objects_and_bake_materials')
+        column.label(text='Join and Bake')
 
         column.operator(view3d_operator.BLENDCONVERTER_OT_export_and_inspect.bl_idname, text="Blender").viewer_type = 'BLENDER'
         column.operator(view3d_operator.BLENDCONVERTER_OT_export_and_inspect.bl_idname, text="Panda3D").viewer_type = 'PANDA'

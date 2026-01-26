@@ -278,15 +278,15 @@ def delete_objects_not_mentioned(objects: Objects_Like):
     bpy.data.batch_remove(set(bpy.data.objects) - set(get_objects(objects)))
 
 
-def merge_objects(objects: Objects_Like = None, object_name: str = None):
+def join_objects(objects: Objects_Like = None, object_name: str = None):
     """
     `bpy.ops.object.join` the objects.
 
     If `objects` is `None` then `view_layer.objects` is used.
 
-    Returns the merged object.
+    Returns the joined object.
     """
-    return bpy_utils.merge_objects(objects=get_objects_fallback(objects), name=object_name)
+    return bpy_utils.join_objects(objects=get_objects_fallback(objects), name=object_name)
 
 
 def remove_all_node_groups_from_materials():
@@ -328,10 +328,10 @@ def remove_vertex_colors(objects: Objects_Like = None):
             data.vertex_colors.remove(data.vertex_colors[name])  # type: ignore
 
 
-def merge_objects_respect_materials(objects: Objects_Like):
+def join_objects_respect_materials(objects: Objects_Like):
     objects = get_objects(objects)
     bpy_utils.make_material_independent_from_object(objects)
-    return bpy_utils.merge_objects(objects)
+    return bpy_utils.join_objects(objects)
 
 
 def ensure_debugpy():

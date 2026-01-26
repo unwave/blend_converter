@@ -23,17 +23,17 @@ def create_object_from_selected_edit_mode_geometry():
 
         new_object = bpy.data.objects.new('collision_shape', bpy.data.meshes.new(name='collision_shape'))
 
-        merged_object = bpy_utils.merge_objects(bpy_utils.convert_to_mesh(objects_in_edit_mode), merge_into=new_object)
+        object = bpy_utils.join_objects(bpy_utils.convert_to_mesh(objects_in_edit_mode), join_into=new_object)
 
-        with bpy_context.Focus(merged_object, 'EDIT'):
+        with bpy_context.Focus(object, 'EDIT'):
 
-            bm = bmesh.from_edit_mesh(merged_object.data)
+            bm = bmesh.from_edit_mesh(object.data)
 
             bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.select], context='VERTS')
 
-            bmesh.update_edit_mesh(merged_object.data)
+            bmesh.update_edit_mesh(object.data)
 
-    return merged_object
+    return object
 
 
 def create_object_from_selected_objects():
@@ -46,10 +46,10 @@ def create_object_from_selected_objects():
 
         new_object = bpy.data.objects.new('collision_shape', bpy.data.meshes.new(name='collision_shape'))
 
-        merged_object = bpy_utils.merge_objects(bpy_utils.convert_to_mesh(selected_objects_copy), merge_into=new_object)
+        object = bpy_utils.join_objects(bpy_utils.convert_to_mesh(selected_objects_copy), join_into=new_object)
 
 
-    return merged_object
+    return object
 
 
 def copy_object(object: bpy.types.Object, name: str):

@@ -455,10 +455,10 @@ def scale_uv_to_world_per_uv_island(operator: bpy.types.Operator, context: bpy.t
     poll = object_mode_poll,
     bl_options = {'REGISTER', 'UNDO'},
 )
-def merge_objects_respect_materials(operator: bpy.types.Operator, context: bpy.types.Context):
+def join_objects_respect_materials(operator: bpy.types.Operator, context: bpy.types.Context):
     objects = context.selected_objects
     bpy_utils.make_material_independent_from_object(objects)
-    bpy_utils.merge_objects(objects)
+    bpy_utils.join_objects(objects)
 
 
 @operator_factory.operator(
