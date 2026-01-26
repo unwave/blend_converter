@@ -46,10 +46,24 @@ class Blender:
     updater_response_queue: 'multiprocessing.Queue[dict]' = None
 
 
-    def __init__(self, binary_path: str, memory_limit_in_gigabytes = 8):
+    def __init__(self, binary_path: str, memory_limit = 8, timeout = 0):
 
         self.binary_path = binary_path
-        self.memory_limit = memory_limit_in_gigabytes
+
+
+        self.memory_limit = memory_limit
+        """
+        A max amount of RAM in gigabytes.
+        Including the swap file, the pagefile.sys on Windows.
+        If it is exceeded — Blender will be terminated.
+        """
+
+        self.timeout = timeout
+        """
+        A max CPU execution time in seconds after which Blender will be terminated.
+        This does not include the suspension time.
+        If `0` — no timeout.
+        """
 
 
     def run(self, *,
@@ -163,19 +177,36 @@ class Blender:
                 process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
 
 
+                start_time = time.monotonic()
+                suspension_time = 0
+                INTERVAL = 1
+
                 while process.is_running():
 
                     try:
-                        if process.memory_info().vms > memory_limit_in_bytes:
-                            utils.kill_process(process)
 
+                        # the executor's parent process should not be suspended
+                        if process.status() == psutil.STATUS_STOPPED:
+                            suspension_time += INTERVAL
+
+                        elapsed = (time.monotonic() - start_time) - suspension_time
+
+                        if self.timeout and elapsed > self.timeout:
+
+                            utils.kill_process(process)
+                            raise Exception(f"Timeout: {self.timeout}")
+
+
+                        if process.memory_info().vms > memory_limit_in_bytes:
+
+                            utils.kill_process(process)
                             raise Exception(f"Memory limit exceeded: {memory_limit_in_bytes/bytes_in_gb} Gb")
 
                     except psutil.NoSuchProcess as e:
                         print(e)
                         break
 
-                    time.sleep(1)
+                    time.sleep(INTERVAL)
 
 
                 self.client_socket.close()
@@ -184,6 +215,7 @@ class Blender:
                 self.message_queue.put(SENTINEL)
                 message_processing.join()
 
+                print(f"Non suspended time: {round(elapsed, 2)}")
 
 
         if blender.returncode != 0:

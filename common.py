@@ -141,7 +141,6 @@ class Program:
                 report_path: typing.Optional[str] = None,
                 config: typing.Optional[Config_Base] = None,
                 tags: typing.Optional[typing.Set[str]] = None,
-                timeout: typing.Optional[float] = None,
             ):
 
 
@@ -164,9 +163,6 @@ class Program:
 
         self.tags: typing.Set[str] = tags if tags else set()
         """ Use for differentiation. See `set_max_workers_by_program_tag`. """
-
-        self.timeout = timeout
-        """ A max execution time in seconds after which the program will be terminated with an error. """
 
 
         self.instructions: typing.List[Instruction] = []

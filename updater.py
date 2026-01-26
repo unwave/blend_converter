@@ -67,8 +67,6 @@ class Program_Entry:
 
         self.lock = threading.RLock()
 
-        self.timeout: typing.Optional[float] = program.timeout
-
         self.stdout_queue = multiprocessing.Queue()
         self.stderr_queue = multiprocessing.Queue()
 
@@ -144,7 +142,7 @@ class Program_Entry:
 
         exit_func = atexit.register(self.terminate)
 
-        process.join(timeout = self.timeout)
+        process.join()
 
         if process.exitcode == None:
             self.terminate()
@@ -169,9 +167,6 @@ class Program_Entry:
         if process.exitcode == 0:
             self.status = 'ok'
             print(f"Done [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
-        elif process.exitcode == None:
-            self.status = 'error'
-            print(f"Timeout [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
         else:
             self.status = 'error'
             print(f"Error [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
