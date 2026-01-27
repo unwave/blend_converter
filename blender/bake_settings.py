@@ -223,11 +223,12 @@ class Normal(_Principled_Input):
 
     _default_color = (0.5, 0.5, 1.0)
 
-    uv_layer: str = tool_settings.Bake.uv_layer_name
+    uv_layer: str = ''
     """
     Name of the UV layer to use for the tangent space.
+    If `''` — the active will be used.
 
-    #### Default: `tool_settings.Bake.uv_layer_name`
+    #### Default: `''`
     """
 
     use_remove_inward_normals: bool = False

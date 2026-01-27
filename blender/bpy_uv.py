@@ -17,6 +17,7 @@ import tempfile
 import operator
 import re
 import itertools
+import uuid
 
 import bpy
 import mathutils
@@ -1220,7 +1221,7 @@ def clear_uv_layers_from_objects(objects: typing.List[bpy.types.Object], uv_laye
 
 
 def unwrap(objects: typing.List[bpy.types.Object], *,
-           uv_layer = tool_settings.DEFAULT_UV_LAYER_NAME,
+           uv_layer = '',
            uv_layer_reuse = '',
            settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
            ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None
@@ -1228,15 +1229,24 @@ def unwrap(objects: typing.List[bpy.types.Object], *,
 
     incompatible_objects = set(objects) - set(object for object in objects if object.data and hasattr(object.data, 'uv_layers'))
     if incompatible_objects:
-        raise ValueError(f"Specified objects cannot be unwrapped: {[o.name_full for o in objects]}\nIncompatible: {[o.name_full for o in incompatible_objects]}")
+        raise ValueError(
+            f"Specified objects cannot be unwrapped."
+            "\n\t" f"Objects: {[o.name_full for o in objects]}\n"
+            "\n\t" f"Incompatible: {[(o.type, o.name_full) for o in incompatible_objects]}"
+        )
 
 
     objects = bpy_utils.get_unique_mesh_objects(objects)
 
-    settings = tool_settings.Unwrap_UVs(uv_layer_name = uv_layer)._update(settings)
+    if uv_layer:
+        uv_layer_name = uv_layer
+    else:
+        uv_layer_name = f'__bc_{uuid.uuid1().hex}'
+
+    settings = tool_settings.Unwrap_UVs(uv_layer_name = uv_layer_name)._update(settings)
 
 
-    ensure_uv_layer(objects, settings.uv_layer_name, init_from = uv_layer_reuse, init_from_does_not_exist_ok=True)
+    ensure_uv_layer(objects, uv_layer_name, init_from = uv_layer_reuse, init_from_does_not_exist_ok=True)
 
 
     with bpy_context.State() as state, bpy_context.Global_Optimizations():
@@ -1254,12 +1264,15 @@ def unwrap(objects: typing.List[bpy.types.Object], *,
                 state.set(modifier, 'show_viewport', False)
 
         for object in objects:
-            state.set(object.data.uv_layers, 'active', object.data.uv_layers[settings.uv_layer_name])
+            state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
 
         with bpy_context.Empty_Scene():
             unwrap_with_fallback(objects, settings, ministry_of_flat_settings)
 
         scale_uv_to_world_per_uv_layout(objects)
+
+
+    return uv_layer_name
 
 
 def get_stdev_mean(values: typing.Union[typing.Sized, typing.Iterable]):

@@ -38,24 +38,28 @@ def get_bake_program(blend_dir: str, blender_executable: str):
 
     objects = program.run(blender, bc_script.get_meshable_objects, program.run(blender, bc_script.get_view_layer_objects))
 
+
+    uv_layer_name = program.run(blender, bc_script.unwrap, objects)
+
     settings = tool_settings.Bake_Materials(
+        uv_layer_bake = uv_layer_name,
         image_dir = os.path.join(result_dir, 'textures'),
         texel_density = 64,
         max_resolution = 128,
     )
 
 
-    program.run(blender, bc_script.unwrap, objects)
 
-    program.run(blender, bc_script.scale_uv_to_world_per_uv_island, objects, tool_settings.DEFAULT_UV_LAYER_NAME)
+    program.run(blender, bc_script.scale_uv_to_world_per_uv_island, objects, uv_layer_name)
 
-    program.run(blender, bc_script.scale_uv_to_world_per_uv_layout, objects, tool_settings.DEFAULT_UV_LAYER_NAME)
+    program.run(blender, bc_script.scale_uv_to_world_per_uv_layout, objects, uv_layer_name)
 
     program.run(blender, bc_script.apply_modifiers, objects)
 
     program.run(blender, bc_script.pack_copy_bake, objects, settings)
 
-    program.run(blender, bc_script.select_uv_layer, objects, tool_settings.DEFAULT_UV_LAYER_NAME)
+
+    program.run(blender, bc_script.select_uv_layer, objects, uv_layer_name)
 
     program.run(blender, bc_script.scene_clean_up)
 

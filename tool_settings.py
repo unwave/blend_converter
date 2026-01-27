@@ -16,7 +16,6 @@ ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 SENTINEL = object()
 
 
-DEFAULT_UV_LAYER_NAME = '__bc_uv'
 
 
 if typing.TYPE_CHECKING:
@@ -926,11 +925,11 @@ class Bake(Settings):
     """
 
 
-    uv_layer_name: str = DEFAULT_UV_LAYER_NAME
+    uv_layer_name: str = ''
     """
     The UV layer to use for baking.
 
-    #### Default: `DEFAULT_UV_LAYER_NAME`
+    #### Default: `''`
     """
 
     use_inpaint: bool = True
@@ -1077,10 +1076,11 @@ class Bake(Settings):
 class Unwrap_UVs(Settings):
 
 
-    uv_layer_name: str = DEFAULT_UV_LAYER_NAME
+    uv_layer_name: str = ''
     """
-    The UV layer to use for baking.
-    #### Default: `DEFAULT_UV_LAYER_NAME`
+    The name of the UV layer to unwrap into.
+
+    #### Default: `''`
     """
 
     smart_project_angle_limit: int = 54
@@ -1190,10 +1190,11 @@ class Pack_UVs(Settings):
     #### Default: `0`
     """
 
-    uv_layer_name: str = DEFAULT_UV_LAYER_NAME
+    uv_layer_name: str = ''
     """
-    The UV layer to use for baking.
-    #### Default: `DEFAULT_UV_LAYER_NAME`
+    The UV layer name to pack.
+
+    #### Default: `''`
     """
 
     merge: bool = True
@@ -1878,11 +1879,11 @@ class Bake_Materials(Settings):
     #### Default: `4096`
     """
 
-    uv_layer_bake: str = DEFAULT_UV_LAYER_NAME
+    uv_layer_bake: str = ''
     """
     The name of a uv layer that will be used for baking.
 
-    #### Default: `DEFAULT_UV_LAYER_NAME`
+    #### Default: `''`
     """
 
     uv_layer_reuse: str = ''

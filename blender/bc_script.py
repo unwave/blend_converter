@@ -418,7 +418,7 @@ def unwrap(objects: Objects_Like, **kwargs):
     if 'ministry_of_flat_settings' in kwargs:
         kwargs['ministry_of_flat_settings'] = tool_settings.Ministry_Of_Flat._from_dict(kwargs['ministry_of_flat_settings'])
 
-    bpy_uv.unwrap(get_objects(objects), **kwargs)
+    return bpy_uv.unwrap(get_objects(objects), **kwargs)
 
 
 @wraps(bpy_mesh.bisect_by_mirror_modifiers if typing.TYPE_CHECKING else object)
