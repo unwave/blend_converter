@@ -255,8 +255,11 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
     Tries to resolve issues in case of a topology mismatch.
     """
 
-    utils.debug_print(object.name_full, modifier_name)
-
+    utils.print_in_color(utils.get_color_code(230, 228, 124, 10, 10, 10),
+        f"Applying modifier to an object with shape keys."
+        "\n\t" f"Object: {object.name_full}"
+        "\n\t" f"Modifier: {modifier_name}"
+    )
 
     def copy_object(object: bpy.types.Object, suffix: str):
         copy = object.copy()
