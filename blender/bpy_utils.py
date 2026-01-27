@@ -568,7 +568,7 @@ def convert_materials_to_principled(objects: typing.List[bpy.types.Object], remo
 def split_into_alpha_and_non_alpha_groups(objects: typing.List[bpy.types.Object]):
 
     alpha_material_key = f"__bc_alpha_material_{uuid.uuid1().hex}"
-    opaque_material_key = f"__bc_non_alpha_material_{uuid.uuid1().hex}"
+    opaque_material_key = f"__bc_opaque_material_{uuid.uuid1().hex}"
 
     for material in group_objects_by_material(objects):
         if material[Material_Bake_Type.HAS_ALPHA]:
