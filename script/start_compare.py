@@ -10,7 +10,8 @@ import atexit
 import bpy
 
 from blend_converter.addon import view3d_operator
-from blend_converter.blender import utils, bpy_utils
+from blend_converter.blender import bpy_utils
+from blend_converter import utils
 
 
 def get_args() -> dict:

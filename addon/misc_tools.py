@@ -10,9 +10,11 @@ import bpy_extras
 import mathutils
 
 from . import operator_factory
+
 from .. import tool_settings
+from .. import utils
+
 from ..blender import bpy_utils
-from ..blender import utils
 from ..blender import bpy_node
 from ..blender import bpy_context
 from ..blender import bpy_uv
