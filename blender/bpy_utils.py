@@ -753,7 +753,7 @@ def unify_color_attributes_format(objects: typing.List[bpy.types.Object]):
         for object in objects:
             if color_attribute_name in object.data.color_attributes.keys():
                 object.data.color_attributes.active_color = object.data.color_attributes[color_attribute_name]
-                bpy_context.call_for_object(object, bpy.ops.geometry.color_attribute_convert, domain='POINT', data_type='FLOAT_COLOR')
+                bpy_context.call_for_object(object, bpy.ops.geometry.color_attribute_convert, domain='CORNER', data_type='FLOAT_COLOR')
 
 
 def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: bpy.types.ShaderNodeTree, texture_coordinates_collection: 'bpy.types.Collection', check_only = False):
