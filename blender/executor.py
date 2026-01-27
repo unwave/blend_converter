@@ -181,12 +181,14 @@ class Blender:
                 suspension_time = 0
                 elapsed = 0
                 INTERVAL = 1
+                exception = None
 
 
                 def checking():
 
                     nonlocal suspension_time
                     nonlocal elapsed
+                    nonlocal exception
 
                     while process.is_running():
 
@@ -201,25 +203,32 @@ class Blender:
                             if self.timeout and elapsed > self.timeout:
 
                                 utils.kill_process(process)
-                                raise Exception(f"Timeout: {self.timeout}")
+                                exception = Exception(f"Timeout: {self.timeout}")
+                                return
 
 
                             if process.memory_info().vms > memory_limit_in_bytes:
 
                                 utils.kill_process(process)
-                                raise Exception(f"Memory limit exceeded: {memory_limit_in_bytes/bytes_in_gb} Gb")
+                                exception = Exception(f"Memory limit exceeded: {memory_limit_in_bytes/bytes_in_gb} Gb")
+                                return
 
                         except psutil.NoSuchProcess as e:
                             print(e)
                             break
 
-                        time.sleep(INTERVAL)
+                        waiting.wait(INTERVAL)
 
 
-                threading.Thread(target=checking, daemon=True).start()
+                waiting = threading.Event()
+
+                process_checking = threading.Thread(target=checking, daemon=True)
+                process_checking.start()
 
                 blender.wait()
+                waiting.set()
 
+                process_checking.join()
 
                 self.client_socket.close()
                 message_receiving.join()
@@ -230,7 +239,10 @@ class Blender:
                 print(f"Non suspended time: {round(elapsed, 2)}")
 
 
-        if blender.returncode != 0:
+        if exception:
+            raise exception
+
+        elif blender.returncode != 0:
 
             utils.print_in_color(utils.CONSOLE_COLOR.RED, "Blender has exited with an error.", file=sys.stderr)
             raise SystemExit('BLENDER')
