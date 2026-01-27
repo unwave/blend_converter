@@ -83,13 +83,39 @@ def get_view3d():
                 if area.type == 'VIEW_3D':
                     for region in area.regions:
                         if region.type == 'WINDOW':
-                            return dict(window=window, workspace=window.workspace, screen=window.screen, area=area, region=region)
-
-    raise Exception('View3D context not found.')
+                            return dict(
+                                window = window,
+                                workspace = window.workspace,
+                                screen = window.screen,
+                                area = area,
+                                region = region,
+                            )
 
 
 def call_in_view3d(func: typing.Callable, *args, **kwargs):
-    return call(get_view3d(), func, *args, **kwargs)
+
+    context = get_view3d()
+
+    if context:
+        return call(context, func, *args, **kwargs)
+
+    else:
+        with State() as state:
+
+            window = bpy.data.window_managers[0].windows[0]
+
+            area = window.screen.areas[0]
+            state.set(area, 'type', 'VIEW_3D')
+
+            context = dict(
+                window = window,
+                workspace = window.workspace,
+                screen = window.screen,
+                area = area,
+                region = next(region for region in area.regions if region.type == 'WINDOW'),
+            )
+
+            call(context, func, *args, **kwargs)
 
 
 def call_for_object(object: 'bpy.types.Object', func: typing.Callable, *args, can_be_canceled = False, **kwargs):
