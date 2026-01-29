@@ -86,6 +86,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             updater.Status.ERROR: wx.Colour(255, 105, 97),
             updater.Status.DOES_NOT_EXIST: wx.Colour(211, 211, 211),
             updater.Status.WAITING_FOR_DEPENDENCY: wx.Colour(201, 177, 113),
+            updater.Status.YIELDING: wx.Colour(99, 179, 232),
         }
 
         self.status_to_bg_color = {}

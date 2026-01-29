@@ -35,7 +35,7 @@ class Status:
     OK = 'ok'
     NEEDS_UPDATE = 'needs_update'
     UPDATING = 'updating'
-    SUSPENDED = 'suspended'
+    YIELDING = 'yielding'
     ERROR = 'error'
     DOES_NOT_EXIST = 'does_not_exist'
     WAITING_FOR_DEPENDENCY = 'waiting_for_dependency'
@@ -45,6 +45,7 @@ STATUS_ICON = {
     Status.OK: '✔️',
     Status.NEEDS_UPDATE: '🔥',
     Status.UPDATING: '🔨',
+    Status.YIELDING: '⛔',
     Status.ERROR: '❌',
     Status.DOES_NOT_EXIST: '👻',
     Status.WAITING_FOR_DEPENDENCY: '🔒',
@@ -453,7 +454,7 @@ class Updater:
 
 
     def total_max_parallel_executions_exceeded(self):
-        return sum(entry.status in (Status.UPDATING, Status.SUSPENDED) for entry in self.entries) >= self.total_max_parallel_executions
+        return sum(entry.status in (Status.UPDATING, Status.YIELDING) for entry in self.entries) >= self.total_max_parallel_executions
 
 
     def despatching(self):
@@ -540,7 +541,7 @@ class Updater:
 
     def max_executions_per_tag_exceeded(self, tags: typing.Iterable[str]):
 
-        updating_entries = [entry for entry in self.entries if entry.status in (Status.UPDATING, Status.SUSPENDED)]
+        updating_entries = [entry for entry in self.entries if entry.status in (Status.UPDATING, Status.YIELDING)]
 
         execution_limiting_tags = [tag for tag in tags if tag in self.max_parallel_execution_per_tag]
         if not execution_limiting_tags:
@@ -578,7 +579,7 @@ class Updater:
                         continue
 
                     entry.suspend()
-                    entry.status = Status.SUSPENDED
+                    entry.status = Status.YIELDING
 
 
                 running_entry = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
@@ -606,7 +607,7 @@ class Updater:
 
                     for entry in self.entries:
 
-                        if entry.status != Status.SUSPENDED:
+                        if entry.status != Status.YIELDING:
                             continue
 
                         if entry.entry_id == running_entry.entry_id:
