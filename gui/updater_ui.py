@@ -313,16 +313,11 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         entry = self.data[int(event.GetIndex())]
 
-        self.main_frame.stdout_viewer.set_data(entry.stdout_lines)
-        self.main_frame.stderr_viewer.set_data(entry.stderr_lines)
-        # if os.path.exists(entry.stdout_file):
-        #     self.parent.console_output.LoadFile(entry.stdout_file)
-        #     self.parent.console_output.SetScrollPos(wx.VERTICAL, self.parent.console_output.GetScrollRange(wx.VERTICAL))
-        #     self.parent.console_output.SetInsertionPoint(-1)
-        # else:
-        #     self.parent.console_output.Clear()
+        self.main_frame.stdout_viewer.data = entry.stdout_lines
+        self.main_frame.stdout_viewer.update()
 
-        self.main_frame.Refresh()
+        self.main_frame.stderr_viewer.data = entry.stderr_lines
+        self.main_frame.stderr_viewer.update()
 
 
     def on_poke_entries(self, entry: updater.Program_Entry):
@@ -633,25 +628,18 @@ class Output_Lines(wxp_utils.Item_Viewer_Native):
             self.SetItemState(-1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
 
 
-    def set_data(self, data: typing.List[dict]):
-
-        self.Freeze()
-
-        self.data = data
-
-        self.SetItemCount(len(data))
-        self.Focus(len(data) - 1)
-
-        self.Thaw()
-
 
     def update(self):
 
-        if self.data:
+        if self.GetItemCount():
             do_scroll = self.IsVisible(self.GetItemCount() - 1)
-            self.SetItemCount(len(self.data))
-            if do_scroll:
-                self.Focus(self.GetItemCount() - 1)
+        else:
+            do_scroll = True
+
+        self.SetItemCount(len(self.data))
+
+        if do_scroll:
+            self.EnsureVisible(self.GetItemCount() - 1)
 
 
     def OnGetItemText(self, row: int, col: int):
