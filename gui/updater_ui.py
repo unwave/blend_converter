@@ -617,7 +617,7 @@ class Output_Lines(wxp_utils.Item_Viewer_Native):
         self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
 
 
-    def on_key_down(self, event: wx.Event):
+    def on_key_down(self, event: wx.KeyEvent):
 
         event.Skip()
 
@@ -627,7 +627,7 @@ class Output_Lines(wxp_utils.Item_Viewer_Native):
         key_code = event.GetKeyCode()
 
         if key_code == ord('C'):
-            wxp_utils.set_clipboard_text('\n'.join(row[1].rstrip() for row in self.get_selected_items_text()))
+            wxp_utils.set_clipboard_text(''.join(self.data[row] for row in self.get_selected_indexes()))
 
         elif key_code == ord('A'):
             self.SetItemState(-1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
