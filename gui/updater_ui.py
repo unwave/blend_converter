@@ -658,9 +658,9 @@ class Output_Lines(wxp_utils.Item_Viewer_Native):
         if col == 0:
             return str(row + 1)
         elif col == 1:
-            return self.data[row]
+            return self.data[row].replace('\t', '    ')
         else:
-            return 'UNKNOWN'
+            return ''
 
 
 class Result_Panel(wx.Panel):
