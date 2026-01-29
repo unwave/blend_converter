@@ -30,6 +30,18 @@ SENTINEL = object()
 LOG_DIR = os.path.join(utils.BLEND_CONVERTER_USER_DIR, 'logs')
 
 
+class Status:
+
+    OK = 'ok'
+    NEEDS_UPDATE = 'needs_update'
+    UPDATING = 'updating'
+    SUSPENDED = 'suspended'
+    ERROR = 'error'
+    DOES_NOT_EXIST = 'does_not_exist'
+    WAITING_FOR_DEPENDENCY = 'waiting_for_dependency'
+    UNKNOWN = 'unknown'
+
+
 class Program_Entry:
 
 
@@ -46,7 +58,7 @@ class Program_Entry:
         self.stdout_file = os.path.join(LOG_DIR, f"{report_stem}_stdout_{uuid.uuid1().hex}.txt")
         self.stderr_file = os.path.join(LOG_DIR, f"{report_stem}_stderr_{uuid.uuid1().hex}.txt")
 
-        self.status: typing.Literal['ok', 'needs_update', 'updating', 'error', 'does_not_exist', 'waiting_for_dependency', 'unknown'] = 'unknown'
+        self.status = Status.UNKNOWN
 
         self.is_live_update = True
 
@@ -81,14 +93,14 @@ class Program_Entry:
     def poke(self, has_non_updated_dependency: bool):
 
         if has_non_updated_dependency:
-            self.status = 'waiting_for_dependency'
+            self.status = Status.WAITING_FOR_DEPENDENCY
         elif os.path.exists(self.program.blend_path):
             if self.program.are_instructions_changed:
-                self.status = 'needs_update'
+                self.status = Status.NEEDS_UPDATE
             else:
-                self.status = 'ok'
+                self.status = Status.OK
         else:
-            self.status = 'does_not_exist'
+            self.status = Status.DOES_NOT_EXIST
 
         self.poke_time = time.time()
 
@@ -165,10 +177,10 @@ class Program_Entry:
             return
 
         if process.exitcode == 0:
-            self.status = 'ok'
+            self.status = Status.OK
             print(f"Done [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
         else:
-            self.status = 'error'
+            self.status = Status.ERROR
             print(f"Error [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
 
 
@@ -184,7 +196,7 @@ class Program_Entry:
 
             print(f"Processing [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
 
-            self.status = 'updating'
+            self.status = Status.UPDATING
 
             self.thread_identity = uuid.uuid4()
 
@@ -400,7 +412,7 @@ class Updater:
         return any(
             _entry.program.result_path == entry.program.blend_path
             for _entry in self.entries
-            if not _entry is entry and _entry.status != 'ok'
+            if not _entry is entry and _entry.status != Status.OK
         )
 
     def poke_entry(self, entry: Program_Entry):
@@ -409,7 +421,7 @@ class Updater:
     def poke_waiting_for_dependency(self):
 
         for entry in self.entries:
-            if entry.status == 'waiting_for_dependency':
+            if entry.status == Status.WAITING_FOR_DEPENDENCY:
                 self.poke_entry(entry)
 
     def poke_all(self):
@@ -432,7 +444,7 @@ class Updater:
 
 
     def total_max_parallel_executions_exceeded(self):
-        return sum(entry.status in ('updating', 'suspended') for entry in self.entries) >= self.total_max_parallel_executions
+        return sum(entry.status in (Status.UPDATING, Status.SUSPENDED) for entry in self.entries) >= self.total_max_parallel_executions
 
 
     def despatching(self):
@@ -446,7 +458,7 @@ class Updater:
 
             for entry in self.entries:
 
-                if entry.status != 'error':
+                if entry.status != Status.ERROR:
                     continue
 
                 failed_tags.update(self.shared_failure_tags.intersection(entry.program.tags))
@@ -455,7 +467,7 @@ class Updater:
 
                 for entry in self.entries:
                     if not entry.program.tags.isdisjoint(failed_tags):
-                        entry.status = 'error'
+                        entry.status = Status.ERROR
 
                 update_ui()
 
@@ -488,7 +500,7 @@ class Updater:
                 if not entry.is_live_update:
                     continue
 
-                if entry.status != 'needs_update':
+                if entry.status != Status.NEEDS_UPDATE:
                     continue
 
                 if self.total_max_parallel_executions_exceeded():
@@ -519,7 +531,7 @@ class Updater:
 
     def max_executions_per_tag_exceeded(self, tags: typing.Iterable[str]):
 
-        updating_entries = [entry for entry in self.entries if entry.status in ('updating', 'suspended')]
+        updating_entries = [entry for entry in self.entries if entry.status in (Status.UPDATING, Status.SUSPENDED)]
 
         execution_limiting_tags = [tag for tag in tags if tag in self.max_parallel_execution_per_tag]
         if not execution_limiting_tags:
@@ -550,14 +562,14 @@ class Updater:
 
                 for entry in self.entries:
 
-                    if entry.status != 'updating':
+                    if entry.status != Status.UPDATING:
                         continue
 
                     if entry.entry_id == item['entry_id']:
                         continue
 
                     entry.suspend()
-                    entry.status = 'suspended'
+                    entry.status = Status.SUSPENDED
 
 
                 running_entry = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
@@ -585,14 +597,14 @@ class Updater:
 
                     for entry in self.entries:
 
-                        if entry.status != 'suspended':
+                        if entry.status != Status.SUSPENDED:
                             continue
 
                         if entry.entry_id == running_entry.entry_id:
                             continue
 
                         entry.resume()
-                        entry.status = 'updating'
+                        entry.status = Status.UPDATING
 
 
                 print('Released cores:', running_entry.program.blend_path)

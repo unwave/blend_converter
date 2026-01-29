@@ -79,16 +79,18 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def set_item_attrs(self):
 
-        self.status_to_bg_color = dict(
-            ok = wx.Colour(91, 237, 120),
-            needs_update = wx.Colour(240, 235, 98),
-            updating = wx.Colour(242, 176, 83),
-            error = wx.Colour(255, 105, 97),
-            does_not_exist = wx.Colour(211, 211, 211),
-            waiting_for_dependency = wx.Colour(201, 177, 113),
-        )
+        colors = {
+            updater.Status.OK: wx.Colour(91, 237, 120),
+            updater.Status.NEEDS_UPDATE : wx.Colour(240, 235, 98),
+            updater.Status.UPDATING: wx.Colour(242, 176, 83),
+            updater.Status.ERROR: wx.Colour(255, 105, 97),
+            updater.Status.DOES_NOT_EXIST: wx.Colour(211, 211, 211),
+            updater.Status.WAITING_FOR_DEPENDENCY: wx.Colour(201, 177, 113),
+        }
 
-        for key, value in self.status_to_bg_color.items():
+        self.status_to_bg_color = {}
+
+        for key, value in colors.items():
             item_attr = wx.ItemAttr()
             item_attr.SetBackgroundColour(value)
             self.status_to_bg_color[key] = item_attr
@@ -113,19 +115,19 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def get_column_icon_status(self, item: updater.Program_Entry):
-        if item.status == 'ok':
+        if item.status == updater.Status.OK:
             return '✔️'
-        elif item.status == 'updating':
+        elif item.status == updater.Status.UPDATING:
             return '🔨'
-        elif item.status == 'needs_update':
+        elif item.status == updater.Status.NEEDS_UPDATE:
             return '🔥'
-        elif item.status == 'error':
+        elif item.status == updater.Status.ERROR:
             return '❌'
-        elif item.status == 'waiting_for_dependency':
+        elif item.status == updater.Status.WAITING_FOR_DEPENDENCY:
             return '🔒'
-        elif item.status == 'does_not_exist':
+        elif item.status == updater.Status.DOES_NOT_EXIST:
             return '👻'
-        elif item.status == 'unknown':
+        elif item.status == updater.Status.UNKNOWN:
             return '❓'
         else:
             return ''
@@ -429,7 +431,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def on_mark_as_needs_update(self):
         for entry in self.get_selected_items():
-            entry.status = 'needs_update'
+            entry.status = updater.Status.NEEDS_UPDATE
 
 
     def on_entry_force_update(self, entry: updater.Program_Entry):
@@ -440,7 +442,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             wx.MessageBox("Max amount of simultaneous updates exceeded.", "Error", style= wx.OK | wx.ICON_ERROR)
             return
 
-        entry.status = 'needs_update'
+        entry.status = updater.Status.NEEDS_UPDATE
         entry.update(main_frame.updater.poke_waiting_for_dependency)
 
 
@@ -480,7 +482,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def on_update_selected(self):
         for entry in self.get_selected_items():
-            if entry.status in ('needs_update', 'error'):
+            if entry.status in (updater.Status.NEEDS_UPDATE, updater.Status.ERROR):
                 entry.is_manual_update = True
         self.Refresh()
 
@@ -1006,7 +1008,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
     def on_mark_update_all(self, event):
 
         for entry in self.updater.entries:
-            entry.status = 'needs_update'
+            entry.status = updater.Status.NEEDS_UPDATE
 
         updater.update_ui()
 
