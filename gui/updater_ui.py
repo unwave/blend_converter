@@ -693,12 +693,12 @@ class Result_Panel(wx.Panel):
 
 
     def on_stdout_need_update(self, event):
-        if event.entry.stdout_lines == self.main_frame.stdout_viewer.data:
+        if event.entry.stdout_lines is self.main_frame.stdout_viewer.data:
             self.stdout_need_update = True
 
 
     def on_stderr_need_update(self, event):
-        if event.entry.stderr_lines == self.main_frame.stderr_viewer.data:
+        if event.entry.stderr_lines is self.main_frame.stderr_viewer.data:
             self.stderr_need_update = True
 
 
