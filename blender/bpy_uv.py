@@ -352,7 +352,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
         try:
 
             object_copy = get_object_copy_for_uv_unwrap(object)
-            object_copy.name = "EXPORT_" + object_copy.name
+            object_copy.name = object_copy.name + "(export)"
 
             with bpy_context.Focus(object_copy):
 
@@ -427,7 +427,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
 
             imported_object = bpy.context.selected_objects[0]
-            imported_object.name = "IMPORT_" + imported_object.name
+            imported_object.name = imported_object.name + "(import)"
 
             print('validate')
             with utils.Capture_Stdout() as capture_stdout:
@@ -1530,7 +1530,7 @@ def unwrap_ministry_of_flat_with_fallback(
             continue
 
         object_copy = get_object_copy_for_uv_unwrap(object)
-        object_copy.name = "UV_UNWRAP_" + object_copy.name
+        object_copy.name = object_copy.name + "(unwrap)"
 
         with bpy_context.Isolate_Focus([object_copy], mode='EDIT'):
 
@@ -2114,7 +2114,7 @@ def brute_force_unwrap(
         return
 
     object_copy = get_object_copy_for_uv_unwrap(object)
-    object_copy.name = "UV_UNWRAP_" + object_copy.name
+    object_copy.name = object_copy.name + "(unwrap)"
 
     with bpy_context.Isolate_Focus([object_copy], mode='EDIT'):
 

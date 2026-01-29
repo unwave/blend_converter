@@ -1956,9 +1956,9 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
 def split_faces_by_materials(object: bpy.types.Object):
 
     copy = object.copy()
-    copy.name = object.name + '[copy]'
+    copy.name = object.name + '(copy)'
     copy.data = object.data.copy()
-    copy.data.name = object.data.name + '[copy]'
+    copy.data.name = object.data.name + '(copy)'
 
 
     with bpy_context.Focus(object, mode='EDIT'):

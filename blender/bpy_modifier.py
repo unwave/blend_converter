@@ -365,7 +365,7 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
 
 
         ## make a copy of the object to store the shape keys
-        copy = copy_object(object, '[copy]')
+        copy = copy_object(object, "(copy)")
 
 
         if copy.data.shape_keys.animation_data:
@@ -384,7 +384,7 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
         ## modify the copy topology in order for SURFACE_DEFORM to work
         if modifier_type in POSITION_SENSITIVE_TOPOLOGY_MODIFIERS:
 
-            bind_copy = copy_object(copy, '[bind_copy]')
+            bind_copy = copy_object(copy, "(bind_copy)")
 
             bind_copy.active_shape_key_index = 0
 
@@ -423,7 +423,7 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
 
         for index, name in enumerate(names, start = 1):
 
-            temp = copy_object(copy, '[temp]')
+            temp = copy_object(copy, "(temp)")
 
             # TODO: treat the modifiers that are not actually position sensitive as simple cases
             # e.g.: Bevel in a non-Angle mode, non-merging Mirror, etc.
