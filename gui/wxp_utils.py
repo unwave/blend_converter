@@ -198,7 +198,7 @@ class Item_Viewer_Native(wx.ListCtrl):
     def get_visible_indexes(self):
         start_index = self.GetTopItem()
         end_index = start_index + self.GetCountPerPage() + 1
-        end_index = min(end_index, len(self.GetItemCount()))
+        end_index = min(end_index, self.GetItemCount())
         return range(start_index, end_index)
 
 
