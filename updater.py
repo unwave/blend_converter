@@ -593,7 +593,7 @@ class Updater:
                     listening_socket.bind((host, 0))
                     port = listening_socket.getsockname()[1]
 
-                    running_entry.updater_response_queue.put({communication.Command_Key.RESULT: True, "address": (host, port)})
+                    running_entry.updater_response_queue.put({communication.Command_Key.RESULT: True, communication.Command_Key.ADDRESS: (host, port)})
 
                     listening_socket.listen()
 

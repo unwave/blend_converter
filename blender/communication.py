@@ -85,6 +85,7 @@ class Command_Key:
 
     RESULT = 'result'
     COMMAND = 'command'
+    ADDRESS = 'address'
 
 
 class Command:
@@ -112,7 +113,7 @@ class Suspend_Others:
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
-        self.socket.connect(tuple(response['address']))
+        self.socket.connect(tuple(response[Command_Key.ADDRESS]))
 
 
     def __exit__(self, type, value, traceback):
