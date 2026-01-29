@@ -64,6 +64,8 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_item_selected)
         self.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.on_right_click)
 
+        self.ignore_select_events = False
+
 
     def set_columns(self, columns):
         for i, column in enumerate(columns):
@@ -305,6 +307,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def on_item_selected(self, event: wx.ListEvent):
+
+        if self.ignore_select_events:
+            return
+
         entry = self.data[int(event.GetIndex())]
 
         self.main_frame.stdout_viewer.set_data(entry.stdout_lines)
@@ -394,11 +400,9 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         if key_code == ord('C'):
             pyperclip.copy(self.get_conversion_command(self.get_selected_items()))
         elif key_code == ord('A'):
-            prev_func = self.on_item_selected
-            self.on_item_selected = lambda a, b: None
-            for index in range(self.GetItemCount()):
-                self.Select(index)
-            self.on_item_selected = prev_func
+            self.ignore_select_events = True
+            self.SetItemState(-1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
+            self.ignore_select_events = False
 
 
     def on_compare_model(self, entry: updater.Program_Entry):
@@ -626,9 +630,7 @@ class Output_Lines(wxp_utils.Item_Viewer_Native):
             wxp_utils.set_clipboard_text('\n'.join(row[1].rstrip() for row in self.get_selected_items_text()))
 
         elif key_code == ord('A'):
-
-            for index in range(self.GetItemCount()):
-                self.Select(index)
+            self.SetItemState(-1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
 
 
     def set_data(self, data: typing.List[dict]):

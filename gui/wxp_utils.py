@@ -182,10 +182,7 @@ class Item_Viewer_Native(wx.ListCtrl):
 
 
     def deselect_all(self):
-        index = self.GetFirstSelected()
-        while index >= 0:
-            self.Select(index, 0)
-            index = self.GetNextSelected(index)
+        self.SetItemState(-1, 0, wx.LIST_STATE_SELECTED)
 
 
     def get_selected_indexes(self) -> typing.List[int]:
