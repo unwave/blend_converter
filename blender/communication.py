@@ -81,7 +81,7 @@ def send_and_get(data: dict) ->  dict:
         return []
 
 
-class Command_Key:
+class Key:
 
     RESULT = 'result'
     COMMAND = 'command'
@@ -106,14 +106,14 @@ class Suspend_Others:
         if not self.enabled:
             return
 
-        response = send_and_get({Command_Key.COMMAND: Command.SUSPEND_OTHERS})
+        response = send_and_get({Key.COMMAND: Command.SUSPEND_OTHERS})
 
         if response.get('disabled') == True:
             return
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
-        self.socket.connect(tuple(response[Command_Key.ADDRESS]))
+        self.socket.connect(tuple(response[Key.ADDRESS]))
 
 
     def __exit__(self, type, value, traceback):

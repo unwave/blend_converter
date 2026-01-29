@@ -566,7 +566,7 @@ class Updater:
 
             print("[updater got]:", item)
 
-            command = item.get(communication.Command_Key.COMMAND)
+            command = item.get(communication.Key.COMMAND)
 
             if command == communication.Command.SUSPEND_OTHERS:
 
@@ -593,7 +593,7 @@ class Updater:
                     listening_socket.bind((host, 0))
                     port = listening_socket.getsockname()[1]
 
-                    running_entry.updater_response_queue.put({communication.Command_Key.RESULT: True, communication.Command_Key.ADDRESS: (host, port)})
+                    running_entry.updater_response_queue.put({communication.Key.RESULT: True, communication.Key.ADDRESS: (host, port)})
 
                     listening_socket.listen()
 
