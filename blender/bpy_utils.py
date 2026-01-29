@@ -1528,13 +1528,6 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
     with bpy_context.Global_Optimizations(), bpy_context.Focus(objects), bpy_context.State() as state:
 
-
-        ## this can help to reduce `Dependency cycle detected` spam in rigs
-        for object in bpy.data.objects:
-            if object.type == 'ARMATURE':
-                state.set(object.pose, 'ik_solver', 'LEGACY')
-
-
         ## disable animation for consistency
         for object in objects:
             if object.animation_data:
