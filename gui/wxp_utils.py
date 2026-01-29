@@ -150,29 +150,7 @@ class Item_Viewer(ULC.UltimateListCtrl):
         print('on_item_checking', index)
 
 
-# class Item_Viewer_Native(wx.ListCtrl, listctrl.ListCtrlAutoWidthMixin):
 class Item_Viewer_Native(wx.ListCtrl):
-
-
-    def __init__(self, *args, **kwargs):
-
-        if not 'style' in kwargs:
-            kwargs['style'] = wx.LC_REPORT | wx.LC_HRULES | wx.LC_VRULES | wx.LC_VIRTUAL
-
-        super().__init__(*args, **kwargs)
-        # listctrl.ListCtrlAutoWidthMixin.__init__(self)
-
-        # self.EnableCheckBoxes(False)
-
-        self.Bind(wx.EVT_LEFT_DCLICK, self._on_left_double_click)
-
-        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_item_selected)
-        self.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.on_right_click)
-        # self.Bind(ULC.EVT_LIST_ITEM_CHECKING, self.on_item_checking)
-
-
-    # def setResizeColumn(self, value):
-    #     pass
 
 
     def set_columns(self, columns):
@@ -201,21 +179,6 @@ class Item_Viewer_Native(wx.ListCtrl):
 
     def on_left_double_click(self, index: int, event: wx.MouseEvent):
         print('on_left_double_click', index)
-
-
-    def on_right_click(self, event: wx.ListEvent):
-        index = event.GetIndex()
-        print('on_right_click', index)
-
-
-    def on_item_selected(self, event: wx.ListEvent):
-        index = event.GetIndex()
-        print('on_item_selected', index)
-
-
-    def on_item_checking(self, event: wx.ListEvent):
-        index = event.GetIndex()
-        print('on_item_checking', index)
 
 
     def deselect_all(self):

@@ -35,7 +35,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         `columns`: list of tuples (name, width, function)
         """
 
-        super().__init__(parent)
+        super().__init__(parent, style = wx.LC_REPORT | wx.LC_HRULES | wx.LC_VRULES | wx.LC_VIRTUAL)
 
         self.parent = parent
 
@@ -59,6 +59,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.Bind(wx.EVT_KEY_DOWN, self.on_key)
 
         self.double_click_function: typing.Optional[typing.Callable[[updater.Program_Entry]]] = self.on_empty_double_click_function
+
+        self.Bind(wx.EVT_LEFT_DCLICK, self._on_left_double_click)
+        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_item_selected)
+        self.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.on_right_click)
 
 
     def set_columns(self, columns):
@@ -596,24 +600,15 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 class Output_Lines(wxp_utils.Item_Viewer_Native):
 
 
-    def __init__(self, parent, name: str, *args, **kwargs):
+    def __init__(self, parent, name: str):
 
-        self.data = []
-
-        if not 'style' in kwargs:
-            # kwargs['style'] = wx.LC_REPORT | wx.LC_HRULES | wx.LC_VRULES | wx.LC_VIRTUAL
-            kwargs['style'] = wx.LC_REPORT | wx.LC_HRULES | wx.LC_VIRTUAL
-
-        super().__init__(parent, *args, **kwargs)
+        super().__init__(parent, style = wx.LC_REPORT | wx.LC_HRULES | wx.LC_VIRTUAL)
 
         self.parent = self.GetParent()
 
-        columns = (
-            ('№', 50),
-            (name, 1400),
-        )
+        self.data: typing.List[str] = []
 
-        self.set_columns(columns)
+        self.set_columns([('№', 50), (name, 1400)])
 
         self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
 
@@ -632,14 +627,8 @@ class Output_Lines(wxp_utils.Item_Viewer_Native):
 
         elif key_code == ord('A'):
 
-            # this ensures that no side effects triggered
-            prev_func = self.on_item_selected
-            self.on_item_selected = lambda a, b: None
-
             for index in range(self.GetItemCount()):
                 self.Select(index)
-
-            self.on_item_selected = prev_func
 
 
     def set_data(self, data: typing.List[dict]):
