@@ -568,7 +568,7 @@ class Updater:
 
             command = item.get(communication.Command_Key.COMMAND)
 
-            if command == communication.Command.REQUEST_ALL_CORES:
+            if command == communication.Command.SUSPEND_OTHERS:
 
                 for entry in self.entries:
 

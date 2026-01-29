@@ -943,7 +943,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
 
     if settings.merge_materials and not settings.material_key:
 
-        with communication.All_Cores():
+        with communication.Suspend_Others():
             images = bake_images(objects, uv_layer_name, settings)
         settings._images.extend(images)
 
@@ -998,7 +998,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             f"For objects: {[o.name_full for o in objects_in_group]}"
         )
 
-        with communication.All_Cores():
+        with communication.Suspend_Others():
             images = bake_images(objects_in_group, uv_layer_name, settings)
         settings._images.extend(images)
 
@@ -1029,7 +1029,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
 
             print_bold('\nMaterial Baking: ', material.name_full, '\nfor objects:', [o.name_full for o in _objects])
 
-            with communication.All_Cores():
+            with communication.Suspend_Others():
                 images = bake_images(_objects, uv_layer_name, settings)
             settings._images.extend(images)
 

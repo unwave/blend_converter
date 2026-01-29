@@ -89,10 +89,10 @@ class Command_Key:
 
 class Command:
 
-    REQUEST_ALL_CORES = 'request_all_cores'
+    SUSPEND_OTHERS = 'suspend_others'
 
 
-class All_Cores:
+class Suspend_Others:
 
 
     def __init__(self, enabled = True):
@@ -105,7 +105,7 @@ class All_Cores:
         if not self.enabled:
             return
 
-        response = send_and_get({Command_Key.COMMAND: Command.REQUEST_ALL_CORES})
+        response = send_and_get({Command_Key.COMMAND: Command.SUSPEND_OTHERS})
 
         if response.get('disabled') == True:
             return
