@@ -306,6 +306,10 @@ def get_object_copy_for_uv_unwrap(object: bpy.types.Object):
         object_copy.delta_location = (0,0,0)
         object_copy.delta_rotation_euler = (0,0,0)
 
+        object_copy.use_mesh_mirror_x = False
+        object_copy.use_mesh_mirror_y = False
+        object_copy.use_mesh_mirror_z = False
+
         bpy_utils.apply_modifiers([object_copy], include_name='Smooth by Angle', ignore_type=bpy_context.TOPOLOGY_CHANGING_MODIFIER_TYPES)
 
         object_copy.modifiers.clear()
@@ -362,11 +366,14 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
                     bpy.ops.mesh.reveal()
                     bpy.ops.mesh.select_all(action='SELECT')
 
+                    state.set(bpy.context.scene.tool_settings, 'use_mesh_automerge', False)
+                    state.set(bpy.context.scene.tool_settings, 'use_transform_correct_face_attributes', False)
+
                     state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'BOUNDING_BOX_CENTER')
-                    bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(1/0.1, 1/0.1, 1/0.1), mirror=False, use_proportional_edit=False, snap=False)
+                    bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(1/0.1, 1/0.1, 1/0.1))
 
                     state.set(bpy.context.scene.tool_settings, 'transform_pivot_point', 'INDIVIDUAL_ORIGINS')
-                    bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(0.1, 0.1, 0.1), mirror=False, use_proportional_edit=False, snap=False)
+                    bpy_context.call_in_view3d(bpy.ops.transform.resize, value=(0.1, 0.1, 0.1))
 
 
                 filepath_input = utils.ensure_unique_path(os.path.join(temp_dir, utils.ensure_valid_basename(object.name_full + '.obj')))
