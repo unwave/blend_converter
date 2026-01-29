@@ -41,6 +41,15 @@ class Status:
     WAITING_FOR_DEPENDENCY = 'waiting_for_dependency'
     UNKNOWN = 'unknown'
 
+STATUS_ICON = {
+    Status.OK: '✔️',
+    Status.NEEDS_UPDATE: '🔥',
+    Status.UPDATING: '🔨',
+    Status.ERROR: '❌',
+    Status.DOES_NOT_EXIST: '👻',
+    Status.WAITING_FOR_DEPENDENCY: '🔒',
+    Status.UNKNOWN: '❓',
+}
 
 class Program_Entry:
 

@@ -115,22 +115,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def get_column_icon_status(self, item: updater.Program_Entry):
-        if item.status == updater.Status.OK:
-            return '✔️'
-        elif item.status == updater.Status.UPDATING:
-            return '🔨'
-        elif item.status == updater.Status.NEEDS_UPDATE:
-            return '🔥'
-        elif item.status == updater.Status.ERROR:
-            return '❌'
-        elif item.status == updater.Status.WAITING_FOR_DEPENDENCY:
-            return '🔒'
-        elif item.status == updater.Status.DOES_NOT_EXIST:
-            return '👻'
-        elif item.status == updater.Status.UNKNOWN:
-            return '❓'
-        else:
-            return ''
+        return updater.STATUS_ICON.get(item.status, '')
 
 
     def get_column_live_update(self, item: updater.Program_Entry):
