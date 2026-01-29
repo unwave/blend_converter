@@ -33,7 +33,7 @@ LOG_DIR = os.path.join(utils.BLEND_CONVERTER_USER_DIR, 'logs')
 class Status:
 
     OK = 'ok'
-    NEEDS_UPDATE = 'needs_update'
+    STALE = 'stale'
     UPDATING = 'updating'
     YIELDING = 'yielding'
     ERROR = 'error'
@@ -43,7 +43,7 @@ class Status:
 
 STATUS_ICON = {
     Status.OK: '✔️',
-    Status.NEEDS_UPDATE: '🔥',
+    Status.STALE: '🦕',
     Status.UPDATING: '🔨',
     Status.YIELDING: '⛔',
     Status.ERROR: '❌',
@@ -106,7 +106,7 @@ class Program_Entry:
             self.status = Status.WAITING_FOR_DEPENDENCY
         elif os.path.exists(self.program.blend_path):
             if self.program.are_instructions_changed:
-                self.status = Status.NEEDS_UPDATE
+                self.status = Status.STALE
             else:
                 self.status = Status.OK
         else:
@@ -510,7 +510,7 @@ class Updater:
                 if not entry.is_live_update:
                     continue
 
-                if entry.status != Status.NEEDS_UPDATE:
+                if entry.status != Status.STALE:
                     continue
 
                 if self.total_max_parallel_executions_exceeded():

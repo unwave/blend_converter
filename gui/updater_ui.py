@@ -81,7 +81,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         colors = {
             updater.Status.OK: wx.Colour(91, 237, 120),
-            updater.Status.NEEDS_UPDATE : wx.Colour(240, 235, 98),
+            updater.Status.STALE : wx.Colour(240, 235, 98),
             updater.Status.UPDATING: wx.Colour(242, 176, 83),
             updater.Status.ERROR: wx.Colour(255, 105, 97),
             updater.Status.DOES_NOT_EXIST: wx.Colour(211, 211, 211),
@@ -417,7 +417,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def on_mark_as_needs_update(self):
         for entry in self.get_selected_items():
-            entry.status = updater.Status.NEEDS_UPDATE
+            entry.status = updater.Status.STALE
 
 
     def on_entry_force_update(self, entry: updater.Program_Entry):
@@ -428,7 +428,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             wx.MessageBox("Max amount of simultaneous updates exceeded.", "Error", style= wx.OK | wx.ICON_ERROR)
             return
 
-        entry.status = updater.Status.NEEDS_UPDATE
+        entry.status = updater.Status.STALE
         entry.update(main_frame.updater.poke_waiting_for_dependency)
 
 
@@ -468,7 +468,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def on_update_selected(self):
         for entry in self.get_selected_items():
-            if entry.status in (updater.Status.NEEDS_UPDATE, updater.Status.ERROR):
+            if entry.status in (updater.Status.STALE, updater.Status.ERROR):
                 entry.is_manual_update = True
         self.Refresh()
 
@@ -994,7 +994,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
     def on_mark_update_all(self, event):
 
         for entry in self.updater.entries:
-            entry.status = updater.Status.NEEDS_UPDATE
+            entry.status = updater.Status.STALE
 
         updater.update_ui()
 
