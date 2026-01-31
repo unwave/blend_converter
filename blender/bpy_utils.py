@@ -1024,6 +1024,18 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
             mapping = node.inputs['Vector'].insert_new('ShaderNodeMapping')
             mapping.inputs['Rotation'].set_default_value(object.matrix_world.to_euler())
 
+        elif node.be('ShaderNodeVertexColor'):
+
+            # after joining the objects the color attribute data is filled with white
+            # instead of remaining black when as when the attribute is missing
+            if node.layer_name not in object.data.color_attributes:
+
+                replacement_node = tree.new('ShaderNodeValue')
+
+                for output in node.outputs:
+                    for other_socket in output.connections:
+                        replacement_node.outputs[0].join(other_socket, move=False)
+
 
     if check_only:
         return False
