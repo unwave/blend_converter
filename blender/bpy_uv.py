@@ -1263,11 +1263,13 @@ def clear_uv_layers_from_objects(objects: typing.List[bpy.types.Object], uv_laye
 
 
 
-def unwrap(objects: typing.List[bpy.types.Object], *,
-           uv_layer = '',
-           uv_layer_reuse = '',
-           settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
-           ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None
+def unwrap(
+            objects: typing.List[bpy.types.Object],
+            uv_layer_name: str,
+            *,
+            uv_layer_reuse = '',
+            settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
+            ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None
         ):
 
     incompatible_objects = set(objects) - set(object for object in objects if object.data and hasattr(object.data, 'uv_layers'))
@@ -1281,10 +1283,6 @@ def unwrap(objects: typing.List[bpy.types.Object], *,
 
     objects = bpy_utils.get_unique_mesh_objects(objects)
 
-    if uv_layer:
-        uv_layer_name = uv_layer
-    else:
-        uv_layer_name = f'__bc_{uuid.uuid1().hex}'
 
     settings = tool_settings.Unwrap_UVs(uv_layer_name = uv_layer_name)._update(settings)
 

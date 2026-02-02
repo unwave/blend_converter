@@ -38,8 +38,9 @@ def get_bake_program(blend_dir: str, blender_executable: str):
 
     objects = program.run(blender, bc_script.get_meshable_objects, program.run(blender, bc_script.get_view_layer_objects))
 
+    uv_layer_name = program.run(blender, bc_script.get_uuid1_hex)
 
-    uv_layer_name = program.run(blender, bc_script.unwrap, objects)
+    program.run(blender, bc_script.unwrap, objects, uv_layer_name)
 
     settings = tool_settings.Bake_Materials(
         uv_layer_bake = uv_layer_name,

@@ -410,7 +410,7 @@ def apply_modifiers(objects: Objects_Like, *args, **kwargs):
 
 
 @wraps(bpy_uv.unwrap if typing.TYPE_CHECKING else object)
-def unwrap(objects: Objects_Like, **kwargs):
+def unwrap(objects: Objects_Like, *args, **kwargs):
 
     if 'settings' in kwargs:
         kwargs['settings'] = tool_settings.Unwrap_UVs._from_dict(kwargs['settings'])
@@ -418,7 +418,7 @@ def unwrap(objects: Objects_Like, **kwargs):
     if 'ministry_of_flat_settings' in kwargs:
         kwargs['ministry_of_flat_settings'] = tool_settings.Ministry_Of_Flat._from_dict(kwargs['ministry_of_flat_settings'])
 
-    return bpy_uv.unwrap(get_objects(objects), **kwargs)
+    return bpy_uv.unwrap(get_objects(objects), *args, **kwargs)
 
 
 @wraps(bpy_mesh.bisect_by_mirror_modifiers if typing.TYPE_CHECKING else object)
@@ -482,3 +482,8 @@ def select_uv_layer(objects: Objects_Like, name: str,):
             index = object.data.uv_layers.find(name)
             if index >= 0:
                 object.data.uv_layers.active_index = index
+
+
+def get_uuid1_hex(prefix = '__bc_'):
+    import uuid
+    return prefix + uuid.uuid1().hex
