@@ -1026,9 +1026,12 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
 
         elif node.be('ShaderNodeVertexColor'):
 
-            # after joining the objects the color attribute data is filled with white
-            # instead of remaining black when as when the attribute is missing
-            if node.layer_name not in object.data.color_attributes:
+            if node.layer_name == '' and object.data.color_attributes.active_color_name:
+                node.layer_name = object.data.color_attributes.active_color_name
+
+            elif node.layer_name not in object.data.color_attributes:
+                # after joining the objects the color attribute data is filled with white
+                # instead of remaining black when as when the attribute is missing
 
                 replacement_node = tree.new('ShaderNodeValue')
 
