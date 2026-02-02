@@ -393,11 +393,42 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
             cmd = settings._get_cmd(filepath_input, filepath_output)
 
+
+            elapsed = 0
+            is_timeout = False
+            stop_counting = threading.Event()
+
+            def time_counting():
+
+                nonlocal elapsed
+                nonlocal is_timeout
+
+                while process.poll() is None:
+
+                    if elapsed > settings.timeout:
+                        is_timeout = True
+                        process.kill()
+                        return
+
+                    elapsed += 1
+
+                    if stop_counting.wait(1):
+                        return
+
+
+            counting = threading.Thread(target = time_counting, daemon=True)
+
             print('subprocess ', end='')
             try:
-                process = subprocess.run(cmd, timeout=settings.timeout, text = True, capture_output=True, encoding='utf-8')
-            except subprocess.TimeoutExpired as e:
-                raise utils.Fallback(f"Timeout: {object.name_full}") from e
+                with utils.Capture_Stdout() as capture:
+                    with subprocess.Popen(cmd) as process:
+
+                        counting.start()
+                        process.wait()
+
+                        stop_counting.set()
+                        counting.join()
+
             except FileNotFoundError as e:
                 raise utils.Fallback(str(e) + '\n' + str(cmd)) from e
 
@@ -412,12 +443,14 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
             else:
                 print()
                 utils.print_in_color(utils.get_color_code(0,0,0, 256,256,256), 'CMD:', utils.get_command_from_list(cmd))
-                utils.print_in_color(yellow_color, process.stdout)
-                utils.print_in_color(magenta_color, process.stderr)
+                utils.print_in_color(yellow_color, capture.exhaust())
                 raise utils.Fallback(f"Bad return code {returncode}: {object.name_full}")
 
             if not os.path.exists(filepath_output):
-                raise utils.Fallback(f"Output .obj file does not exist: {filepath_output}")
+                if is_timeout:
+                    raise utils.Fallback(f"Timeout: {object.name_full}")
+                else:
+                    raise utils.Fallback(f"Output .obj file does not exist: {filepath_output}")
 
             bpy.ops.object.select_all(action='DESELECT')
 
