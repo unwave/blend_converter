@@ -130,8 +130,8 @@ def replace_return_values(value):
         new_value = []
 
         for sub_value in value:
-            if sub_value in ARGS['instructions']:
-                new_value.append(return_values[ARGS['instructions'].index(sub_value)])
+            if sub_value in INSTRUCTIONS:
+                new_value.append(return_values[INSTRUCTIONS.index(sub_value)])
             elif type(sub_value) in (list, dict):
                 new_value.append(replace_return_values(sub_value))
             else:
@@ -144,8 +144,8 @@ def replace_return_values(value):
         new_value = {}
 
         for key, sub_value in value.items():
-            if sub_value in ARGS['instructions']:
-                new_value[key] = return_values[ARGS['instructions'].index(sub_value)]
+            if sub_value in INSTRUCTIONS:
+                new_value[key] = return_values[INSTRUCTIONS.index(sub_value)]
             elif type(sub_value) in (list, dict):
                 new_value[key] = replace_return_values(sub_value)
             else:
@@ -181,10 +181,14 @@ if any(arg.startswith('inspect:func') for arg in ARGS['inspect_identifiers']):
 
 utils.disable_buffering()
 
+INSTRUCTIONS: typing.List[dict]
+
 def process():
 
+    global INSTRUCTIONS
+    INSTRUCTIONS = communication.send_and_get({communication.Key.COMMAND: communication.Command.INSTRUCTIONS})[communication.Key.DATA]
 
-    for index, instruction in enumerate(ARGS['instructions']):
+    for index, instruction in enumerate(INSTRUCTIONS):
 
         try:
 

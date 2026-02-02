@@ -13,6 +13,7 @@ import multiprocessing
 
 from .. import utils
 from .. import common
+from . import communication
 
 
 
@@ -85,11 +86,13 @@ class Blender:
                 debug = debug,
                 profile = profile,
         ), default = lambda x: x._to_dict())
-        arguments = json.loads(arguments)
+        arguments: dict = json.loads(arguments)
 
 
         ## fix "The filename or extension is too long"
         remove_code(arguments)
+
+        self.instructions = arguments.pop('instructions')
 
 
         self.run_blender(
@@ -260,6 +263,11 @@ class Blender:
                 continue
 
             print('[blender executor got]:', data, flush=True)
+
+
+            if data.get(communication.Key.COMMAND) == communication.Command.INSTRUCTIONS:
+                self.send({communication.Key.RESULT: True, communication.Key.DATA: self.instructions})
+                continue
 
             if self.entry_command_queue is None:
                 self.send({"disabled": True})

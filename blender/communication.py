@@ -86,10 +86,12 @@ class Key:
     RESULT = 'result'
     COMMAND = 'command'
     ADDRESS = 'address'
+    DATA = 'data'
 
 
 class Command:
 
+    INSTRUCTIONS = 'instructions'
     SUSPEND_OTHERS = 'suspend_others'
 
 
