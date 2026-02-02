@@ -342,10 +342,11 @@ def get_object_info(object: bpy.types.Object):
 
 def join_objects(objects: typing.List[bpy.types.Object], *, join_into: typing.Optional[bpy.types.Object] = None, name: str = None, generate_joined_objects_info = False):
 
+    objects = list(objects)
 
     if join_into is not None:
         if not join_into in objects:
-            objects = list(objects) + [join_into]
+            objects = objects + [join_into]
     else:
         if not objects:
             raise Exception("No objects to join were provided.")
