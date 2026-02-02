@@ -503,7 +503,7 @@ class Baked_Image:
 
                         file_node.format.color_mode = 'RGBA'
 
-                        context_stack.enter_context(self.bake_types[3]._get_compositor_context(combine_rgba.inputs[A], self.sub_images[3], Compositor_Image_Channel.RGB))
+                        context_stack.enter_context(self.bake_types[3]._get_compositor_context(combine_rgba.inputs[A], self.sub_images[-1], Compositor_Image_Channel.RGB))
 
                 else:
                     raise ValueError(f"Unexpected identifier length: {self.bake_types}")
@@ -914,7 +914,7 @@ def create_material(
             image_node = separate_rgb.inputs[non_none_index].new('ShaderNodeTexImage', image = image)
             uv_node.outputs[0].join(image_node.inputs['Vector'], False)
 
-            for index, _identifier in enumerate(map_identifier):
+            for index, _identifier in enumerate(map_identifier[:3]):
 
                 if not _identifier:
                     continue

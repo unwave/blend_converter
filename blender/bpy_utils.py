@@ -1661,12 +1661,16 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
             bake_types = []
 
-
-            bake_types.append([
+            orma = [
                 tool_settings_bake.AO_Diffuse(faster=settings.faster_ao_bake, environment_has_transparent_materials = environment_has_transparent_materials),
                 tool_settings_bake.Roughness(use_denoise=settings.denoise_all),
                 tool_settings_bake.Metallic(use_denoise=settings.denoise_all)
-            ])
+            ]
+
+            if material_key == alpha_material_key:
+                orma.append(tool_settings_bake.Alpha(use_denoise=settings.denoise_all))
+
+            bake_types.append(orma)
 
 
             if any(material[Material_Bake_Type.HAS_EMISSION] for material in material_group):
@@ -1675,10 +1679,9 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
             if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
                 bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name, use_denoise=settings.denoise_all))
 
-            if material_key == alpha_material_key:
-                bake_types.append([tool_settings_bake.Base_Color(use_denoise=settings.denoise_all), tool_settings_bake.Alpha(use_denoise=settings.denoise_all)])
-            else:
-                bake_types.append(tool_settings_bake.Base_Color(use_denoise=settings.denoise_all))
+
+            bake_types.append([tool_settings_bake.Base_Color(use_denoise=settings.denoise_all)])
+
 
             _bake_settings.material_key = material_key
             _bake_settings.bake_types = bake_types
