@@ -102,10 +102,10 @@ class File:
 class Instruction:
 
 
-    def __init__(self, executor, func: typing.Callable, *args, **kwargs):
+    def __init__(self, index: int, executor, func: typing.Callable, *args, **kwargs):
 
         self.func = func
-
+        self.index = index
         self.executor = executor
         self.filepath: str = os.path.realpath(func.__code__.co_filename)
         self.name: str = func.__name__
@@ -118,6 +118,7 @@ class Instruction:
     def _to_dict(self):
         return dict(
             _type = type(self).__name__,
+            index = self.index,
             executor = self.executor,
             filepath = self.filepath,
             name = self.name,
@@ -182,6 +183,8 @@ class Program:
 
         self.return_values_file: typing.Optional[str] = None
         """ A file where the return values will be written. """
+
+        self._instruction_index = 0
 
 
     def read_report(self):
@@ -325,7 +328,7 @@ class Program:
                     self.substitute_filepaths(args)
                     self.substitute_filepaths(kwargs)
 
-                    substituted_instructions.append(Instruction(instruction.executor, instruction.func, *args, **kwargs))
+                    substituted_instructions.append(Instruction(instruction.index, instruction.executor, instruction.func, *args, **kwargs))
 
                 executor.run(
                     instructions = substituted_instructions,
@@ -351,8 +354,10 @@ class Program:
     def run(self, executor, func: 'typing.Callable[P, T]', *args: P.args, **kwargs: P.kwargs) -> T:
         """ `args` and `kwargs` must be JSON serializable. """
 
-        instruction = Instruction(executor, func, *args, **kwargs)
+        instruction = Instruction(self._instruction_index, executor, func, *args, **kwargs)
         self.instructions.append(instruction)
+
+        self._instruction_index += 1
 
         return instruction
 
