@@ -307,6 +307,8 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.main_frame.stderr_viewer.data = entry.stderr_lines
         self.main_frame.stderr_viewer.update()
 
+        self.main_frame.Refresh()
+
 
     def on_poke_entries(self, entry: updater.Program_Entry):
         for entry in self.get_selected_items():
