@@ -323,8 +323,10 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
                     "\n\t" f"Tree: {repr(self.node.tree.bl_tree)}"
                     "\n\t" f"From node: '{socket.node.name}' [{socket.node.bl_idname}]"
                     "\n\t" f"From socket: '{socket.identifier}'"
+                        f"{_get_socket_debug_info(socket)}"
                     "\n\t" f"To node: '{self.node.name}' [{self.node.bl_idname}]"
                     "\n\t" f"To socket: '{self.identifier}'"
+                        f"{_get_socket_debug_info(self)}"
                 )
 
             # only one input is allowed
@@ -363,8 +365,10 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
                     "\n\t" f"Tree: {repr(self.node.tree.bl_tree)}"
                     "\n\t" f"From node: '{self.node.name}' [{self.node.bl_idname}]"
                     "\n\t" f"From socket: '{self.identifier}'"
+                        f"{_get_socket_debug_info(self)}"
                     "\n\t" f"To node: '{socket.node.name}' [{socket.node.bl_idname}]"
                     "\n\t" f"To socket: '{socket.identifier}'"
+                        f"{_get_socket_debug_info(socket)}"
                 )
 
             # only one input is allowed
@@ -526,6 +530,18 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
 
         else:
             return self.default_value
+
+
+def _get_socket_debug_info(socket: 'bpy.types.NodeSocket'):
+    return (
+        "\n\t\t" f"type: {socket.type}"
+        "\n\t\t" f"name: {socket.name}"
+        "\n\t\t" f"is_output: {socket.is_output}"
+        "\n\t\t" f"is_linked: {socket.is_output}"
+        "\n\t\t" f"enabled: {socket.enabled}"
+        "\n\t\t" f"hide: {socket.hide}"
+        "\n\t\t" f"is_unavailable: {getattr(socket, 'is_unavailable', 'UNDEFINED')}"
+    )
 
 
 class _Sockets_Wrapper(typing.Generic[_S_SOCKET, _S_NODE], typing.Dict[str, _S_SOCKET]):
