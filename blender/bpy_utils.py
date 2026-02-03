@@ -502,10 +502,13 @@ def convert_materials_to_principled(objects: typing.List[bpy.types.Object], remo
 
 
     if remove_unused:
-        with bpy_context.Focus(objects) as context:
-            object_with_materials = next((object for object in context.view_layer.objects if hasattr(object, 'material_slots') and object.material_slots), None)
-            if object_with_materials is not None:
-                context.view_layer.objects.active = object_with_materials
+
+        for object in objects:
+
+            if not hasattr(object, 'material_slots'):
+                continue
+
+            with bpy_context.Focus(object):
                 bpy.ops.object.material_slot_remove_unused()
 
 
