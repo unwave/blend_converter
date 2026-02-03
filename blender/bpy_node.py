@@ -1654,6 +1654,9 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
 
                 for identifier in principled_1.inputs.keys():
 
+                    if getattr(principled_1.inputs[identifier], 'is_unavailable', False):
+                        continue
+
                     if principled_1.inputs[identifier].is_equal(principled_2.inputs[identifier]):
                         continue
 
@@ -1685,6 +1688,9 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
 
 
                 for identifier in principled_1.inputs.keys():
+
+                    if getattr(principled_1.inputs[identifier], 'is_unavailable', False):
+                        continue
 
                     socket_1 = principled_1.inputs[identifier].as_output()
                     socket_2 = principled_2.inputs[identifier].as_output()
