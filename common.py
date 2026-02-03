@@ -476,3 +476,26 @@ class Config_Base:
             section, option = key.split(' @ ', maxsplit= 1)
 
             self.set_option(section, option, value)
+
+
+class Program_Definition:
+
+    def __init__(
+                self,
+                file_name: str,
+                program_getter_name: str,
+                arguments_getter_name: str,
+                args: list = None,
+                kwargs: dict = None,
+            ):
+
+        self.file_name = file_name
+        self.program_getter_name = program_getter_name
+        self.arguments_getter_name = arguments_getter_name
+
+        self.args = [] if args is None else args
+        self.kwargs = {} if kwargs is None else kwargs
+
+
+    def __repr__(self):
+        return str(self.__dict__)

@@ -1,7 +1,9 @@
 def main():
 
     from blend_converter.gui import updater_ui
-    app = updater_ui.Main_Frame.get_app([(__file__, 'get_bake_program', 'get_keyword_arguments')])
+    from blend_converter import common
+
+    app = updater_ui.Main_Frame.get_app([common.Program_Definition(__file__, 'get_bake_program', 'get_keyword_arguments')])
 
     import os
     cpu_count = os.cpu_count()

@@ -308,45 +308,25 @@ def import_files(files: typing.List[str]):
     return modules
 
 
-def get_program_entries(program_definitions: typing.List[typing.Tuple[str, str, str]]):
+def get_program_entries(definitions: typing.List[common.Program_Definition]):
 
     entries = []
 
-    path_to_module_map = import_files([p[0] for p in program_definitions])
+    path_to_module_map = import_files([d.file_name for d in definitions])
 
-    for file_name, program_getter_name, arguments_getter_name in program_definitions:
+    for d in definitions:
 
-        module = path_to_module_map[os.path.realpath(file_name)]
+        module = path_to_module_map[os.path.realpath(d.file_name)]
 
-        program_getter = getattr(module, program_getter_name)
-        if not isinstance(program_getter, typing.Callable):
-            raise Exception(
-                f"A program_getter must be a function, got: {repr(program_getter)}"
-                "\n\t" f"file_name = {file_name}"
-                "\n\t" f"program_getter_name = {program_getter_name}"
-            )
+        program_getter = getattr(module, d.program_getter_name)
 
-        arguments_getter = getattr(module, arguments_getter_name)
-        if not isinstance(arguments_getter, typing.Callable):
-            raise Exception(
-                f"An arguments_getter must be a function, got: {repr(arguments_getter)}"
-                "\n\t" f"file_name = {file_name}"
-                "\n\t" f"arguments_getter_name = {arguments_getter_name}"
-            )
+        arguments_getter = getattr(module, d.arguments_getter_name)
 
-        for kwargs in arguments_getter():
+        for arguments in arguments_getter(*d.args, **d.kwargs):
 
-            program = program_getter(**kwargs)
+            program = program_getter(**arguments)
 
-            if not isinstance(program, common.Program):
-                raise Exception(
-                    f"A program_getter function must return a common.Program, got: {repr(program)}"
-                    "\n\t" f"file_name = {file_name}"
-                    "\n\t" f"program_getter_name = {program_getter_name}"
-                    "\n\t" f"kwargs = {kwargs}"
-                )
-
-            entries.append(Program_Entry(program, module.__file__, program_getter_name, kwargs))
+            entries.append(Program_Entry(program, module.__file__, d.program_getter_name, arguments))
 
     return entries
 
@@ -402,11 +382,11 @@ class Updater:
 
 
     @classmethod
-    def from_files(cls, program_definitions: typing.List[typing.Tuple[str, str, str]]):
+    def from_entries(cls, entries: typing.List[Program_Entry]):
 
         updater = cls()
 
-        updater.entries = get_program_entries(program_definitions)
+        updater.entries = entries
 
         updater.poke_all()
 

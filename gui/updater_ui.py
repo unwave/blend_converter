@@ -793,12 +793,12 @@ class BC_App(wx.App):
 class Main_Frame(wxp_utils.Generic_Frame):
 
 
-    def __init__(self, program_definitions: typing.List[typing.Tuple[str, str, str]], columns: typing.Optional[typing.Iterable[typing.Tuple[str, int, typing.Callable[[int], str]]]] = None):
+    def __init__(self, definitions: typing.List[common.Program_Definition], columns: typing.Optional[typing.Iterable[typing.Tuple[str, int, typing.Callable[[int], str]]]] = None):
 
-        self.updater = updater.Updater.from_files(program_definitions)
+        self.updater = updater.Updater.from_entries(updater.get_program_entries(definitions))
 
         if not self.updater.entries:
-            raise Exception(f"No programs provided in files: {program_definitions}")
+            raise Exception(f"No programs provided in files: {definitions}")
 
         blender_executable = collections.Counter([entry.program.blender_executable for entry in self.updater.entries]).most_common(1)[0][0]
 
@@ -847,12 +847,12 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     @classmethod
-    def get_app(cls, program_definitions: typing.List[typing.Tuple[str, str, str]], columns = None):
+    def get_app(cls, definitions: typing.List[common.Program_Definition], columns = None):
 
         print(sys.argv)
 
         app = BC_App()
-        frame = cls(program_definitions, columns = columns)
+        frame = cls(definitions, columns = columns)
         app.main_frame = frame
 
         is_console_shown = False
