@@ -6,6 +6,9 @@ import importlib.util
 import sys
 
 
+BC_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+
+
 INDENT = ' ' * 4
 
 IMPORTS = """
@@ -89,16 +92,12 @@ def import_module_from_file(file_path: str, module_name: typing.Optional[str] = 
     return module
 
 
-LIB_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-BLEND_CONVERTER_INIT_PY = os.path.join(LIB_ROOT_DIR, '__init__.py')
-
-
 if __name__ == '__main__':
 
     if typing.TYPE_CHECKING:
         import blend_converter
     else:
-        blend_converter = import_module_from_file(BLEND_CONVERTER_INIT_PY, 'blend_converter')
+        blend_converter = import_module_from_file(os.path.join(BC_ROOT, '__init__.py'), 'blend_converter')
 
     from blend_converter import utils
 

@@ -7,8 +7,7 @@ import sys
 import typing
 
 
-BLEND_CONVERTER_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-BLEND_CONVERTER_INIT_PY = os.path.join(BLEND_CONVERTER_ROOT_DIR, '__init__.py')
+BC_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
 def import_module_from_file(file_path: str, module_name: typing.Optional[str] = None):
@@ -46,7 +45,7 @@ def run(data: dict):
     try:
         import blend_converter
     except ImportError:
-        import_module_from_file(BLEND_CONVERTER_INIT_PY, 'blend_converter')
+        import_module_from_file(os.path.join(BC_ROOT, '__init__.py'), 'blend_converter')
         import blend_converter
 
 

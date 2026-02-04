@@ -6,7 +6,7 @@ import sys
 import json
 
 
-BLEND_CONVERTER_INIT = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), '__init__.py')
+BC_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
 def import_module_from_file(file_path: str, module_name: typing.Optional[str] = None):
@@ -32,7 +32,7 @@ def import_module_from_file(file_path: str, module_name: typing.Optional[str] = 
 if typing.TYPE_CHECKING:
     import blend_converter
 else:
-    blend_converter = import_module_from_file(BLEND_CONVERTER_INIT, 'blend_converter')
+    blend_converter = import_module_from_file(os.path.join(BC_ROOT, '__init__.py'), 'blend_converter')
 
 
 

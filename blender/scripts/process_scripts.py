@@ -16,7 +16,7 @@ import warnings
 import builtins
 
 
-BLEND_CONVERTER_INIT_PY = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))), '__init__.py')
+BC_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 SENTINEL = object()
 
@@ -161,7 +161,7 @@ def replace_return_values(value):
 if typing.TYPE_CHECKING:
     import blend_converter
 else:
-    blend_converter = import_module_from_file(BLEND_CONVERTER_INIT_PY, 'blend_converter')
+    blend_converter = import_module_from_file(os.path.join(BC_ROOT, '__init__.py'), 'blend_converter')
 
 
 from blend_converter import utils
