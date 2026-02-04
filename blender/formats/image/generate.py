@@ -89,7 +89,7 @@ def import_module_from_file(file_path: str, module_name: typing.Optional[str] = 
     return module
 
 
-LIB_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+LIB_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 BLEND_CONVERTER_INIT_PY = os.path.join(LIB_ROOT_DIR, '__init__.py')
 
 
