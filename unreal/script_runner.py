@@ -42,11 +42,8 @@ def run(data: dict):
         if module.startswith('blend_converter'):
             del sys.modules[module]
 
-    try:
-        import blend_converter
-    except ImportError:
-        import_module_from_file(os.path.join(BC_ROOT, '__init__.py'), 'blend_converter')
-        import blend_converter
+
+    import_module_from_file(os.path.join(BC_ROOT, '__init__.py'), 'blend_converter')
 
 
     for script in data['instructions']:
