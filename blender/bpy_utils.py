@@ -38,9 +38,11 @@ def get_view_layer_objects(view_layer: typing.Optional['bpy.types.ViewLayer'] = 
     https://projects.blender.org/blender/blender/issues/113378
     """
     if view_layer is None:
-        return list(filter(None, bpy.context.view_layer.objects))
-    else:
-        return list(filter(None, view_layer.objects))
+        view_layer =  bpy.context.view_layer
+
+    view_layer.update()
+
+    return list(filter(None, view_layer.objects))
 
 
 def iter_bone_names(action: bpy.types.Action):
@@ -229,7 +231,6 @@ def make_object_data_independent_from_other(objects: bpy.types.Object):
 
 def _focus(objects: typing.List[bpy.types.Object], view_layer: 'bpy.types.ViewLayer'):
 
-    view_layer.update()
     view_layer_objects = get_view_layer_objects(view_layer)
 
     for object in view_layer_objects:

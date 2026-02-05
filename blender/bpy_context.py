@@ -1460,8 +1460,7 @@ class Focus:
 
         bpy.data.collections.remove(visible_collection)
 
-        view_layer.update()
-        scene_objects = set(list(filter(None, view_layer.objects)))
+        scene_objects = set(bpy_utils.get_view_layer_objects(view_layer))
 
         for object, state in affected:
             if object in scene_objects and object.visible_get(view_layer=view_layer) != state[1]:
