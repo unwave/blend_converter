@@ -65,6 +65,7 @@ def create_simplified_armature_and_constrain(armature: bpy.types.Object, deform_
 
     # copy the armature
     new = armature.copy()
+    new.name = armature.name + '(simplified)'
     new.data = armature.data.copy()
 
 
