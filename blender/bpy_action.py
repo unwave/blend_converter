@@ -30,7 +30,7 @@ def assign_bendy_bone_segments_weights(armature: bpy.types.Object, mesh: bpy.typ
     Expects the armature in the rest pose.
     """
 
-    map_vertex_to_group = {vert.index: set(map(operator.attrgetter('group'), vert.groups)) for vert in mesh.data.vertices}
+    vertex_to_groups = {vert.index: {g.group: g.weight for g in vert.groups} for vert in mesh.data.vertices}
 
     armature_space_matrix = armature.matrix_world.inverted() @ mesh.matrix_world
 
@@ -49,10 +49,9 @@ def assign_bendy_bone_segments_weights(armature: bpy.types.Object, mesh: bpy.typ
 
         for vert in mesh.data.vertices:
 
-            if not group_index in map_vertex_to_group[vert.index]:
+            weight = vertex_to_groups[vert.index].get(group_index, 0)
+            if not weight:
                 continue
-
-            weight = bone_vertex_group.weight(vert.index)
 
             segment_group_index, blend_next = pose_bone.bbone_segment_index(armature_space_matrix @ vert.co)
 
