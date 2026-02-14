@@ -4,7 +4,7 @@ import json
 import subprocess
 import threading
 import itertools
-
+import shutil
 
 from . import utils
 from . import common
@@ -31,7 +31,9 @@ def show_program_diff_vscode(program: common.Program):
         old = write_file(temp_dir, 'old.json', json.dumps(a, indent=4, default= lambda x: x._to_dict()))
         new = write_file(temp_dir, 'new.json', json.dumps(b, indent=4, default= lambda x: x._to_dict()))
 
-        main_cmd = ['code', '--new-window', '--wait', '--diff', old, new]
+        code = shutil.which('code')
+
+        main_cmd = [code, '--new-window', '--wait', '--diff', old, new]
 
         commands = []
 
@@ -54,7 +56,7 @@ def show_program_diff_vscode(program: common.Program):
                 func2 = script_b[1] + '.py'
 
                 cmd = [
-                    'code',
+                    code,
                     '--reuse-window',
                     '--diff',
                     write_file(temp_dir, func1, script_a[3]),
