@@ -48,11 +48,8 @@ class COMMON:
     INSPECT_BLEND_OPEN = 'inspect:blend:open'
     """ inspect on blend_converter.blender.formats.blend.open_mainfile """
 
-    INSPECT_BLEND_FINAL = 'inspect:blend:final'
+    INSPECT_BLEND_FINAL = 'inspect:final'
     """ inspect the final blend """
-
-    INSPECT_ERROR = 'inspect:error'
-    """ inspect on a script error """
 
     INSPECT_BAKE_PRE = 'inspect:bake:pre'
     """ inspect before baking a texture """
