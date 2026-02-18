@@ -5,6 +5,7 @@ import typing
 import bpy
 import bmesh
 import mathutils
+import math
 
 from . import bpy_context
 from . import bpy_utils
@@ -107,7 +108,7 @@ def get_decimated_copy(high_poly: bpy.types.Object, target_triangles = 15000, st
     return low_poly
 
 
-def make_bake_cage(object: bpy.types.Object, cage_offset = 0.15, voxel_size = 0.02, number_of_steps = 3, solid_guide_object: typing.Optional[bpy.types.Object] = None):
+def make_bake_cage(object: bpy.types.Object, cage_offset_ratio = 0.05, voxel_count = 200, number_of_steps = 3, solid_guide_object: typing.Optional[bpy.types.Object] = None):
 
 
     bake_cage = copy_object(object, '__bc_cage')
@@ -116,6 +117,18 @@ def make_bake_cage(object: bpy.types.Object, cage_offset = 0.15, voxel_size = 0.
         guide_cage = copy_object(solid_guide_object, '__bc_cage_guide')
     else:
         guide_cage = copy_object(object, '__bc_cage_guide')
+
+    with bpy_context.Focus(guide_cage):
+        bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+        bpy.ops.object.transform_apply()
+
+    dimensions = guide_cage.evaluated_get(bpy.context.evaluated_depsgraph_get()).dimensions
+    quadratic_mean = math.sqrt((dimensions.x ** 2 + dimensions.y ** 2 + dimensions.z ** 2) / 3)
+
+    voxel_size = quadratic_mean / voxel_count
+    cage_offset = quadratic_mean * cage_offset_ratio
+
+    if not solid_guide_object:
         bpy_modifier.apply_solidify(guide_cage, voxel_size * 2)  # TODO: a better way to make it solid for the remesh to work
 
 
