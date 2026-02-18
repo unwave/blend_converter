@@ -952,13 +952,11 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             if settings.use_selected_to_active:
                 objects = [o for o in objects if bpy.context.view_layer.objects.active == o]
 
-            bpy_uv.clear_uv_layers_from_objects(objects, uv_layer_name, 'UVMap')
-
             material_name = settings.texture_name_prefix
             if not material_name:
                 material_name = bpy_utils.get_common_name(objects)
 
-            material = create_material(material_name, 'UVMap', images, k_map_identifier = settings._K_MAP_IDENTIFIER)
+            material = create_material(material_name, uv_layer_name, images, k_map_identifier = settings._K_MAP_IDENTIFIER)
             material[settings._K_MATERIAL_KEY] = settings.material_key
 
             for object in objects:
@@ -1041,9 +1039,6 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
 
             if settings.use_selected_to_active:
                 objects = [o for o in objects if bpy.context.view_layer.objects.active == o]
-
-            bpy_uv.clear_uv_layers_from_objects(objects, uv_layer_name, 'UVMap')
-
 
 
 def get_default_material() -> bpy.types.Material:
