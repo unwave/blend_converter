@@ -216,7 +216,7 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
 
 
     def __repr__(self):
-        return f"""< {self.bl_idname} "{self.identifier}" >"""
+        return f"<{self.bl_idname}, {repr(self.bl_socket)}>"
 
 
     def new(self, type, identifier: typing.Union[str, int] = 0, **attributes) -> _S_NODE:
@@ -665,7 +665,7 @@ class _Node_Wrapper(bpy.types.Node if typing.TYPE_CHECKING else _No_Type, typing
 
 
     def __repr__(self):
-        return f"""< {self.bl_idname} "{self.name}" >"""
+        return f"<{self.name}, {self.bl_idname}, {repr(self.tree.bl_tree)[9:]}>"
 
 
     def __getitem__(self, key: typing.Union[int, str]) -> typing.Optional['typing_extensions.Self']:
