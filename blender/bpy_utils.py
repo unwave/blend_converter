@@ -1649,9 +1649,33 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
             ensure_pixel_per_island(_bake_settings.resolution, material_key)
 
 
-            if settings.denoise_all:
+            def does_need_denoise(
+                        identifier: str,
+                        trees: typing.List[bpy_node.Shader_Tree_Wrapper] = [bpy_node.Shader_Tree_Wrapper(m.node_tree) for m in material_group]
+                    ):
 
-                view_space_normals_bake_type = tool_settings_bake.View_Space_Normal(use_denoise=settings.denoise_all)
+                for tree in trees:
+                    for node in tree.output['Surface'].inputs[identifier].iter_descendant_nodes_recursive():
+                        if node.bl_idname in ('ShaderNodeAmbientOcclusion', 'ShaderNodeBevel'):
+                            return True
+
+                return False
+
+            need_denoise = dict(
+                Normal = does_need_denoise(tool_settings_bake.Normal()._identifier),
+                Roughness = does_need_denoise(tool_settings_bake.Roughness()._identifier),
+                Metallic = does_need_denoise(tool_settings_bake.Metallic()._identifier),
+                Alpha = does_need_denoise(tool_settings_bake.Alpha()._identifier),
+                Emission = does_need_denoise(tool_settings_bake.Emission()._identifier),
+                Base_Color = does_need_denoise(tool_settings_bake.Base_Color()._identifier),
+            )
+
+            need_denoise = {key: (value and settings.denoise_all) for key, value in need_denoise.items()}
+
+
+            if any(need_denoise.values()):
+
+                view_space_normals_bake_type = tool_settings_bake.View_Space_Normal(use_denoise=need_denoise['Normal'])
 
                 pre_bake_settings = _bake_settings._get_copy()
 
@@ -1672,24 +1696,24 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
             orma = [
                 tool_settings_bake.AO_Diffuse(faster=settings.faster_ao_bake, environment_has_transparent_materials = environment_has_transparent_materials),
-                tool_settings_bake.Roughness(use_denoise=settings.denoise_all),
-                tool_settings_bake.Metallic(use_denoise=settings.denoise_all)
+                tool_settings_bake.Roughness(use_denoise=need_denoise['Roughness']),
+                tool_settings_bake.Metallic(use_denoise=need_denoise['Metallic'])
             ]
 
             if material_key == alpha_material_key:
-                orma.append(tool_settings_bake.Alpha(use_denoise=settings.denoise_all))
+                orma.append(tool_settings_bake.Alpha(use_denoise=need_denoise['Alpha']))
 
             bake_types.append(orma)
 
 
             if any(material[Material_Bake_Type.HAS_EMISSION] for material in material_group):
-                bake_types.append(tool_settings_bake.Emission(use_denoise=settings.denoise_all))
+                bake_types.append(tool_settings_bake.Emission(use_denoise=need_denoise['Emission']))
 
             if any(material[Material_Bake_Type.HAS_NORMALS] for material in material_group):
-                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name, use_denoise=settings.denoise_all))
+                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name, use_denoise=need_denoise['Normal']))
 
 
-            bake_types.append([tool_settings_bake.Base_Color(use_denoise=settings.denoise_all)])
+            bake_types.append([tool_settings_bake.Base_Color(use_denoise=need_denoise['Base_Color'])])
 
 
             _bake_settings.material_key = material_key
@@ -1912,11 +1936,22 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
 
         materials = [m for m in get_unique_materials(objects) if m.get(prebake_label) and m.get(original_material_key)]
 
+        use_denoise = False
+
         _materials: typing.List[bpy.types.Material] = []
         for material in materials:
             tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
-            if any(node.label == prebake_label for node in tree.output.inputs[0].descendants):
+
+            for node in tree.output.inputs[0].descendants:
+
+                if node.label != prebake_label:
+                    continue
+
                 _materials.append(material)
+
+                use_denoise = use_denoise or any(n.bl_idname in ('ShaderNodeAmbientOcclusion', 'ShaderNodeBevel') for n in node.inputs[0].iter_descendant_nodes_recursive())
+
+                break
 
         materials = _materials
 
@@ -1925,7 +1960,7 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
         for material in materials:
             material[map_id] = True
 
-        settings.bake_types = [tool_settings_bake.Buffer_Factor(node_label=prebake_label, _identifier = 'buffer' + map_id)]
+        settings.bake_types = [tool_settings_bake.Buffer_Factor(node_label=prebake_label, _identifier = 'buffer' + map_id, use_denoise = use_denoise)]
 
         settings.material_key = map_id
 

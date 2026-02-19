@@ -532,6 +532,35 @@ class _Socket_Wrapper(bpy.types.NodeSocketColor if typing.TYPE_CHECKING else _No
             return self.default_value
 
 
+    def iter_descendant_nodes_recursive(self):
+        """ #### The nodes returned by this generator may belong to different wrappers. """
+
+        seen = set()
+        pool = self.connections.copy()
+
+        while pool:
+
+            socket = pool.pop()
+            node = socket.node
+
+            if node in seen:
+                continue
+            seen.add(node)
+
+            yield node
+
+            if node.bl_idname.endswith('NodeGroup') and node.node_tree:
+
+                tree: _Tree_Wrapper = type(self.node.tree)(node.node_tree)
+
+                for inner_node in tree:
+                    if inner_node.bl_idname == 'NodeGroupOutput' and inner_node.is_active_output:
+                        yield inner_node
+                        yield from inner_node.inputs[socket.identifier].iter_descendant_nodes_recursive()
+
+            pool.extend(other for input in node.inputs for other in input.connections)
+
+
 def _get_socket_debug_info(socket: 'bpy.types.NodeSocket'):
     return (
         "\n\t\t" f"type: {socket.type}"
