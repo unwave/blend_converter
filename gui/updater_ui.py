@@ -1043,7 +1043,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         command = [
             sys.executable,
-            *argv,
+            utils.get_command_from_list(argv),  # https://github.com/python/cpython/issues/64650
             utils.get_command_from_list(['__restart__', json.dumps(restart_info)]),
         ]
 
