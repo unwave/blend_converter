@@ -11,7 +11,15 @@ def save_as_mainfile(filepath: str, compress = True, relative_remap = True, copy
     else:
         bpy.context.user_preferences.filepaths.save_version = 0
 
-    if bpy.data.filepath and os.path.exists(filepath) and os.path.samefile(filepath, bpy.data.filepath):
+    if (
+                bpy.data.filepath
+                and
+                os.path.exists(filepath)
+                and
+                os.path.exists(bpy.data.filepath)
+                and
+                os.path.samefile(filepath, bpy.data.filepath)
+            ):
         raise Exception(f"Should not save the blend file in the same location: {filepath}")
 
     os.makedirs(os.path.dirname(filepath), exist_ok = True)
