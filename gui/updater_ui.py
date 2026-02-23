@@ -826,7 +826,6 @@ class Main_Frame(wxp_utils.Generic_Frame):
         updater.stdout_line_printed = lambda entry: wx.PostEvent(self, Event_Stdout_Line_Printed(entry=entry))
         updater.stderr_line_printed = lambda entry: wx.PostEvent(self, Event_Stderr_Line_Printed(entry=entry))
 
-        self.SetDoubleBuffered(True)
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
 

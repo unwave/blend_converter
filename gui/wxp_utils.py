@@ -839,7 +839,6 @@ class Generic_Frame(wx.Frame):
     def __init__(self, parent, app_id_name = 'my_test', font: typing.Optional[wx.Font] = None, icon: typing.Optional[wx.Icon] = None, **kwargs):
         super().__init__(parent, **kwargs)
 
-        self.SetDoubleBuffered(True)
 
         if font:
             self.SetFont(font)
