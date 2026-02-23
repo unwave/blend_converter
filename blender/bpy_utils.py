@@ -354,7 +354,7 @@ def join_objects(objects: typing.List[bpy.types.Object], *, join_into: typing.Op
         join_into = objects[0]
 
 
-    incompatible_objects = set(objects) - set(get_joinable_objects(objects))
+    incompatible_objects = set(objects) - set(o for o in objects if o.type == 'MESH' and o.data.vertices)
     if incompatible_objects:
         raise ValueError(
             f"Specified objects cannot be joined: {[o.name_full for o in objects]}"
@@ -368,9 +368,6 @@ def join_objects(objects: typing.List[bpy.types.Object], *, join_into: typing.Op
 
         for object in objects:
             joined_objects_info[get_object_info_key(object)] = get_object_info(object)
-
-
-    objects = convert_to_mesh(objects)
 
 
     # if there are more than 8 unique uv layer names among the objects there are not going to be preserved
