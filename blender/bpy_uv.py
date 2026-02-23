@@ -816,7 +816,7 @@ def uv_packer_pack(
         uvp_padding: int,
         uvp_prerotate: bool,
         uvp_rescale = False,
-        use_high_quality_engine = True
+        use_high_quality_engine = False
     ):
 
     uv_packer_props: uv_packer.UVPackProperty = bpy.context.scene.UVPackerProps
@@ -957,7 +957,7 @@ def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_
         if blend_inspector.has_identifier(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_PACK):
             pass
         elif settings.use_uv_packer_addon and settings.use_uv_packer_for_pre_packing and enable_uv_packer_addon():
-            uv_packer_pack(settings._actual_width, settings._actual_height, settings._actual_padding, settings.uvp_prerotate, settings.uvp_rescale, use_high_quality_engine=False)
+            uv_packer_pack(settings._actual_width, settings._actual_height, settings._actual_padding, settings.uvp_prerotate, settings.uvp_rescale)
         else:
             aabb_pack(merge_overlap=settings.merge_overlap)
 
@@ -1883,7 +1883,7 @@ def get_unwrap_quality_measures(object: bpy.types.Object, uv_layer_name: str, cl
             bpy.ops.uv.select_all(action='SELECT')
             bpy.ops.uv.pin(clear=True)
 
-            uv_packer_pack(2048, 2048, 4, True, False, use_high_quality_engine = False)
+            uv_packer_pack(2048, 2048, 4, True, False)
 
         _, _,  texel_density_deviation, area_ratios_deviation = get_texel_density_for_uv_quality(object, uv_layer_name)
 
