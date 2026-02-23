@@ -220,9 +220,13 @@ def skipable(*identifier: str):
     return decorator
 
 
-def inspect_if_has_identifier(*identifier: str):
+def inspect_if_has_identifier(*identifier: str, name = ''):
     if has_identifier(*identifier):
-        inspect_blend(' | '.join(_identifiers & set(identifier)))
+
+        if not name:
+            name = ' | '.join(_identifiers & set(identifier))
+
+        inspect_blend(name)
         return True
     else:
         return False
