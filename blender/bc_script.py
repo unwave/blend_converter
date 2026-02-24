@@ -126,23 +126,11 @@ def apply_scale(objects: Objects_Like = None):
 
     objects = get_objects_fallback(objects)
 
-    objects = [o for o in objects if o.scale != (1,1,1)]
+    bpy_utils.make_object_data_unique(objects)
 
-    objects = bpy_utils.get_unique_data_objects(objects)
+    with bpy_context.Focus(objects):
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
-    for object in objects:
-
-        translation, rotation, scale = object.matrix_basis.decompose()
-
-        scale_matrix = mathutils.Matrix.Diagonal(scale).to_4x4()
-
-        if hasattr(object.data, "transform"):
-            object.data.transform(scale_matrix)
-
-        for child in object.children:
-            child.matrix_local = scale_matrix @ child.matrix_local
-
-        object.matrix_basis = mathutils.Matrix.Translation(translation) @ rotation.to_matrix().to_4x4()
 
 
 def add_actions_to_nla(regex: typing.Optional[str] = None):
