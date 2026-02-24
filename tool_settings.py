@@ -948,14 +948,6 @@ class Bake(Settings):
     """
 
 
-    create_materials: bool = True
-    """
-    After the baking replace the materials with the new ones made from baked textures.
-
-    #### Default: `True`
-    """
-
-
     isolate_objects: bool = True
     """
     Isolate baking objects from other objects in the scene.

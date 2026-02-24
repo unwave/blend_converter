@@ -19,11 +19,9 @@ from .. import utils
 from . import bpy_node
 from . import bpy_context
 from . import bpy_utils
-from . import bpy_uv
 from . import bake_settings
 from . import blend_inspector
 from . import communication
-from . import bpy_material
 
 
 
@@ -825,24 +823,6 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             images = bake_images(objects, uv_layer_name, settings)
         settings._images.extend(images)
 
-        if settings.create_materials:
-
-            if settings.use_selected_to_active:
-                objects = [o for o in objects if bpy.context.view_layer.objects.active == o]
-
-            material_name = settings.texture_name_prefix
-            if not material_name:
-                material_name = bpy_utils.get_common_name(objects)
-
-            material = bpy_material.create_material(material_name, uv_layer_name, images, k_map_identifier = settings._K_MAP_IDENTIFIER)
-            material[settings._K_MATERIAL_KEY] = settings.material_key
-
-            for object in objects:
-                mesh: bpy.types.Mesh = object.data
-
-                mesh.materials.clear()
-                mesh.materials.append(material)
-
     elif settings.merge_materials and settings.material_key:
 
         materials_to_bake = [m for m in bpy.data.materials if m.get(settings.material_key)]
@@ -878,45 +858,19 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             images = bake_images(objects_in_group, uv_layer_name, settings)
         settings._images.extend(images)
 
-        if settings.create_materials:
-
-            if settings.use_selected_to_active:
-                objects_in_group = [o for o in objects_in_group if bpy.context.view_layer.objects.active == o]
-
-            material_name = settings.texture_name_prefix
-            if not material_name:
-                material_name = bpy_utils.get_common_name(materials_to_bake)
-
-            material = bpy_material.create_material(material_name, uv_layer_name, images, k_map_identifier = settings._K_MAP_IDENTIFIER)
-            material[settings._K_MATERIAL_KEY] = settings.material_key
-
-            for object in objects_in_group:
-
-                object.data.uv_layers.active = object.data.uv_layers[uv_layer_name]
-
-                for slot in object.material_slots:
-                    if slot.material in materials_to_bake:
-                        slot.material = material
-
     else:
         objects_by_material = bpy_utils.group_objects_by_material(objects)
 
         for material, _objects in objects_by_material.items():
 
-            print_bold('\nMaterial Baking: ', material.name_full, '\nfor objects:', [o.name_full for o in _objects])
+            print_bold(
+                f"Material Baking: {material.name_full}",
+                "\n\t" f"For objects:, {[o.name_full for o in _objects]}"
+            )
 
             with communication.Suspend_Others():
                 images = bake_images(_objects, uv_layer_name, settings)
             settings._images.extend(images)
-
-            if settings.create_materials:
-                material = bpy_material.create_material(material.name, uv_layer_name, images, material, k_map_identifier = settings._K_MAP_IDENTIFIER)
-                material[settings._K_MATERIAL_KEY] = settings.material_key
-
-        if settings.create_materials:
-
-            if settings.use_selected_to_active:
-                objects = [o for o in objects if bpy.context.view_layer.objects.active == o]
 
 
 def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):

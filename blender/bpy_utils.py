@@ -993,7 +993,6 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
                 pre_bake_settings = _bake_settings._get_copy()
 
                 pre_bake_settings.image_dir = os.path.join(bpy.app.tempdir, '__bc_pre_baked')
-                pre_bake_settings.create_materials = False
                 pre_bake_settings.do_downscale = False
                 pre_bake_settings.use_anti_aliasing = False
                 pre_bake_settings.material_key = material_key
@@ -1091,26 +1090,29 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
                 bpy_bake.bake([bake_proxy], bake_settings)
 
 
+        ## create new materials
+        new_materials = {}
+
+        for bake_settings in bake_tasks:
+
+            material_name = bake_settings.texture_name_prefix
+            if not material_name:
+                material_name = get_common_name(objects)
+
+            new_materials[bake_settings.material_key] = bpy_material.create_material(
+                material_name,
+                bake_settings.uv_layer_name,
+                bake_settings._images,
+                k_map_identifier = bake_settings._K_MAP_IDENTIFIER
+            )
+
+
         ## assign the baked materials
-
-        def get_material(key: str):
-
-            for slot in bake_proxy.material_slots:
-
-                if not slot.material:
-                    continue
-
-                for bake_settings in bake_tasks:
-                    if slot.material.get(bake_settings._K_MATERIAL_KEY) == key:
-                        return slot.material
-
-
         for object in objects:
             for material_slot in object.material_slots:
                 for material_key in (opaque_material_key, alpha_material_key):
                     if material_slot.material.get(material_key):
-                        material_slot.material = get_material(material_key)
-
+                        material_slot.material = new_materials[material_key]
 
         bpy_material.merge_material_slots_with_the_same_materials(objects)
 
@@ -1238,7 +1240,6 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
     original_material_key = settings.material_key
 
     settings = tool_settings.Bake()._update(settings)
-    settings.create_materials = False
     settings.do_downscale = False
     settings.use_anti_aliasing = False
     settings.image_dir = os.path.join(bpy.app.tempdir, '__bc_pre_baked')
