@@ -38,6 +38,7 @@ if 'bpy' in sys.modules:
     from blend_converter.blender import blend_inspector
     from blend_converter.blender import bpy_mesh
     from blend_converter.blender import bpy_modifier
+    from blend_converter.blender import bpy_material
 
 
 
@@ -255,7 +256,7 @@ def convert_to_mesh(objects: Objects_Like):
 def make_materials_unique(objects: Objects_Like):
     """ Make a unique copy of a material for each material slot of an object. """
     for object in get_objects(objects):
-        bpy_utils.make_materials_unique(object)
+        bpy_material.make_materials_unique(object)
 
 
 def make_meshes_unique(objects: Objects_Like = None):
@@ -330,7 +331,7 @@ def remove_vertex_colors(objects: Objects_Like = None):
 
 def join_objects_respect_materials(objects: Objects_Like):
     objects = get_objects(objects)
-    bpy_utils.make_material_independent_from_object(objects)
+    bpy_material.make_material_independent_from_object(objects)
     return bpy_utils.join_objects(objects)
 
 

@@ -23,6 +23,7 @@ from . import bpy_uv
 from . import bake_settings
 from . import blend_inspector
 from . import communication
+from . import bpy_material
 
 
 
@@ -814,129 +815,6 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
     return [image.final_image for image in baking_images if image.final_image]
 
 
-def get_gltf_settings_node_tree():
-    node_tree = bpy.data.node_groups.get('glTF Settings')
-    if node_tree:
-        return node_tree
-
-    node_tree: bpy.types.ShaderNodeTree = bpy.data.node_groups.new('glTF Settings', 'ShaderNodeTree')
-
-    if hasattr(node_tree, 'interface'):
-        node_tree.interface.new_socket(name='Occlusion', in_out='INPUT', socket_type='NodeSocketFloat')
-        node_tree.interface.items_tree['Occlusion'].default_value = 0.5
-    else:
-        node_tree.inputs.new('NodeSocketFloatFactor', 'Occlusion')
-        node_tree.inputs['Occlusion'].default_value = 0.5
-
-    return node_tree
-
-
-def create_material(
-            name: str,
-            uv_layer: str,
-            images: typing.Iterable[bpy.types.Image],
-            material: typing.Optional[bpy.types.Material] = None,
-            k_map_identifier = tool_settings.Bake._K_MAP_IDENTIFIER
-        ):
-
-    do_reset = False
-
-    if not material:
-        material = bpy.data.materials.new(name)
-        if bpy.app.version < (5, 0):
-            material.use_nodes = True
-    else:
-        do_reset = True
-
-    tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
-    if do_reset:
-        tree.reset_nodes()
-
-    principled = tree.output['Surface']
-
-    uv_node = tree.new('ShaderNodeUVMap')
-    uv_node.uv_map = uv_layer
-    x, y = uv_node.location
-    uv_node.location = (x - 500, y)
-
-
-    def get_gltf_settings_node():
-        node = tree.bl_tree.nodes.get('glTF Settings')
-        if node:
-            return tree[node]
-
-        node = tree.new('ShaderNodeGroup', node_tree = get_gltf_settings_node_tree())
-        node.name = 'glTF Settings'
-        return node
-
-
-    def get_input(identifier):
-        if identifier == bake_settings._AO._identifier:
-            return get_gltf_settings_node().inputs[0]
-        else:
-            socket = principled.inputs.get(identifier)
-            if socket is None:
-                print("Unexpected image type:", map_identifier)
-                return tree.new('NodeReroute').inputs[0]
-            else:
-                return socket
-
-
-    for image in images:
-
-        map_identifier = list(image[k_map_identifier].keys())
-
-        if len(map_identifier) in (1,2):
-            input = get_input(map_identifier[0])
-
-            image_node = input.new('ShaderNodeTexImage', image = image)
-
-            uv_node.outputs[0].join(image_node.inputs['Vector'], False)
-
-            if map_identifier[0] in NORMAL_SOCKETS:
-                normal_map_node = image_node.outputs[0].new('ShaderNodeNormalMap', 'Color')
-                normal_map_node.uv_map = uv_layer
-                normal_map_node.outputs[0].join(input)
-
-        elif len(map_identifier) in (3, 4):
-
-            for index, _identifier in enumerate(map_identifier[:3]):
-                if _identifier:
-                    non_none_index = index
-                    break
-            else:
-                continue
-
-            input = get_input(map_identifier[non_none_index])
-
-            separate_rgb = input.new(bpy_node.Shader_Node_Type.SEPARATE_RGB)
-
-            image_node = separate_rgb.inputs[non_none_index].new('ShaderNodeTexImage', image = image)
-            uv_node.outputs[0].join(image_node.inputs['Vector'], False)
-
-            for index, _identifier in enumerate(map_identifier[:3]):
-
-                if not _identifier:
-                    continue
-
-                separate_rgb.outputs[index].join(get_input(_identifier), move = False)
-
-        if len(map_identifier) in (2, 4):
-            image_node.outputs[1].join(get_input(map_identifier[-1]))
-
-    if principled['Alpha']:
-        material.blend_method = 'HASHED'
-
-    if principled[bpy_node.Socket_Identifier.EMISSION]:
-        if 'Emission Strength' in principled.inputs.identifiers and not principled['Emission Strength']:
-            principled['Emission Strength'] = 1
-
-    if principled['Base Color']:
-        tree.bl_tree.nodes.active = principled['Base Color'].bl_node
-
-    return material
-
-
 def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
 
     uv_layer_name = settings.uv_layer_name
@@ -956,7 +834,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             if not material_name:
                 material_name = bpy_utils.get_common_name(objects)
 
-            material = create_material(material_name, uv_layer_name, images, k_map_identifier = settings._K_MAP_IDENTIFIER)
+            material = bpy_material.create_material(material_name, uv_layer_name, images, k_map_identifier = settings._K_MAP_IDENTIFIER)
             material[settings._K_MATERIAL_KEY] = settings.material_key
 
             for object in objects:
@@ -1009,7 +887,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             if not material_name:
                 material_name = bpy_utils.get_common_name(materials_to_bake)
 
-            material = create_material(material_name, uv_layer_name, images, k_map_identifier = settings._K_MAP_IDENTIFIER)
+            material = bpy_material.create_material(material_name, uv_layer_name, images, k_map_identifier = settings._K_MAP_IDENTIFIER)
             material[settings._K_MATERIAL_KEY] = settings.material_key
 
             for object in objects_in_group:
@@ -1032,25 +910,13 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             settings._images.extend(images)
 
             if settings.create_materials:
-                material = create_material(material.name, uv_layer_name, images, material, k_map_identifier = settings._K_MAP_IDENTIFIER)
+                material = bpy_material.create_material(material.name, uv_layer_name, images, material, k_map_identifier = settings._K_MAP_IDENTIFIER)
                 material[settings._K_MATERIAL_KEY] = settings.material_key
 
         if settings.create_materials:
 
             if settings.use_selected_to_active:
                 objects = [o for o in objects if bpy.context.view_layer.objects.active == o]
-
-
-def get_default_material() -> bpy.types.Material:
-
-    material = bpy.data.materials.get('__bc_default_material')
-    if not material:
-        material = bpy.data.materials.new('__bc_default_material')
-        if bpy.app.version < (5, 0):
-            material.use_nodes = True
-
-    return material
-
 
 
 def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):

@@ -26,6 +26,9 @@
 			"dist": true,
 			"build": true,
 		},
+		"python.analysis.exclude": [
+			"**/_other", "**/external", "**/build"
+		],
 		"python.analysis.diagnosticSeverityOverrides": {
 			"reportInvalidTypeForm": "none"
 		},

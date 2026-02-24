@@ -19,6 +19,7 @@ from ..blender import bpy_node
 from ..blender import bpy_context
 from ..blender import bpy_uv
 from ..blender import bpy_mesh
+from ..blender import bpy_material
 
 
 
@@ -459,7 +460,7 @@ def scale_uv_to_world_per_uv_island(operator: bpy.types.Operator, context: bpy.t
 )
 def join_objects_respect_materials(operator: bpy.types.Operator, context: bpy.types.Context):
     objects = context.selected_objects
-    bpy_utils.make_material_independent_from_object(objects)
+    bpy_material.make_material_independent_from_object(objects)
     bpy_utils.join_objects(objects)
 
 
