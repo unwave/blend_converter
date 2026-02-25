@@ -19,9 +19,6 @@ import re
 import itertools
 import uuid
 
-import bpy
-import mathutils
-import bmesh
 
 from . import bpy_context
 from . import bpy_utils
@@ -30,6 +27,20 @@ from . import blend_inspector
 from .. import utils
 from .. import tool_settings
 from .. import common
+
+
+if utils.is_in_blender():
+
+    import bpy
+    import mathutils
+    import bmesh
+
+elif not typing.TYPE_CHECKING:
+
+    bpy = utils.Dummy()
+    mathutils = utils.Dummy()
+    bmesh = utils.Dummy()
+
 
 
 def ensure_uv_layer(objects: typing.List[bpy.types.Object], name: str, *, init_from: str = '', init_from_does_not_exist_ok = False):

@@ -1204,3 +1204,50 @@ def disable_buffering():
         pointer = lib.__acrt_iob_func(index)
 
         lib.setvbuf(pointer, None, _IONBF, 0)
+
+
+def is_in_blender():
+
+    if 'bpy' in sys.modules:
+        import bpy
+        return bool(bpy.app.version) and bool(bpy.app.binary_path)
+    else:
+        return False
+
+
+class Dummy:
+
+    def __getattribute__(self, key):
+
+        if key.startswith('__') and key.endswith('__'):
+            return super().__getattribute__(key)
+
+        return self
+
+    def __getattr__(self, key):
+        return self
+
+    def __getitem__(self, key):
+        return self
+
+    def __call__(self, *args, **kwargs):
+
+        if len(args) == 1 and callable(args[0]):
+            return args[0]
+        else:
+            return self
+
+    def __mro_entries__(self, bases):
+        return (object,)
+
+    def __lt__(self, other):
+        return False
+
+    def __gt__(self, other):
+        return False
+
+    def __le__(self, other):
+        return False
+
+    def __ge__(self, other):
+        return False

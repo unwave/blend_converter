@@ -21,6 +21,9 @@ def get_bake_program(blend_dir: str, blender_executable: str):
     from blend_converter import utils
     from blend_converter import tool_settings
 
+    from blend_converter.blender import bpy_utils
+    from blend_converter.blender import bpy_uv
+
 
     blend_path = common.File(utils.get_last_blend(blend_dir))
     result_dir = get_result_dir(blend_dir)
@@ -51,13 +54,13 @@ def get_bake_program(blend_dir: str, blender_executable: str):
 
 
 
-    program.run(blender, bc_script.scale_uv_to_world_per_uv_island, objects, uv_layer_name)
+    program.run(blender, bpy_uv.scale_uv_to_world_per_uv_island, objects, uv_layer_name)
 
-    program.run(blender, bc_script.scale_uv_to_world_per_uv_layout, objects, uv_layer_name)
+    program.run(blender, bpy_uv.scale_uv_to_world_per_uv_layout, objects, uv_layer_name)
 
-    program.run(blender, bc_script.apply_modifiers, objects)
+    program.run(blender, bpy_utils.apply_modifiers, objects)
 
-    program.run(blender, bc_script.pack_copy_bake, objects, settings)
+    program.run(blender, bpy_utils.pack_copy_bake, objects, settings)
 
 
     program.run(blender, bc_script.select_uv_layer, objects, uv_layer_name)

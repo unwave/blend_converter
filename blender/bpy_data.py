@@ -1,9 +1,21 @@
 """ Utilities for `bpy.data` and blend files.  """
 
-import bpy
 import os
+import typing
+
 
 from .. import common
+from .. import utils
+
+
+if utils.is_in_blender():
+
+    import bpy
+
+elif not typing.TYPE_CHECKING:
+
+    bpy = utils.Dummy()
+
 
 
 def load_compositor_node_tree(name: str) -> bpy.types.CompositorNodeTree:

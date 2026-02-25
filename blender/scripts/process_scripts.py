@@ -132,8 +132,14 @@ def replace_return_values(value):
         for sub_value in value:
             if sub_value in INSTRUCTIONS:
                 new_value.append(return_values[INSTRUCTIONS.index(sub_value)])
-            elif type(sub_value) in (list, dict):
+            elif type(sub_value) is list:
                 new_value.append(replace_return_values(sub_value))
+            elif type(sub_value) is dict:
+                _bc_settings_name = sub_value.get('_bc_settings_name')
+                if _bc_settings_name:
+                    new_value.append(replace_return_values(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value)))
+                else:
+                    new_value.append(replace_return_values(sub_value))
             else:
                 new_value.append(sub_value)
 
@@ -146,25 +152,62 @@ def replace_return_values(value):
         for key, sub_value in value.items():
             if sub_value in INSTRUCTIONS:
                 new_value[key] = return_values[INSTRUCTIONS.index(sub_value)]
-            elif type(sub_value) in (list, dict):
+            elif type(sub_value) is list:
                 new_value[key] = replace_return_values(sub_value)
+            elif type(sub_value) is dict:
+                _bc_settings_name = sub_value.get('_bc_settings_name')
+                if _bc_settings_name:
+                    new_value[key] = replace_return_values(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value))
+                else:
+                    new_value[key] = replace_return_values(sub_value)
             else:
                 new_value[key] = sub_value
 
         return new_value
 
+    elif isinstance(value, tool_settings.Settings):
+
+        for key in value.__dict__:
+
+            if key.startswith('_'):
+                continue
+
+            if not key in value._has_been_set:
+                continue
+
+            sub_value = getattr(value, key)
+
+            if sub_value in INSTRUCTIONS:
+                new_value = return_values[INSTRUCTIONS.index(sub_value)]
+            elif type(sub_value) is list:
+                new_value = replace_return_values(sub_value)
+            elif type(sub_value) is dict:
+                _bc_settings_name = sub_value.get('_bc_settings_name')
+                if _bc_settings_name:
+                   new_value = replace_return_values(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value))
+                else:
+                    new_value = replace_return_values(sub_value)
+            else:
+                new_value = sub_value
+
+            setattr(value, key, new_value)
+
+        return value
+
     else:
         raise Exception(f"Unexpected args type: {value}")
 
 
+CANONICAL_NAME = 'blend_converter'
 
 if typing.TYPE_CHECKING:
     import blend_converter
 else:
-    blend_converter = import_module_from_file(os.path.join(BC_ROOT, '__init__.py'), 'blend_converter')
+    blend_converter = import_module_from_file(os.path.join(BC_ROOT, '__init__.py'), CANONICAL_NAME)
 
 
 from blend_converter import utils
+from blend_converter import tool_settings
 from blend_converter.blender import blend_inspector
 
 from blend_converter.blender import communication
@@ -194,15 +237,17 @@ def process():
 
             blend_inspector.inspect_if_has_identifier(f"inspect:script:pre={instruction['name']}")
 
-
-            append_sys_path(os.path.dirname(instruction['filepath']))
-
             utils.print_separator(char='█')
             utils.print_in_color(utils.get_color_code(256,256,256, 0, 150, 255), 'SCRIPT:', instruction['name'], "...", flush=True)
 
             script_start_time = time.perf_counter()
 
-            module = import_module_from_file(instruction['filepath'])
+            if instruction['module_name'].startswith(CANONICAL_NAME + '.'):
+                module = importlib.import_module(instruction['module_name'][len(CANONICAL_NAME):], CANONICAL_NAME)
+            else:
+                append_sys_path(os.path.dirname(instruction['filepath']))
+                module = import_module_from_file(instruction['filepath'])
+
             result = getattr(module, instruction['name'])(*replace_return_values(instruction['args']), **replace_return_values(instruction['kwargs']))
             return_values[index] = result
 

@@ -1,15 +1,25 @@
 """ Utilities for working with modifiers. """
 
-
-import bpy
+import typing
 import math
 import os
+
 
 from .. import utils
 
 from . import bpy_context
 from . import bpy_node
 from . import bpy_mesh
+
+
+if utils.is_in_blender():
+
+    import bpy
+
+elif not typing.TYPE_CHECKING:
+
+    bpy = utils.Dummy()
+
 
 
 def move_modifier_to_first(modifier: bpy.types.Modifier):

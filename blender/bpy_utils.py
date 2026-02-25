@@ -13,11 +13,6 @@ import itertools
 import contextlib
 
 
-import bpy
-from bpy import utils as b_utils
-import mathutils
-import bmesh
-
 from . import bpy_bake
 from . import bpy_context
 from . import bake_settings as tool_settings_bake
@@ -28,6 +23,22 @@ from . import bpy_material
 
 from .. import tool_settings
 from .. import utils
+
+
+if utils.is_in_blender():
+
+    import bpy
+    from bpy import utils as b_utils
+    import mathutils
+    import bmesh
+
+elif not typing.TYPE_CHECKING:
+
+    bpy = utils.Dummy()
+    b_utils = utils.Dummy()
+    mathutils = utils.Dummy()
+    bmesh = utils.Dummy()
+
 
 
 T_Objects = typing.TypeVar('T_Objects', bpy.types.Object, typing.List[bpy.types.Object], typing.Iterable[bpy.types.Object])

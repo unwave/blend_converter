@@ -10,9 +10,6 @@ import re
 import math
 import collections
 
-import bpy
-from bpy import utils as b_utils
-import mathutils
 
 from . import bpy_node
 from . import bpy_utils
@@ -21,6 +18,20 @@ from . import blend_inspector
 
 from .. import utils
 from .. import tool_settings
+
+
+if utils.is_in_blender():
+
+    import bpy
+    from bpy import utils as b_utils
+    import mathutils
+
+elif not typing.TYPE_CHECKING:
+
+    bpy = utils.Dummy()
+    b_utils = utils.Dummy()
+    mathutils = utils.Dummy()
+
 
 
 TOPOLOGY_CHANGING_MODIFIER_TYPES = {

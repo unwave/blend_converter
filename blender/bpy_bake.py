@@ -10,8 +10,6 @@ import sys
 import re
 import math
 
-import bpy
-
 
 from .. import tool_settings
 from .. import utils
@@ -22,6 +20,14 @@ from . import bpy_utils
 from . import bake_settings
 from . import blend_inspector
 from . import communication
+
+
+if utils.is_in_blender():
+    import bpy
+
+elif not typing.TYPE_CHECKING:
+    bpy = utils.Dummy()
+
 
 
 
@@ -323,7 +329,7 @@ class Baked_Image:
             if bpy.app.version >= (5, 0):
                 file_node.format.media_type = 'IMAGE'
 
-            for key, value in self.image_file_settings._to_dict().items():
+            for key, value in self.image_file_settings.items():
                 setattr(file_node.format, key, value)
 
             if bpy.app.version >= (5, 0):

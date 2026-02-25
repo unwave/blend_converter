@@ -6,14 +6,26 @@ import math
 import heapq
 
 
-import bpy
-import bmesh
-import mathutils
 
 from .. import tool_settings
 
 from . import bpy_context
 from . import bpy_utils
+
+from .. import utils
+
+if utils.is_in_blender():
+
+    import bpy
+    import mathutils
+    import bmesh
+
+elif not typing.TYPE_CHECKING:
+
+    bpy = utils.Dummy()
+    mathutils = utils.Dummy()
+    bmesh = utils.Dummy()
+
 
 
 if typing.TYPE_CHECKING:

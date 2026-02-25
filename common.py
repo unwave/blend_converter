@@ -108,6 +108,7 @@ class Instruction:
         self.index = index
         self.executor = executor
         self.filepath: str = os.path.realpath(func.__code__.co_filename)
+        self.module_name = func.__module__
         self.name: str = func.__name__
         self.args: typing.List[typing.Any] = list(args)
         self.kwargs: typing.Dict[str, typing.Any] = kwargs
@@ -121,6 +122,7 @@ class Instruction:
             index = self.index,
             executor = self.executor,
             filepath = self.filepath,
+            module_name = self.module_name,
             name = self.name,
             args = self.args,
             kwargs = self.kwargs,

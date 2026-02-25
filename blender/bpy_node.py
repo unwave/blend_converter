@@ -4,13 +4,23 @@ import math
 import operator
 import typing
 
-import bpy
-
 if typing.TYPE_CHECKING:
     import typing_extensions
 
 
 from . import bpy_context
+
+from .. import utils
+
+
+if utils.is_in_blender():
+
+    import bpy
+
+elif not typing.TYPE_CHECKING:
+
+    bpy = utils.Dummy()
+
 
 
 VALIDATE_NEW_LINKS = True

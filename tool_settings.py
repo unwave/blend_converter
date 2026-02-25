@@ -278,7 +278,7 @@ class Settings():
 
         settings = type(self)()
 
-        for key, value in self._to_dict().items():
+        for key, value in self.items():
 
             if isinstance(value, Settings):
                 setattr(settings, key, value._get_copy())
@@ -334,6 +334,9 @@ class Settings():
 
         for key, value in data.items():
 
+            if key == '_bc_settings_name':
+                continue
+
             if only_matching and not key in cls.__annotations__:
                 continue
 
@@ -366,6 +369,8 @@ class Settings():
             else:
                 data[key] = value
 
+        if self.__class__.__name__ in globals():
+            data['_bc_settings_name'] = self.__class__.__name__
 
         return data
 
@@ -383,7 +388,7 @@ class Settings():
 
         command = []
 
-        for key, value in self._to_dict().items():
+        for key, value in self.items():
 
             spec = self._get_attribute_spec(key)
 
@@ -467,6 +472,11 @@ class Settings():
             return list(value)
         else:
             return value
+
+
+    def items(self):
+        for key in self:
+            yield key, self[key]
 
 
 FILE_EXTENSION = dict(

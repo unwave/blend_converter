@@ -5,10 +5,6 @@ import operator
 import random
 import typing
 import uuid
-
-import bpy
-import mathutils
-
 from .. import tool_settings
 from .. import utils
 
@@ -18,6 +14,19 @@ from . import bpy_node
 from . import bpy_utils
 from . import bpy_uv
 from . import bpy_modifier
+
+
+
+if utils.is_in_blender():
+
+    import bpy
+    import mathutils
+
+elif not typing.TYPE_CHECKING:
+
+    bpy = utils.Dummy()
+    mathutils = utils.Dummy()
+
 
 
 NORMAL_SOCKETS = {

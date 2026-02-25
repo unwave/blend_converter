@@ -1,15 +1,28 @@
 """ Utilities for mesh objects. """
 
 import typing
-
-import bpy
-import bmesh
-import mathutils
 import math
+
 
 from . import bpy_context
 from . import bpy_utils
 from . import bpy_modifier
+
+from .. import utils
+
+
+if utils.is_in_blender():
+
+    import bpy
+    import mathutils
+    import bmesh
+
+elif not typing.TYPE_CHECKING:
+
+    bpy = utils.Dummy()
+    mathutils = utils.Dummy()
+    bmesh = utils.Dummy()
+
 
 
 def create_object_from_selected_edit_mode_geometry():
