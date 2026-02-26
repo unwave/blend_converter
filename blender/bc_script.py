@@ -28,14 +28,9 @@ if 'bpy' in sys.modules:
 
     import re
     import bpy
-    import mathutils
-
-    from blend_converter import tool_settings
 
     from blend_converter.blender import bpy_context
     from blend_converter.blender import bpy_utils
-    from blend_converter.blender import bpy_uv
-    from blend_converter.blender import blend_inspector
     from blend_converter.blender import bpy_mesh
     from blend_converter.blender import bpy_modifier
     from blend_converter.blender import bpy_material
@@ -87,39 +82,16 @@ def get_objects(objects: Objects_Like) -> typing.List['bpy.types.Object']:
         return bpy_objects
 
 
-def get_view_layer_objects():
-    return bpy_utils.get_view_layer_objects()
-
-
 def get_objects_fallback(objects: Objects_Like = None):
     """
     Get a list of `bpy.types.Object` from different kinds of notations.
 
-    Same as `get_objects` but with a fallback to `get_view_layer_objects` if `objects` is `None`.
+    Same as `get_objects` but with a fallback to `bpy_utils.get_view_layer_objects` if `objects` is `None`.
     """
     if objects is None:
-        return get_view_layer_objects()
+        return bpy_utils.get_view_layer_objects()
     else:
         return get_objects(objects)
-
-
-def duplicates_make_real():
-    """ Convert particles to objects. """
-
-    if bpy.app.version > (2,80,0):
-        select_func = lambda object: object.select_set(True)
-    else:
-        select_func = lambda object: setattr(object, 'select', True)
-
-    for object in get_view_layer_objects():
-
-        if not any(modifier for modifier in object.modifiers if modifier.type == 'PARTICLE_SYSTEM' and modifier.show_viewport):
-            continue
-
-        bpy.ops.object.select_all(action='DESELECT')
-        select_func(object)
-
-        bpy.ops.object.duplicates_make_real()
 
 
 def apply_scale(objects: Objects_Like = None):
@@ -236,46 +208,10 @@ def create_default_root_bone():
             bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
 
 
-def convert_to_mesh(objects: Objects_Like):
-    """ Convert objects to mesh objects using `bpy.ops.object.convert`. """
-    return bpy_utils.convert_to_mesh(get_objects(objects))
-
-
 def make_materials_unique(objects: Objects_Like):
     """ Make a unique copy of a material for each material slot of an object. """
     for object in get_objects(objects):
         bpy_material.make_materials_unique(object)
-
-
-def make_meshes_unique(objects: Objects_Like = None):
-    """ Make a unique copy of a mesh data for each mesh object. """
-    bpy_utils.make_object_data_unique([object for object in get_objects_fallback(objects) if object.type == 'MESH'])
-
-
-def focus(objects: Objects_Like = None):
-    """
-    Deselect, unhide, select and make active the objects according to `bpy.context.view_layer`.
-
-    If `objects` is `None` then all objects will be used.
-
-    Returns the focused objects.
-    """
-    return bpy_utils.focus(get_objects_fallback(objects))
-
-
-def delete_objects_not_mentioned(objects: Objects_Like):
-    bpy.data.batch_remove(set(bpy.data.objects) - set(get_objects(objects)))
-
-
-def join_objects(objects: Objects_Like = None, object_name: str = None):
-    """
-    `bpy.ops.object.join` the objects.
-
-    If `objects` is `None` then `view_layer.objects` is used.
-
-    Returns the joined object.
-    """
-    return bpy_utils.join_objects(objects=get_objects_fallback(objects), name=object_name)
 
 
 def remove_all_node_groups_from_materials():
@@ -317,21 +253,11 @@ def remove_vertex_colors(objects: Objects_Like = None):
             data.vertex_colors.remove(data.vertex_colors[name])  # type: ignore
 
 
-def join_objects_respect_materials(objects: Objects_Like):
-    objects = get_objects(objects)
-    bpy_material.make_material_independent_from_object(objects)
-    return bpy_utils.join_objects(objects)
-
-
 def ensure_debugpy():
 
     from . import ensure_site_packages
     import site
     ensure_site_packages.ensure_site_packages([('debugpy', 'debugpy')], directory=site.getusersitepackages())
-
-
-def save_blend_as_copy(filepath: str, compress=True):
-    bpy.ops.wm.save_as_mainfile(filepath=filepath, copy=True, compress=compress)
 
 
 def reset_ui_layout():
@@ -344,31 +270,6 @@ def reset_ui_layout():
         bpy.ops.wm.open_mainfile(filepath = filepath, load_ui=False)
     except RuntimeError as e:
         print(e)
-
-
-def get_visible_objects():
-    return bpy_utils.get_visible_objects()
-
-
-def get_meshable_objects(objects: Objects_Like):
-    return bpy_utils.get_meshable_objects(get_objects(objects))
-
-
-@wraps(bpy_utils.pack_copy_bake if typing.TYPE_CHECKING else object)
-def pack_copy_bake(
-            objects: Objects_Like,
-            settings,
-            *,
-            bake_settings = None,
-            pack_settings = None,
-        ):
-
-    return bpy_utils.pack_copy_bake(
-        get_objects(objects),
-        tool_settings.S_Bake_Materials._from_dict(settings),
-        bake_settings = tool_settings.S_Bake._from_dict(bake_settings) if bake_settings else None,
-        pack_settings = tool_settings.S_Pack_UVs._from_dict(pack_settings) if pack_settings else None,
-    )
 
 
 def scene_clean_up():
@@ -391,39 +292,10 @@ def scene_clean_up():
     bpy.ops.outliner.orphans_purge()
 
 
-
-@wraps(bpy_utils.apply_modifiers if typing.TYPE_CHECKING else object)
-def apply_modifiers(objects: Objects_Like, *args, **kwargs):
-    bpy_utils.apply_modifiers(get_objects(objects), *args, **kwargs)
-
-
-
-@wraps(bpy_uv.unwrap if typing.TYPE_CHECKING else object)
-def unwrap(objects: Objects_Like, *args, **kwargs):
-
-    if 'settings' in kwargs:
-        kwargs['settings'] = tool_settings.S_Unwrap_UVs._from_dict(kwargs['settings'])
-
-    if 'ministry_of_flat_settings' in kwargs:
-        kwargs['ministry_of_flat_settings'] = tool_settings.S_Ministry_Of_Flat._from_dict(kwargs['ministry_of_flat_settings'])
-
-    return bpy_uv.unwrap(get_objects(objects), *args, **kwargs)
-
-
 @wraps(bpy_mesh.bisect_by_mirror_modifiers if typing.TYPE_CHECKING else object)
 def bisect_by_mirror_modifiers(objects: Objects_Like):
     for object in get_objects(objects):
         bpy_mesh.bisect_by_mirror_modifiers(object)
-
-
-@wraps(bpy_uv.scale_uv_to_world_per_uv_island if typing.TYPE_CHECKING else object)
-def scale_uv_to_world_per_uv_island(objects: Objects_Like, uv_layer_name: str = ''):
-    bpy_uv.scale_uv_to_world_per_uv_island(get_objects(objects), uv_layer_name = uv_layer_name)
-
-
-@wraps(bpy_uv.scale_uv_to_world_per_uv_layout if typing.TYPE_CHECKING else object)
-def scale_uv_to_world_per_uv_layout(objects: Objects_Like, uv_layer_name: str = ''):
-    bpy_uv.scale_uv_to_world_per_uv_layout(get_objects(objects), uv_layer_name = uv_layer_name)
 
 
 def clean_up_topology_and_triangulate_ngons(objects: Objects_Like = None, split_concave_faces = True, tris_to_quads = True):
@@ -453,11 +325,6 @@ def clean_up_topology_and_triangulate_ngons(objects: Objects_Like = None, split_
                     if split_concave_faces:
                         # might not be necessary but just in case
                         bpy.ops.mesh.vert_connect_concave()
-
-
-@wraps(bpy_utils.label_mix_shader_nodes if typing.TYPE_CHECKING else object)
-def label_mix_shader_nodes(objects: Objects_Like):
-    return bpy_utils.label_mix_shader_nodes(get_objects(objects))
 
 
 def do_nothing(*args, **kwargs):
