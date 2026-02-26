@@ -1570,7 +1570,14 @@ def unwrap_ministry_of_flat_with_fallback(
         ):
 
     settings = tool_settings.Unwrap_UVs()._update(settings)
-    ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(vertex_weld=False, rasterization_resolution=1, packing_iterations=1)._update(ministry_of_flat_settings)
+
+    ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(
+        stretch = False,
+        scale_uv_space_to_worldspace = True,
+        vertex_weld= False,
+        rasterization_resolution = 1,
+        packing_iterations = 1
+    )._update(ministry_of_flat_settings)
 
     for object in objects:
 
@@ -1623,7 +1630,11 @@ def unwrap_ministry_of_flat_with_fallback(
                 bpy.ops.mesh.select_all(action='SELECT')
                 bpy.ops.uv.select_all(action='SELECT')
                 bpy.ops.uv.pin(clear=True)
-                bpy.ops.uv.smart_project(angle_limit = math.radians(settings.smart_project_angle_limit))
+                bpy.ops.uv.smart_project(
+                    angle_limit = math.radians(settings.smart_project_angle_limit),
+                    scale_to_bounds=False,
+                    correct_aspect=False,
+                )
 
             do_reunwrap = settings.reunwrap_bad_uvs_with_minimal_stretch or settings.reunwrap_all_with_minimal_stretch
 
@@ -1643,6 +1654,7 @@ def unwrap_ministry_of_flat_with_fallback(
                         weight_group = settings.uv_importance_weight_group,
                         weight_factor = settings.uv_importance_weight_factor,
                         can_be_canceled=True,
+                        correct_aspect=False,
                     )
 
                 reunwrap_bad_uvs([object_copy])
