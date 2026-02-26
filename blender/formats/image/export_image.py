@@ -1,6 +1,7 @@
-import sys
 
-if 'bpy' in sys.modules:
+from .... import utils
+
+if utils.is_in_blender():
     import bpy
 
 

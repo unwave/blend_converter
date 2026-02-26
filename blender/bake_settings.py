@@ -3,15 +3,12 @@ import contextlib
 import sys
 
 
-if __package__:
-    from . import bpy_node
-    from .. import tool_settings
-    from . import bpy_context
-    from . import blend_inspector
-else:
-    from blend_converter import tool_settings
-    from blend_converter import blend_inspector
+from . import bpy_node
+from . import bpy_context
+from . import blend_inspector
 
+from .. import tool_settings
+from .. import utils
 
 if typing.TYPE_CHECKING:
     # need only __init__ hints
@@ -20,7 +17,7 @@ else:
     dataclass = lambda x: x
 
 
-if 'bpy' in sys.modules:
+if utils.is_in_blender():
     import bpy
 
 

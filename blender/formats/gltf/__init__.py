@@ -1,12 +1,8 @@
 import typing
 
 
-if __spec__.name == __name__:
-    from blend_converter.blender.formats.gltf.export_gltf import export_gltf
-    from blend_converter import tool_settings
-else:
-    from .export_gltf import export_gltf
-    from .... import tool_settings
+from .export_gltf import export_gltf
+from .... import tool_settings
 
 
 if typing.TYPE_CHECKING:

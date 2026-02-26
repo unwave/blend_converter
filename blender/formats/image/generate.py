@@ -15,10 +15,7 @@ IMPORTS = """
 import typing
 
 
-if __spec__.name == __name__:
-    from blend_converter import tool_settings
-else:
-    from .... import tool_settings
+from .... import tool_settings
 
 
 if typing.TYPE_CHECKING:

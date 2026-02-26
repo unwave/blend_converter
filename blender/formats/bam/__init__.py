@@ -7,10 +7,11 @@ import traceback
 import sys
 
 
-from .. import common
-from ... import utils
+from .... import common
+from .... import utils
+from .... import tool_settings
+
 from .. import gltf
-from ... import tool_settings
 
 
 if typing.TYPE_CHECKING:

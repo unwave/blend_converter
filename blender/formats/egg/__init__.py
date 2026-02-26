@@ -1,12 +1,8 @@
 import typing
 
 
-if __spec__.name == __name__:
-    from blend_converter.blender.formats.egg.export_egg import export_egg
-    from blend_converter import tool_settings
-else:
-    from .export_egg import export_egg
-    from .... import tool_settings
+from .export_egg import export_egg
+from .... import tool_settings
 
 
 

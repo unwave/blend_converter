@@ -2,11 +2,15 @@ import json
 import os
 import typing
 
-import bpy
 
-if typing.TYPE_CHECKING:
-    __KWARGS__: dict
-    __GLTF_PATH__: str
+from .. import bam
+
+from .... import utils
+
+
+if utils.is_in_blender():
+    import bpy
+
 
 
 def export_physics(gltf_data, invisible_collisions_collection: str):
@@ -136,7 +140,7 @@ def validate_image_paths(gltf_data: dict, gltf_path: str):
 
 
 
-def export_gltf():
+def export_gltf(__KWARGS__, __GLTF_PATH__):
 
     result_dir = os.path.dirname(__GLTF_PATH__)
     os.makedirs(result_dir, exist_ok=True)
@@ -145,7 +149,6 @@ def export_gltf():
     export_options_keys = rna_type.properties.keys()
     export_format_options = [item.identifier for item in rna_type.properties['export_format'].enum_items_static]
 
-    from blend_converter.format import bam
 
     gltf_settings = bam.S_Blender_Gltf._from_dict(__KWARGS__['gltf_settings'])
     gltf2bam_settings = bam.S_Gltf_2_Bam._from_dict(__KWARGS__['gltf2bam_settings'])
@@ -222,6 +225,3 @@ def export_gltf():
 
     with open(__GLTF_PATH__, 'w') as gltf_file:
         json.dump(gltf_data, gltf_file)
-
-
-export_gltf()

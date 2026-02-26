@@ -1,12 +1,8 @@
 import typing
 
 
-if __spec__.name == __name__:
-    from blend_converter.blender.formats.fbx.export_fbx import export_fbx
-    from blend_converter import tool_settings
-else:
-    from .export_fbx import export_fbx
-    from .... import tool_settings
+from .export_fbx import export_fbx
+from .... import tool_settings
 
 
 if typing.TYPE_CHECKING:
