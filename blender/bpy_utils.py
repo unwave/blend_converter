@@ -349,7 +349,7 @@ def join_objects(objects: typing.List[bpy.types.Object], *, join_into: typing.Op
         join_into = objects[0]
 
 
-    incompatible_objects = set(objects) - set(o for o in objects if o.type == 'MESH' and o.data.vertices)
+    incompatible_objects = set(objects) - set(o for o in objects if o.type == 'MESH' and (o.data.vertices or o == join_into))
     if incompatible_objects:
         raise ValueError(
             f"Specified objects cannot be joined: {[o.name_full for o in objects]}"
