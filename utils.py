@@ -564,12 +564,17 @@ def is_not_comment_line(line):
 
 @functools.lru_cache(None)
 def get_minimal_source_code(func: typing.Callable):
-    return '\n'.join(filter(is_not_comment_line, filter(None, (line.rstrip() for line in textwrap.dedent(inspect.getsource(func)).splitlines()))))
+    return '\n'.join(filter(is_not_comment_line, filter(None, (line.rstrip() for line in get_source(func).splitlines()))))
 
 
 @functools.lru_cache(None)
 def get_function_sha256(func: typing.Callable):
     return hashlib.sha256(get_minimal_source_code(func).encode()).hexdigest()
+
+
+@functools.lru_cache(None)
+def get_source(func: typing.Callable):
+    return textwrap.dedent(inspect.getsource(func))
 
 
 def get_temp_dir(filename: os.PathLike):

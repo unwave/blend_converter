@@ -113,7 +113,7 @@ class Instruction:
         self.args: typing.List[typing.Any] = list(args)
         self.kwargs: typing.Dict[str, typing.Any] = kwargs
         self.sha256: str = utils.get_function_sha256(func)
-        self.code: str = textwrap.dedent(inspect.getsource(func))
+        self.code: str = utils.get_source(func)
 
 
     def _to_dict(self):
