@@ -15,7 +15,6 @@ def get_result_dir(blend_dir):
 def get_bake_program(blend_dir: str, blender_executable: str):
 
     from blend_converter.blender.formats.blend import open_mainfile, save_as_mainfile
-    from blend_converter.blender import bc_script
     from blend_converter.blender.executor import Blender
     from blend_converter import common
     from blend_converter import utils
@@ -41,7 +40,7 @@ def get_bake_program(blend_dir: str, blender_executable: str):
 
     objects = program.run(blender, bpy_utils.get_meshable_objects, program.run(blender, bpy_utils.get_view_layer_objects))
 
-    uv_layer_name = program.run(blender, bc_script.get_uuid1_hex)
+    uv_layer_name = program.run(blender, bpy_utils.get_uuid1_hex)
 
     program.run(blender, bpy_uv.unwrap, objects, uv_layer_name)
 
@@ -63,11 +62,11 @@ def get_bake_program(blend_dir: str, blender_executable: str):
     program.run(blender, bpy_utils.pack_copy_bake, objects, settings)
 
 
-    program.run(blender, bc_script.select_uv_layer, objects, uv_layer_name)
+    program.run(blender, bpy_utils.select_uv_layer, objects, uv_layer_name)
 
-    program.run(blender, bc_script.scene_clean_up)
+    program.run(blender, bpy_utils.scene_clean_up)
 
-    program.run(blender, bc_script.remove_all_node_groups_from_materials)
+    program.run(blender, bpy_utils.remove_all_node_groups_from_materials)
 
     program.run(blender, save_as_mainfile, result_path)
 

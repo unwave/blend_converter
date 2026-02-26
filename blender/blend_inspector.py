@@ -246,7 +246,6 @@ def add_value(**kwargs):
 def make_top_functions_inspectable():
 
     from . import bake_settings
-    from . import bc_script
     from . import bpy_bake
     from . import bpy_context
     from . import bpy_data
@@ -258,7 +257,6 @@ def make_top_functions_inspectable():
 
     modules = [
         bake_settings,
-        bc_script,
         bpy_bake,
         bpy_context,
         bpy_data,

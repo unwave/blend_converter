@@ -71,7 +71,7 @@ if __name__ == '__main__':
 
     from blend_converter import common
     from blend_converter.blender.executor import Blender
-    from blend_converter.blender import bc_script
+    from blend_converter.blender import bpy_utils
     from blend_converter.blender.formats.blend import open_mainfile
 
     blender = Blender(blender_executable)
@@ -86,7 +86,7 @@ if __name__ == '__main__':
 
         kwargs = dict(image_dir = temp_dir, resolution = 1024)
         kwargs.update(bake_settings)
-        program.run(blender, bc_script.do_nothing, object_names, **kwargs)
+        program.run(blender, bpy_utils.do_nothing, object_names, **kwargs)
 
         program.run(blender, delete_other, object_names)
 
