@@ -365,9 +365,9 @@ def pack_copy_bake(
 
     return bpy_utils.pack_copy_bake(
         get_objects(objects),
-        tool_settings.Bake_Materials._from_dict(settings),
-        bake_settings = tool_settings.Bake._from_dict(bake_settings) if bake_settings else None,
-        pack_settings = tool_settings.Pack_UVs._from_dict(pack_settings) if pack_settings else None,
+        tool_settings.S_Bake_Materials._from_dict(settings),
+        bake_settings = tool_settings.S_Bake._from_dict(bake_settings) if bake_settings else None,
+        pack_settings = tool_settings.S_Pack_UVs._from_dict(pack_settings) if pack_settings else None,
     )
 
 
@@ -402,10 +402,10 @@ def apply_modifiers(objects: Objects_Like, *args, **kwargs):
 def unwrap(objects: Objects_Like, *args, **kwargs):
 
     if 'settings' in kwargs:
-        kwargs['settings'] = tool_settings.Unwrap_UVs._from_dict(kwargs['settings'])
+        kwargs['settings'] = tool_settings.S_Unwrap_UVs._from_dict(kwargs['settings'])
 
     if 'ministry_of_flat_settings' in kwargs:
-        kwargs['ministry_of_flat_settings'] = tool_settings.Ministry_Of_Flat._from_dict(kwargs['ministry_of_flat_settings'])
+        kwargs['ministry_of_flat_settings'] = tool_settings.S_Ministry_Of_Flat._from_dict(kwargs['ministry_of_flat_settings'])
 
     return bpy_uv.unwrap(get_objects(objects), *args, **kwargs)
 

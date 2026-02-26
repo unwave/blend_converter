@@ -519,7 +519,7 @@ class Bpy_Reference_Collection:
 class Bake_Settings(State):
 
 
-    def __init__(self, bake_settings: 'tool_settings.Bake'):
+    def __init__(self, bake_settings: 'tool_settings.S_Bake'):
         super().__init__()
         self.bake_settings = bake_settings
 

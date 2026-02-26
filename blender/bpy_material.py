@@ -70,7 +70,7 @@ def create_material(
             uv_layer: str,
             images: typing.Iterable[bpy.types.Image],
             material: typing.Optional[bpy.types.Material] = None,
-            k_map_identifier = tool_settings.Bake._K_MAP_IDENTIFIER
+            k_map_identifier = tool_settings.S_Bake._K_MAP_IDENTIFIER
         ):
 
     do_reset = False
@@ -105,7 +105,7 @@ def create_material(
 
 
     def get_input(identifier):
-        if identifier == bake_settings._AO._identifier:
+        if identifier == bake_settings._S_AO._identifier:
             return get_gltf_settings_node().inputs[0]
         else:
             socket = principled.inputs.get(identifier)

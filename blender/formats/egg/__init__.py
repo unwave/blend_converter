@@ -18,7 +18,7 @@ else:
 
 
 @dataclasses.dataclass
-class Settings_YABEE(tool_settings.Settings):
+class S_YABEE(tool_settings.Settings):
     """
     `yabee_libs.egg_writer.write_out`'s settings
     """

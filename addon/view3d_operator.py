@@ -198,7 +198,7 @@ def update_camera(scene: bpy.types.Scene, depsgraph: bpy.types.Depsgraph, comman
 
 
 class BLENDCONVERTER_PROP_bake_settings(bpy.types.PropertyGroup):
-    __annotations__ = tool_settings.Bake._get_ui_properties()
+    __annotations__ = tool_settings.S_Bake._get_ui_properties()
 
 
 reg.property(
@@ -343,7 +343,7 @@ class BLENDCONVERTER_OT_export_and_inspect(bpy.types.Operator):
 
         utils.os_show(blend_path)
 
-        bake_settings = tool_settings.Bake._from_bpy_struct(context.window_manager.blend_converter_bake_settings)
+        bake_settings = tool_settings.S_Bake._from_bpy_struct(context.window_manager.blend_converter_bake_settings)
 
         kwargs = dict(
             blend_path = blend_path,

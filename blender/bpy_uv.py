@@ -248,7 +248,7 @@ def enable_uv_packer_addon():
         return True
 
 
-def get_island_margin(meshes: typing.Iterable[bpy.types.Mesh], settings: tool_settings.Pack_UVs):
+def get_island_margin(meshes: typing.Iterable[bpy.types.Mesh], settings: tool_settings.S_Pack_UVs):
     """
     For the `ADD` margin method. The UV islands should already exist in the meshes.
 
@@ -334,7 +334,7 @@ def get_object_copy_for_uv_unwrap(object: bpy.types.Object):
     return object_copy
 
 
-def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, settings: tool_settings.Ministry_Of_Flat, uv_layer_name: typing.Optional[str] = None):
+def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, settings: tool_settings.S_Ministry_Of_Flat, uv_layer_name: typing.Optional[str] = None):
     """ Currently operates on per mesh basis, so it is not possible to unwrap only a part of `bpy.types.Mesh`. """
     print(unwrap_ministry_of_flat.__name__, object.name_full)
 
@@ -869,10 +869,10 @@ def uv_packer_pack(
     execute_uv_packer_addon(Dummy(), Dummy_Context())
 
 
-def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_settings.Pack_UVs] = None) -> str:
+def pack(objects: typing.List[bpy.types.Object], settings: typing.Optional[tool_settings.S_Pack_UVs] = None) -> str:
     """ Assumes the objects are selected and in the object mode. """
 
-    settings =  tool_settings.Pack_UVs()._update(settings)
+    settings =  tool_settings.S_Pack_UVs()._update(settings)
 
     print('pack_uvs...')
 
@@ -1232,7 +1232,7 @@ def _ensure_pixel_per_island(
         bmesh.update_edit_mesh(data, loop_triangles=False, destructive=False)
 
 
-def ensure_pixel_per_island(objects: typing.List[bpy.types.Object], settings: tool_settings.Pack_UVs):
+def ensure_pixel_per_island(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Pack_UVs):
     print('ensure_pixel_per_island...')
 
     objects = bpy_utils.get_unique_mesh_objects(objects)
@@ -1279,8 +1279,8 @@ def unwrap(
             uv_layer_name: str,
             *,
             uv_layer_reuse = '',
-            settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
-            ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None
+            settings: typing.Optional[tool_settings.S_Unwrap_UVs] = None,
+            ministry_of_flat_settings: typing.Optional[tool_settings.S_Ministry_Of_Flat] = None
         ):
 
     incompatible_objects = set(objects) - set(object for object in objects if object.data and hasattr(object.data, 'uv_layers'))
@@ -1295,7 +1295,7 @@ def unwrap(
     objects = bpy_utils.get_unique_mesh_objects(objects)
 
 
-    settings = tool_settings.Unwrap_UVs(uv_layer_name = uv_layer_name)._update(settings)
+    settings = tool_settings.S_Unwrap_UVs(uv_layer_name = uv_layer_name)._update(settings)
 
 
     ensure_uv_layer(objects, uv_layer_name, init_from = uv_layer_reuse, init_from_does_not_exist_ok=True)
@@ -1565,13 +1565,13 @@ def get_active_render_uv_layer(object: bpy.types.Object):
 
 def unwrap_ministry_of_flat_with_fallback(
             objects: typing.List[bpy.types.Object],
-            settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
-            ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None,
+            settings: typing.Optional[tool_settings.S_Unwrap_UVs] = None,
+            ministry_of_flat_settings: typing.Optional[tool_settings.S_Ministry_Of_Flat] = None,
         ):
 
-    settings = tool_settings.Unwrap_UVs()._update(settings)
+    settings = tool_settings.S_Unwrap_UVs()._update(settings)
 
-    ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(
+    ministry_of_flat_settings = tool_settings.S_Ministry_Of_Flat(
         stretch = False,
         scale_uv_space_to_worldspace = True,
         vertex_weld= False,
@@ -2156,13 +2156,13 @@ DEFAULT_BRUTE_FORCE_METHODS = {
 
 def brute_force_unwrap(
             object: bpy.types.Object,
-            settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
-            ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None,
+            settings: typing.Optional[tool_settings.S_Unwrap_UVs] = None,
+            ministry_of_flat_settings: typing.Optional[tool_settings.S_Ministry_Of_Flat] = None,
             methods: typing.Set[str] = DEFAULT_BRUTE_FORCE_METHODS,
         ):
 
-    settings = tool_settings.Unwrap_UVs()._update(settings)
-    ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(vertex_weld=False, rasterization_resolution=1, packing_iterations=1)._update(ministry_of_flat_settings)
+    settings = tool_settings.S_Unwrap_UVs()._update(settings)
+    ministry_of_flat_settings = tool_settings.S_Ministry_Of_Flat(vertex_weld=False, rasterization_resolution=1, packing_iterations=1)._update(ministry_of_flat_settings)
 
     ministry_of_flat_settings.stretch = False
     ministry_of_flat_settings.scale_uv_space_to_worldspace = True
@@ -2574,11 +2574,11 @@ def brute_force_unwrap(
 
 def unwrap_with_fallback(
             objects: typing.List[bpy.types.Object],
-            settings: typing.Optional[tool_settings.Unwrap_UVs] = None,
-            ministry_of_flat_settings: typing.Optional[tool_settings.Ministry_Of_Flat] = None,
+            settings: typing.Optional[tool_settings.S_Unwrap_UVs] = None,
+            ministry_of_flat_settings: typing.Optional[tool_settings.S_Ministry_Of_Flat] = None,
         ):
 
-    settings = tool_settings.Unwrap_UVs()._update(settings)
+    settings = tool_settings.S_Unwrap_UVs()._update(settings)
 
     use_use_brute_force_unwrap = (
         settings.use_brute_force_unwrap

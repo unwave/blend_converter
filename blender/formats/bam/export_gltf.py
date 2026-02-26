@@ -147,8 +147,8 @@ def export_gltf():
 
     from blend_converter.format import bam
 
-    gltf_settings = bam.Settings_Blender_Gltf._from_dict(__KWARGS__['gltf_settings'])
-    gltf2bam_settings = bam.Settings_Gltf_2_Bam._from_dict(__KWARGS__['gltf2bam_settings'])
+    gltf_settings = bam.S_Blender_Gltf._from_dict(__KWARGS__['gltf_settings'])
+    gltf2bam_settings = bam.S_Gltf_2_Bam._from_dict(__KWARGS__['gltf2bam_settings'])
 
 
     gltf_settings.export_animations = gltf2bam_settings.animations != 'skip'

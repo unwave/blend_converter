@@ -24,7 +24,7 @@ BLENDER_EXPORT_GLTF = os.path.join(os.path.dirname(__file__), 'export_gltf.py')
 
 
 @dataclasses.dataclass
-class Settings_Blender_Gltf(gltf.Settings_GLTF):
+class S_Blender_Gltf(gltf.S_GLTF):
 
 
     export_format: typing.Union[int, str]
@@ -116,7 +116,7 @@ class Settings_Blender_Gltf(gltf.Settings_GLTF):
 
 
 @dataclasses.dataclass
-class Settings_Gltf_2_Bam(tool_settings.Settings):
+class S_Gltf_2_Bam(tool_settings.Settings):
     """ `panda3d-gltf`'s .gltf to .bam settings """
 
 
@@ -287,13 +287,13 @@ class Bam(common.Generic_Exporter, Panda3D_Path_Mixin):
     def __init__(self, source_path: str, result_dir: str, **kwargs):
         super().__init__(source_path, result_dir, **kwargs)
 
-        self.gltf2bam_settings = Settings_Gltf_2_Bam()
+        self.gltf2bam_settings = S_Gltf_2_Bam()
         """ `panda3d-gltf`'s `.gltf` to `.bam` settings """
 
         self.gltf2bam_settings.skip_axis_conversion = True
 
 
-        self.gltf_settings = Settings_Blender_Gltf()
+        self.gltf_settings = S_Blender_Gltf()
         """
         The arguments for `bpy.ops.export_scene.gltf()`
         Version: `1.8.19`

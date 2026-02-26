@@ -17,7 +17,7 @@ else:
 
 
 @dataclasses.dataclass
-class Settings_Obj(tool_settings.Settings):
+class S_Obj(tool_settings.Settings):
     """ The built-in C based Wavefront OBJ exporter. """
 
 

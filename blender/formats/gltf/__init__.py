@@ -17,7 +17,7 @@ else:
 
 
 @dataclasses.dataclass
-class Settings_GLTF(tool_settings.Settings):
+class S_GLTF(tool_settings.Settings):
     """
     The arguments for `bpy.ops.export_scene.gltf()`
     Version: `1.8.19`

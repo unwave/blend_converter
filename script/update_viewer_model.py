@@ -103,11 +103,11 @@ if __name__ == '__main__':
         program.run_bam_function(post_conversion.convert_collision_placeholders)
 
     elif model_type == 'Gltf':
-        from blend_converter.blender.formats.gltf import export_gltf, Settings_GLTF
+        from blend_converter.blender.formats.gltf import export_gltf, S_GLTF
 
         result_path = os.path.join(temp_dir, 'converted.gltf')
 
-        program.run(blender, export_gltf, result_path, Settings_GLTF(export_format = 'GLTF_SEPARATE'))
+        program.run(blender, export_gltf, result_path, S_GLTF(export_format = 'GLTF_SEPARATE'))
 
     else:
         raise Exception(f"Unknown file type: {model_type}")

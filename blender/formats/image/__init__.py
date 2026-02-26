@@ -14,9 +14,9 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 if not os.path.exists(os.path.join(DIR, '_generated.py')):
 
     if __spec__.name == __name__:
-        from blend_converter.blender.formats.image._generated import Settings_Image, Settings_Cycles, Settings_Eevee, Settings_Render, Settings_View
+        from blend_converter.blender.formats.image._generated import S_Image, S_Cycles, S_Eevee, S_Render, S_View
     else:
-        from ._generated import Settings_Image, Settings_Cycles, Settings_Eevee, Settings_Render, Settings_View
+        from ._generated import S_Image, S_Cycles, S_Eevee, S_Render, S_View
 
 elif not typing.TYPE_CHECKING:
 
@@ -25,11 +25,11 @@ elif not typing.TYPE_CHECKING:
     else:
         from .... import tool_settings
 
-    class Fake_Settings(tool_settings.Settings):
+    class S_Fake(tool_settings.Settings):
 
         allow_missing_settings = True
 
-    Settings_Image = Settings_Cycles = Settings_Eevee = Settings_Render = Settings_View = Fake_Settings
+    S_Image = S_Cycles = S_Eevee = S_Render = S_View = S_Fake
 
 
 

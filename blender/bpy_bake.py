@@ -163,9 +163,9 @@ class Compositor_Image_Channel:
 class Baked_Image:
 
 
-    def __init__(self, bake_types: typing.Union[bake_settings._Bake_Type, typing.List[bake_settings._Bake_Type]], name_prefix: str, settings: tool_settings.Bake):
+    def __init__(self, bake_types: typing.Union[bake_settings._S_Bake_Type, typing.List[bake_settings._S_Bake_Type]], name_prefix: str, settings: tool_settings.S_Bake):
 
-        if isinstance(bake_types, bake_settings._Bake_Type):
+        if isinstance(bake_types, bake_settings._S_Bake_Type):
             bake_types = [bake_types]
 
         self.bake_types = bake_types
@@ -179,7 +179,7 @@ class Baked_Image:
 
 
     @property
-    def bakeable_tasks(self) -> typing.List[typing.List[bake_settings._Bake_Type]]:
+    def bakeable_tasks(self) -> typing.List[typing.List[bake_settings._S_Bake_Type]]:
 
         if len(self.bake_types) == 1:
             return [
@@ -199,7 +199,7 @@ class Baked_Image:
                 ]
             else:
                 return [
-                    [self.bake_types[0], self.bake_types[1], bake_settings.Fill_Color()],
+                    [self.bake_types[0], self.bake_types[1], bake_settings.S_Fill_Color()],
                 ]
 
         elif len(self.bake_types) in (3, 4):
@@ -214,18 +214,18 @@ class Baked_Image:
             elif self.bake_types[0]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[1:3]):
                 return [
                     [self.bake_types[0]],
-                    [bake_settings.Fill_Color(), self.bake_types[1], self.bake_types[2]],
+                    [bake_settings.S_Fill_Color(), self.bake_types[1], self.bake_types[2]],
                     *alpha,
                 ]
             elif self.bake_types[1]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:3:2]):
                 return [
-                    [self.bake_types[0], bake_settings.Fill_Color(), self.bake_types[2]],
+                    [self.bake_types[0], bake_settings.S_Fill_Color(), self.bake_types[2]],
                     [self.bake_types[1]],
                     *alpha,
                 ]
             elif self.bake_types[2]._socket_type == bake_settings._Socket_Type.SHADER and all(type._socket_type != bake_settings._Socket_Type.SHADER for type in self.bake_types[:2]):
                 return [
-                    [self.bake_types[0], self.bake_types[1], bake_settings.Fill_Color()],
+                    [self.bake_types[0], self.bake_types[1], bake_settings.S_Fill_Color()],
                     [self.bake_types[2]],
                     *alpha,
                 ]
@@ -240,7 +240,7 @@ class Baked_Image:
             raise ValueError(f"Unexpected identifier length: {self.bake_types}")
 
 
-    def append_sub_image(self, bake_task: typing.List[bake_settings._Bake_Type]):
+    def append_sub_image(self, bake_task: typing.List[bake_settings._S_Bake_Type]):
 
         name = self.name_prefix + '_' + '_'.join(bake_type._identifier for bake_type in bake_task).replace(' ', '_').lower() + '_' + uuid.uuid1().hex
 
@@ -264,16 +264,16 @@ class Baked_Image:
         return any(bake_type._is_srgb for bake_type in self.bake_types)
 
 
-    default_file_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '8', compression = 15, color_mode = 'RGB')
+    default_file_settings = tool_settings.S_Image_File(file_format = 'PNG', color_depth = '8', compression = 15, color_mode = 'RGB')
     """ Default: PNG 8-bit RGB """
 
-    normal_file_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '16', compression = 15, color_mode = 'RGB')
+    normal_file_settings = tool_settings.S_Image_File(file_format = 'PNG', color_depth = '16', compression = 15, color_mode = 'RGB')
     """ Default: PNG 16-bit RGB """
 
-    displacement_file_settings = tool_settings.Image_File_Settings(file_format = 'PNG', color_depth = '16', compression = 15, color_mode = 'BW')
+    displacement_file_settings = tool_settings.S_Image_File(file_format = 'PNG', color_depth = '16', compression = 15, color_mode = 'BW')
     """ Default: PNG 16-bit BW """
 
-    buffer_file_settings = tool_settings.Image_File_Settings(file_format = 'OPEN_EXR', color_depth = '32', exr_codec = 'ZIP', color_mode = 'RGB')
+    buffer_file_settings = tool_settings.S_Image_File(file_format = 'OPEN_EXR', color_depth = '32', exr_codec = 'ZIP', color_mode = 'RGB')
     """ For intermediate data. """
 
 
@@ -281,9 +281,9 @@ class Baked_Image:
     def image_file_settings(self):
         if self.bake_types[0]._identifier in NORMAL_SOCKETS:
             return self.normal_file_settings
-        elif any(isinstance(type, bake_settings.Buffer_Factor) for type in self.bake_types):
+        elif any(isinstance(type, bake_settings.S_Buffer_Factor) for type in self.bake_types):
             return self.buffer_file_settings
-        elif any(isinstance(type, bake_settings.View_Space_Normal) for type in self.bake_types):
+        elif any(isinstance(type, bake_settings.S_View_Space_Normal) for type in self.bake_types):
             return self.buffer_file_settings
         else:
             return self.default_file_settings
@@ -389,9 +389,9 @@ class Baked_Image:
                 else:
                     target_input = blur_node.inputs[0]
 
-                if isinstance(self.bake_types[0], (bake_settings.Normal, bake_settings.Normal_Native)):
+                if isinstance(self.bake_types[0], (bake_settings.S_Normal, bake_settings.S_Normal_Native)):
                     bpy_context.insert_normalize(scale_node)
-                elif isinstance(self.bake_types[0], bake_settings.View_Space_Normal):
+                elif isinstance(self.bake_types[0], bake_settings.S_View_Space_Normal):
                     bpy_context.insert_normalize(scale_node, use_map_range = False)
             else:
                 if self.settings.use_anti_aliasing and bpy.app.version >= (2, 93):
@@ -674,7 +674,7 @@ def the_bake(active_object: bpy.types.Object, selected_objects: typing.List[bpy.
     )
 
 
-def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings: tool_settings.Bake):
+def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings: tool_settings.S_Bake):
 
     materials_to_bake: typing.List[bpy.types.Material] = []
     objects_by_material = bpy_utils.group_objects_by_material(objects)
@@ -729,7 +729,7 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                 for sub_task in bake_task:
                     context_stack.enter_context(sub_task._get_setup_context())
 
-                def enter_output_context(material: bpy.types.Material, bake_task: typing.List[bake_settings._Bake_Type]):
+                def enter_output_context(material: bpy.types.Material, bake_task: typing.List[bake_settings._S_Bake_Type]):
                     if len(bake_task) == 1:
                         output_socket = context_stack.enter_context(bake_task[0]._get_material_context(material))
                         context_stack.enter_context(bpy_context.Output_Override(material, output_socket))
@@ -738,7 +738,7 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
                         context_stack.enter_context(bpy_context.Output_Override_Combine_RGB(material, *r_g_b))
 
 
-                is_global_bake_type = any(isinstance(task, bake_settings.AO_Diffuse) for task in bake_task)
+                is_global_bake_type = any(isinstance(task, bake_settings.S_AO_Diffuse) for task in bake_task)
                 if is_global_bake_type:
                     for material in materials_to_bake:
                         enter_output_context(material, bake_task)
@@ -819,7 +819,7 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
     return [image.final_image for image in baking_images if image.final_image]
 
 
-def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
+def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Bake):
 
     uv_layer_name = settings.uv_layer_name
 
@@ -879,7 +879,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             settings._images.extend(images)
 
 
-def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake):
+def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Bake):
 
     start_time = time.perf_counter()
 
@@ -925,7 +925,7 @@ def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings
     utils.print_separator(char='▓')
 
 
-def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -> typing.List[bpy.types.Image]:
+def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Bake) -> typing.List[bpy.types.Image]:
 
 
     if not objects:
@@ -953,7 +953,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake) -
 
     requires_single_principled_bsdf = False
     for bake_type in settings.bake_types:
-        if isinstance(bake_type, bake_settings._Bake_Type):
+        if isinstance(bake_type, bake_settings._S_Bake_Type):
             requires_single_principled_bsdf |= bake_type._requires_principled_bsdf
         else:
             for sub_type in bake_type:

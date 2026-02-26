@@ -502,7 +502,7 @@ FILE_EXTENSION = dict(
 
 
 @dataclasses.dataclass
-class Image_File_Settings(Settings):
+class S_Image_File(Settings):
 
 
     @property
@@ -760,7 +760,7 @@ class Image_File_Settings(Settings):
 
 
 @dataclasses.dataclass
-class Bake(Settings):
+class S_Bake(Settings):
 
 
     @property
@@ -1075,7 +1075,7 @@ class Bake(Settings):
     """
 
 @dataclasses.dataclass
-class Unwrap_UVs(Settings):
+class S_Unwrap_UVs(Settings):
 
 
     uv_layer_name: str = ''
@@ -1143,7 +1143,7 @@ class Unwrap_UVs(Settings):
 
 
 @dataclasses.dataclass
-class Pack_UVs(Settings):
+class S_Pack_UVs(Settings):
 
 
     @property
@@ -1296,7 +1296,7 @@ class Pack_UVs(Settings):
 
 
 @dataclasses.dataclass
-class Vhacd(Settings):
+class S_Vhacd(Settings):
     """ https://github.com/kmammou/v-hacd """
 
 
@@ -1426,7 +1426,7 @@ class Vhacd(Settings):
 
 
 @dataclasses.dataclass
-class Ministry_Of_Flat(Settings):
+class S_Ministry_Of_Flat(Settings):
 
 
     silent: bool = False
@@ -1837,7 +1837,7 @@ class Ministry_Of_Flat(Settings):
 
 
 @dataclasses.dataclass
-class Bake_Materials(Settings):
+class S_Bake_Materials(Settings):
 
 
     image_dir: str = os.path.join(tempfile.gettempdir(), 'blend_converter', 'default_image_dir')
@@ -1980,7 +1980,7 @@ class Bake_Materials(Settings):
     """
 
 @dataclasses.dataclass
-class Future_Bake_Materials(Settings):
+class S_Future_Bake_Materials(Settings):
 
     is_same_resolution: bool = True
     """

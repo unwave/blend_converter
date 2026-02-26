@@ -852,9 +852,9 @@ def move_objects_to_new_collection(objects: typing.List[bpy.types.Object], colle
     return layer_collection
 
 
-def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settings.Bake_Materials, *,
-            bake_settings: typing.Optional[tool_settings.Bake] = None,
-            pack_settings: typing.Optional[tool_settings.Pack_UVs] = None,
+def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Bake_Materials, *,
+            bake_settings: typing.Optional[tool_settings.S_Bake] = None,
+            pack_settings: typing.Optional[tool_settings.S_Pack_UVs] = None,
         ):
 
 
@@ -911,7 +911,7 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         def pack_uvs(resolution: int, material_key: str):
 
-            _pack_settings = tool_settings.Pack_UVs(
+            _pack_settings = tool_settings.S_Pack_UVs(
                 resolution = resolution,
                 uv_layer_name = settings.uv_layer_bake,
                 material_key = material_key,
@@ -923,7 +923,7 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         def ensure_pixel_per_island(resolution: int, material_key: str):
 
-            _pack_settings = tool_settings.Pack_UVs(
+            _pack_settings = tool_settings.S_Pack_UVs(
                     resolution = resolution,
                     uv_layer_name = settings.uv_layer_bake,
                     material_key = material_key,
@@ -936,8 +936,8 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
         ## collect bake settings
 
-        pre_bake_tasks: typing.List[tool_settings.Bake] = []
-        bake_tasks: typing.List[tool_settings.Bake] = []
+        pre_bake_tasks: typing.List[tool_settings.S_Bake] = []
+        bake_tasks: typing.List[tool_settings.S_Bake] = []
 
         # TODO: this only works for the materials that has been processed, not others in the scene
         environment_has_transparent_materials = any(m for m in bpy.data.materials if m.get(alpha_material_key))
@@ -949,7 +949,7 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
                 continue
 
 
-            _bake_settings = tool_settings.Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)._update(bake_settings)
+            _bake_settings = tool_settings.S_Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)._update(bake_settings)
 
             if settings.resolution:
                 # the final resolution is hard set
@@ -986,12 +986,12 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
                 return False
 
             need_denoise = dict(
-                Normal = does_need_denoise(tool_settings_bake.Normal()._identifier),
-                Roughness = does_need_denoise(tool_settings_bake.Roughness()._identifier),
-                Metallic = does_need_denoise(tool_settings_bake.Metallic()._identifier),
-                Alpha = does_need_denoise(tool_settings_bake.Alpha()._identifier),
-                Emission = does_need_denoise(tool_settings_bake.Emission()._identifier),
-                Base_Color = does_need_denoise(tool_settings_bake.Base_Color()._identifier),
+                Normal = does_need_denoise(tool_settings_bake.S_Normal()._identifier),
+                Roughness = does_need_denoise(tool_settings_bake.S_Roughness()._identifier),
+                Metallic = does_need_denoise(tool_settings_bake.S_Metallic()._identifier),
+                Alpha = does_need_denoise(tool_settings_bake.S_Alpha()._identifier),
+                Emission = does_need_denoise(tool_settings_bake.S_Emission()._identifier),
+                Base_Color = does_need_denoise(tool_settings_bake.S_Base_Color()._identifier),
             )
 
             need_denoise = {key: (value and settings.denoise_all) for key, value in need_denoise.items()}
@@ -999,7 +999,7 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
             if any(need_denoise.values()):
 
-                view_space_normals_bake_type = tool_settings_bake.View_Space_Normal(use_denoise=need_denoise['Normal'])
+                view_space_normals_bake_type = tool_settings_bake.S_View_Space_Normal(use_denoise=need_denoise['Normal'])
 
                 pre_bake_settings = _bake_settings._get_copy()
 
@@ -1018,25 +1018,25 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
             bake_types = []
 
             orma = [
-                tool_settings_bake.AO_Diffuse(faster=settings.faster_ao_bake, environment_has_transparent_materials = environment_has_transparent_materials),
-                tool_settings_bake.Roughness(use_denoise=need_denoise['Roughness']),
-                tool_settings_bake.Metallic(use_denoise=need_denoise['Metallic'])
+                tool_settings_bake.S_AO_Diffuse(faster=settings.faster_ao_bake, environment_has_transparent_materials = environment_has_transparent_materials),
+                tool_settings_bake.S_Roughness(use_denoise=need_denoise['Roughness']),
+                tool_settings_bake.S_Metallic(use_denoise=need_denoise['Metallic'])
             ]
 
             if material_key == alpha_material_key:
-                orma.append(tool_settings_bake.Alpha(use_denoise=need_denoise['Alpha']))
+                orma.append(tool_settings_bake.S_Alpha(use_denoise=need_denoise['Alpha']))
 
             bake_types.append(orma)
 
 
             if any(material[bpy_material.Material_Bake_Type.HAS_EMISSION] for material in material_group):
-                bake_types.append(tool_settings_bake.Emission(use_denoise=need_denoise['Emission']))
+                bake_types.append(tool_settings_bake.S_Emission(use_denoise=need_denoise['Emission']))
 
             if any(material[bpy_material.Material_Bake_Type.HAS_NORMALS] for material in material_group):
-                bake_types.append(tool_settings_bake.Normal(uv_layer=_bake_settings.uv_layer_name, use_denoise=need_denoise['Normal']))
+                bake_types.append(tool_settings_bake.S_Normal(uv_layer=_bake_settings.uv_layer_name, use_denoise=need_denoise['Normal']))
 
 
-            bake_types.append([tool_settings_bake.Base_Color(use_denoise=need_denoise['Base_Color'])])
+            bake_types.append([tool_settings_bake.S_Base_Color(use_denoise=need_denoise['Base_Color'])])
 
 
             _bake_settings.material_key = material_key
@@ -1246,11 +1246,11 @@ def label_mix_shader_nodes(objects: typing.List[bpy.types.Object]):
 
 
 @contextlib.contextmanager
-def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.List[str], settings: tool_settings.Bake = None):
+def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.List[str], settings: tool_settings.S_Bake = None):
 
     original_material_key = settings.material_key
 
-    settings = tool_settings.Bake()._update(settings)
+    settings = tool_settings.S_Bake()._update(settings)
     settings.do_downscale = False
     settings.use_anti_aliasing = False
     settings.image_dir = os.path.join(bpy.app.tempdir, '__bc_pre_baked')
@@ -1285,7 +1285,7 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
         for material in materials:
             material[map_id] = True
 
-        settings.bake_types = [tool_settings_bake.Buffer_Factor(node_label=prebake_label, _identifier = 'buffer' + map_id, use_denoise = use_denoise)]
+        settings.bake_types = [tool_settings_bake.S_Buffer_Factor(node_label=prebake_label, _identifier = 'buffer' + map_id, use_denoise = use_denoise)]
 
         settings.material_key = map_id
 

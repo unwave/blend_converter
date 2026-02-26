@@ -61,11 +61,11 @@ def write_settings(file_path: str):
     lines.append('')
     lines.append('')
 
-    lines.extend(get_class_lines('Settings_Image', "`bpy.context.scene.render.image_settings`", bpy.context.scene.render.image_settings.bl_rna.properties))
-    lines.extend(get_class_lines('Settings_Render', "`bpy.context.scene.render`", bpy.context.scene.render.bl_rna.properties))
-    lines.extend(get_class_lines('Settings_Cycles', "`bpy.context.scene.cycles`", bpy.context.scene.cycles.bl_rna.properties))
-    lines.extend(get_class_lines('Settings_Eevee', "`bpy.context.scene.eevee`", bpy.context.scene.eevee.bl_rna.properties))
-    lines.extend(get_class_lines('Settings_View', "`bpy.context.scene.view_settings`", bpy.context.scene.view_settings.bl_rna.properties))
+    lines.extend(get_class_lines('S_Image', "`bpy.context.scene.render.image_settings`", bpy.context.scene.render.image_settings.bl_rna.properties))
+    lines.extend(get_class_lines('S_Render', "`bpy.context.scene.render`", bpy.context.scene.render.bl_rna.properties))
+    lines.extend(get_class_lines('S_Cycles', "`bpy.context.scene.cycles`", bpy.context.scene.cycles.bl_rna.properties))
+    lines.extend(get_class_lines('S_Eevee', "`bpy.context.scene.eevee`", bpy.context.scene.eevee.bl_rna.properties))
+    lines.extend(get_class_lines('S_View', "`bpy.context.scene.view_settings`", bpy.context.scene.view_settings.bl_rna.properties))
 
 
     with open(file_path, 'w', encoding='utf-8') as f:

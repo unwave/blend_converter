@@ -36,7 +36,7 @@ class _Socket_Type:
 
 
 @dataclass
-class _Bake_Type(tool_settings.Settings):
+class _S_Bake_Type(tool_settings.Settings):
 
 
     _requires_principled_bsdf = False
@@ -149,7 +149,7 @@ def _Output_Socket_Fill_Color(material: 'bpy.types.Material', default_color: typ
 
 
 @dataclass
-class Fill_Color(_Bake_Type, tool_settings.Settings):
+class S_Fill_Color(_S_Bake_Type, tool_settings.Settings):
 
     default_color: tuple = (0.0, 0.0, 0.0)
 
@@ -176,7 +176,7 @@ class Fill_Color(_Bake_Type, tool_settings.Settings):
 
 
 @dataclass
-class _Principled_Input(_Bake_Type, tool_settings.Settings):
+class _S_Principled_Input(_S_Bake_Type, tool_settings.Settings):
 
     if typing.TYPE_CHECKING:
         _not_versioned_socket_identifier = ''
@@ -214,7 +214,7 @@ class _Principled_Input(_Bake_Type, tool_settings.Settings):
 
 
 @dataclass
-class Normal(_Principled_Input):
+class S_Normal(_S_Principled_Input):
     """ Tangent space normals. """
 
     _not_versioned_socket_identifier = 'Normal'
@@ -274,7 +274,7 @@ class Normal(_Principled_Input):
 
 
 @dataclass
-class Base_Color(_Principled_Input):
+class S_Base_Color(_S_Principled_Input):
 
     _not_versioned_socket_identifier = 'Base Color'
     _socket_type = _Socket_Type.COLOR
@@ -284,7 +284,7 @@ class Base_Color(_Principled_Input):
 
 
 @dataclass
-class Roughness(_Principled_Input):
+class S_Roughness(_S_Principled_Input):
 
     _not_versioned_socket_identifier = 'Roughness'
     _socket_type = _Socket_Type.VALUE
@@ -292,7 +292,7 @@ class Roughness(_Principled_Input):
 
 
 @dataclass
-class Metallic(_Principled_Input):
+class S_Metallic(_S_Principled_Input):
 
     _not_versioned_socket_identifier = 'Metallic'
     _socket_type = _Socket_Type.VALUE
@@ -300,7 +300,7 @@ class Metallic(_Principled_Input):
 
 
 @dataclass
-class Alpha(_Principled_Input):
+class S_Alpha(_S_Principled_Input):
 
     _not_versioned_socket_identifier = 'Alpha'
     _socket_type = _Socket_Type.VALUE
@@ -329,7 +329,7 @@ def _Output_Socket_Emission(material: 'bpy.types.Material') -> 'bpy.types.NodeSo
 
 
 @dataclass
-class Emission(_Principled_Input):
+class S_Emission(_S_Principled_Input):
 
     _not_versioned_socket_identifier = 'Emission'
     _socket_type = _Socket_Type.COLOR
@@ -343,7 +343,7 @@ class Emission(_Principled_Input):
 
 
 @dataclass
-class _AO(_Bake_Type, tool_settings.Settings):
+class _S_AO(_S_Bake_Type, tool_settings.Settings):
 
     _identifier = 'Ambient Occlusion'
     _default_color = (1.0, 1.0, 1.0)
@@ -352,7 +352,7 @@ class _AO(_Bake_Type, tool_settings.Settings):
 
 
 @dataclass
-class AO_Node(_AO):
+class S_AO_Node(_S_AO):
     """ Uses the Ambient Occlusion shader node: `ShaderNodeAmbientOcclusion`. """
 
     _socket_type = _Socket_Type.VALUE
@@ -395,7 +395,7 @@ class AO_Node(_AO):
 
 
 @dataclass
-class AO_Diffuse(_AO):
+class S_AO_Diffuse(_S_AO):
     """ Uses a diffuse shader to bake the occlusion. Respects the usual shaders properties like transparency, emission, transmission, etc. """
 
     _socket_type = _Socket_Type.SHADER
@@ -460,7 +460,7 @@ class AO_Diffuse(_AO):
 
 
 @dataclass
-class Diffuse(_Bake_Type, tool_settings.Settings):
+class S_Diffuse(_S_Bake_Type, tool_settings.Settings):
 
 
     _socket_type = _Socket_Type.SHADER
@@ -507,7 +507,7 @@ class Diffuse(_Bake_Type, tool_settings.Settings):
 
 
 @dataclass
-class Glossy(_Bake_Type, tool_settings.Settings):
+class S_Glossy(_S_Bake_Type, tool_settings.Settings):
 
 
     _socket_type = _Socket_Type.SHADER
@@ -603,7 +603,7 @@ def _Output_Socket_AOV(material: 'bpy.types.Material', aov_name: str, is_color: 
 
 
 @dataclass
-class AOV(_Bake_Type, tool_settings.Settings):
+class S_AOV(_S_Bake_Type, tool_settings.Settings):
 
     name: str = ''
     is_color: bool = True
@@ -648,7 +648,7 @@ def _Output_Socket_View_Space_Normals(material: 'bpy.types.Material') -> 'bpy.ty
 
 
 @dataclass
-class View_Space_Normal(_Bake_Type, tool_settings.Settings):
+class S_View_Space_Normal(_S_Bake_Type, tool_settings.Settings):
 
 
     _default_color = (0.0, 0.0, 0.0)
@@ -685,7 +685,7 @@ class View_Space_Normal(_Bake_Type, tool_settings.Settings):
 
 
 @dataclass
-class Lightmap(_Bake_Type, tool_settings.Settings):
+class S_Lightmap(_S_Bake_Type, tool_settings.Settings):
 
         _socket_type = _Socket_Type.SHADER
 
@@ -746,7 +746,7 @@ def _Output_Label(material: 'bpy.types.Material', node_label: str, socket: typin
         tree.delete_new_nodes()
 
 @dataclass
-class Buffer_Factor(_Bake_Type, tool_settings.Settings):
+class S_Buffer_Factor(_S_Bake_Type, tool_settings.Settings):
 
         _socket_type = _Socket_Type.VALUE
 
@@ -781,7 +781,7 @@ class Buffer_Factor(_Bake_Type, tool_settings.Settings):
             return bpy_context.Compositor_Input_Factor(input_socket, image, channel, use_denoise=self.use_denoise)
 
 @dataclass
-class Normal_Native(_Bake_Type, tool_settings.Settings):
+class S_Normal_Native(_S_Bake_Type, tool_settings.Settings):
     """ The native Normal bake type. Use for baking from selected to active. """
 
     _default_color = (0.5, 0.5, 1.0)
@@ -815,7 +815,7 @@ class Normal_Native(_Bake_Type, tool_settings.Settings):
 
 
 @dataclass
-class Combined(_Bake_Type, tool_settings.Settings):
+class S_Combined(_S_Bake_Type, tool_settings.Settings):
 
 
     _socket_type = _Socket_Type.SHADER
@@ -860,7 +860,7 @@ class Combined(_Bake_Type, tool_settings.Settings):
 
 
 @dataclass
-class AO_Native(_Bake_Type, tool_settings.Settings):
+class S_AO_Native(_S_Bake_Type, tool_settings.Settings):
 
     _socket_type = _Socket_Type.SHADER
 

@@ -341,7 +341,7 @@ def iter_material(operator: bpy.types.Operator, context: bpy.types.Context):
 
 @operator_factory.operator(
     poll = object_mode_poll,
-    __annotations__ = tool_settings.Vhacd._get_ui_properties(),
+    __annotations__ = tool_settings.S_Vhacd._get_ui_properties(),
     invoke = lambda operator, context, event: bpy.data.window_managers[0].invoke_props_dialog(operator, width=400),
     bl_options = {'REGISTER', 'UNDO', 'PRESET'},
 )
@@ -365,7 +365,7 @@ def run_vhacd(operator: bpy.types.Operator, context: bpy.types.Context):
                 bpy.ops.export_scene.obj(filepath=filepath_input, use_selection=True, use_materials=False, use_uvs=False, use_mesh_modifiers=True)
 
 
-            cmd = tool_settings.Vhacd._from_bpy_struct(operator)._get_cmd(filepath_input)
+            cmd = tool_settings.S_Vhacd._from_bpy_struct(operator)._get_cmd(filepath_input)
             print('CMD:', utils.get_command_from_list(cmd))
             subprocess.run(cmd, check=True, cwd=tempdir)
 
@@ -379,7 +379,7 @@ def run_vhacd(operator: bpy.types.Operator, context: bpy.types.Context):
 @operator_factory.operator(
     poll = view_3d_poll,
     __annotations__ = dict(
-        **tool_settings.Ministry_Of_Flat._get_ui_properties(),
+        **tool_settings.S_Ministry_Of_Flat._get_ui_properties(),
         mark_seams_from_islands = bpy.props.BoolProperty(default=True),
     ),
     invoke = lambda operator, context, event: bpy.data.window_managers[0].invoke_props_dialog(operator, width=400),
@@ -391,7 +391,7 @@ def ministry_of_flat(operator: bpy.types.Operator, context: bpy.types.Context):
 
     with tempfile.TemporaryDirectory() as temp_dir:
         for object in objects:
-            bpy_uv.unwrap_ministry_of_flat(object, temp_dir, tool_settings.Ministry_Of_Flat._from_bpy_struct(operator, ignore_other = True))
+            bpy_uv.unwrap_ministry_of_flat(object, temp_dir, tool_settings.S_Ministry_Of_Flat._from_bpy_struct(operator, ignore_other = True))
             if operator.mark_seams_from_islands:
                 bpy_uv.mark_seams_from_islands(object)
 
@@ -399,7 +399,7 @@ def ministry_of_flat(operator: bpy.types.Operator, context: bpy.types.Context):
 
 @operator_factory.operator(
     poll = view_3d_poll,
-    __annotations__ = tool_settings.Ministry_Of_Flat._get_ui_properties(),
+    __annotations__ = tool_settings.S_Ministry_Of_Flat._get_ui_properties(),
     invoke = lambda operator, context, event: bpy.data.window_managers[0].invoke_props_dialog(operator, width=400),
     bl_options = {'REGISTER', 'UNDO', 'PRESET'},
 )
@@ -423,7 +423,7 @@ def obj_only_ministry_of_flat(operator: bpy.types.Operator, context: bpy.types.C
                 bpy.ops.export_scene.obj(filepath=filepath_input, use_selection=True, use_materials=False, use_uvs=False, use_mesh_modifiers=False)
 
 
-            cmd = tool_settings.Ministry_Of_Flat._from_bpy_struct(operator)._get_cmd(filepath_input, filepath_output)
+            cmd = tool_settings.S_Ministry_Of_Flat._from_bpy_struct(operator)._get_cmd(filepath_input, filepath_output)
             print('CMD:', utils.get_command_from_list(cmd))
 
             try:
@@ -545,13 +545,13 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
 
             uv_layer_name = object.data.uv_layers.active.name
 
-            uvs_unwrap_settings = tool_settings.Unwrap_UVs(
+            uvs_unwrap_settings = tool_settings.S_Unwrap_UVs(
                 uv_layer_name = object.data.uv_layers.active.name,
                 mark_seams_from_islands = operator.mark_seams_from_islands,
                 reunwrap_all_with_minimal_stretch = operator.reunwrap_with_minimal_stretch,
             )
 
-            ministry_of_flat_settings = tool_settings.Ministry_Of_Flat(
+            ministry_of_flat_settings = tool_settings.S_Ministry_Of_Flat(
                 vertex_weld = operator.vertex_weld,
                 rasterization_resolution = 1,
                 packing_iterations = 1,
@@ -578,7 +578,7 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
                     bpy.ops.uv.average_islands_scale()
 
 
-            pack_uvs_settings = tool_settings.Pack_UVs(
+            pack_uvs_settings = tool_settings.S_Pack_UVs(
                 resolution = operator.resolution,
                 uv_layer_name = uv_layer_name,
                 average_uv_scale = False,

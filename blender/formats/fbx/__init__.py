@@ -17,7 +17,7 @@ else:
 
 
 @dataclasses.dataclass
-class Settings_Fbx(tool_settings.Settings):
+class S_Fbx(tool_settings.Settings):
     """ Official Blender FBX Exporter `4.29.1` """
 
 
