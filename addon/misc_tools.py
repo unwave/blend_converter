@@ -638,3 +638,30 @@ def make_manifold(operator: bpy.types.Operator, context: bpy.types.Context):
     objects = bpy_utils.get_unique_data_objects(objects)
     for object in objects:
         bpy_mesh.make_manifold(object)
+
+
+@operator_factory.operator(
+    poll = object_mode_poll,
+    bl_options = {'REGISTER', 'UNDO'},
+)
+def delete_non_mesh(operator: bpy.types.Operator, context: bpy.types.Context):
+
+    with bpy_context.Focus(bpy.data.objects):
+        bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+
+    bpy.data.batch_remove([o for o in bpy.data.objects if o.type != 'MESH' or not o.data.polygons])
+
+    bpy.data.batch_remove(bpy.data.collections)
+
+    scene_collection_objects = set(bpy.context.scene.collection.objects)
+
+    for o in bpy.data.objects:
+        if not o in scene_collection_objects:
+            bpy.context.scene.collection.objects.link(o)
+
+    for o in bpy.data.objects:
+
+        o.lock_location = (False, False, False)
+        o.lock_rotation = (False, False, False)
+        o.lock_rotation_w = False
+        o.lock_scale = (False, False, False)
