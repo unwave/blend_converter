@@ -1916,13 +1916,6 @@ class S_Bake_Materials(Settings):
     #### Default: `False`
     """
 
-    isolate_object_hierarchies: bool = False
-    """
-    Space out object hierarchies, grouped by a top common parent, before baking to prevent them affecting each other, aka exploded bake.
-
-    #### Default: `False`
-    """
-
     bake_original_topology: bool = True
     """
     The UV data is transferred using the data transfer modifier.
@@ -1948,35 +1941,6 @@ class S_Bake_Materials(Settings):
     May fix stretched UVs issues or make it worse.
 
     #### Default: `False`
-    """
-
-    convert_materials: bool = True
-    """
-    Convert materials to use a single Principled BSDF shader and make them independent from objects.
-
-    #### Disable only if it was done prior.
-
-    `bpy_utils.convert_materials_to_principled(objects)`
-
-    `bpy_utils.make_material_independent_from_object(objects)`
-
-    #### Default: `True`
-    """
-
-    pre_bake_labels: list = []
-    """
-    Bakes and replaces the nodes with the labels specified. See `label_mix_shader_nodes` and `bake_by_label`.
-
-    #### Default: `[]`
-    """
-
-    split_faces_by_materials: bool = True
-    """
-    Split the bake mesh faces by materials.
-
-    To negate the effect of the `ADJACENT_FACES` margin generation bleeding between different materials.
-
-    #### Default: `True`
     """
 
 @dataclasses.dataclass

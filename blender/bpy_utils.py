@@ -853,40 +853,16 @@ def move_objects_to_new_collection(objects: typing.List[bpy.types.Object], colle
     return layer_collection
 
 
-def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Bake_Materials, *,
+def pack_and_task(
+            objects: typing.List[bpy.types.Object],
+            settings: tool_settings.S_Bake_Materials,
+            *,
             bake_settings: typing.Optional[tool_settings.S_Bake] = None,
             pack_settings: typing.Optional[tool_settings.S_Pack_UVs] = None,
         ):
 
 
-    if not objects:
-        utils.print_in_color(utils.get_color_code(245, 115, 30, 10, 10, 10), "No objects were provided for baking.")
-        return []
-
-
-    incompatible_objects = set(objects) - set(get_meshable_objects(objects))
-    if incompatible_objects:
-        raise ValueError(
-            f"Specified objects cannot be baked, type must be MESH or convertible to MESH."
-            "\n"
-            f"Objects: {[o.name_full for o in objects]}"
-            "\n"
-            f"Incompatible: {[o.name_full for o in incompatible_objects]}"
-        )
-
-
-    with bpy_context.Global_Optimizations(), bpy_context.Focus(objects), bpy_context.State() as state:
-
-        ## disable animation for consistency
-        for object in objects:
-            if object.animation_data:
-
-                for driver in object.animation_data.drivers:
-                    state.set(driver, 'mute', True)
-
-                for nla_track in object.animation_data.nla_tracks:
-                    state.set(nla_track, 'mute', True)
-
+    with bpy_context.Global_Optimizations(), bpy_context.Focus(objects):
 
         ## process the materials
 
@@ -895,9 +871,7 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
         # TODO: it might be possible to convert the materials on the bake proxy and leave the original intact
         # but to sort them into alpha and non-alpha they should be converter first
 
-        if settings.convert_materials:
-            bpy_material.convert_materials_to_principled(objects, remove_unused=False)
-
+        bpy_material.convert_materials_to_principled(objects, remove_unused=False)
         bpy_material.set_out_of_range_material_indexes_to_zero(objects)
         bpy_material.merge_material_slots_with_the_same_materials(objects)
 
@@ -1058,23 +1032,60 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
             bake_tasks.append(_bake_settings)
 
 
+    return bake_tasks, pre_bake_tasks
+
+
+def copy_and_bake(
+        objects: typing.List[bpy.types.Object],
+        tasks: typing.Tuple[typing.List[tool_settings.S_Bake], typing.List[tool_settings.S_Bake]],
+        pre_bake_labels: typing.List[str] = tuple(),
+        isolate_object_hierarchies = False,
+        split_faces_by_materials = True,
+    ):
+    """
+    `pre_bake_labels`: Bakes and replaces the nodes with the labels specified. See `label_mix_shader_nodes` and `bake_by_label`.
+
+    `isolate_object_hierarchies``: Space out object hierarchies, grouped by a top common parent, before baking.
+    To prevent them affecting each other, aka exploded bake.
+
+    `split_faces_by_materials`: Split the bake mesh faces by materials.
+    To negate the effect of the `ADJACENT_FACES` margin generation bleeding between different materials.
+    """
+
+
+    if not objects:
+        utils.print_in_color(utils.get_color_code(245, 115, 30, 10, 10, 10), "No objects were provided for baking.")
+        return
+
+
+    with bpy_context.Global_Optimizations(), bpy_context.Focus(objects), bpy_context.State() as state:
+
+
+        ## disable animation for consistency
+        for object in objects:
+            if object.animation_data:
+
+                for driver in object.animation_data.drivers:
+                    state.set(driver, 'mute', True)
+
+                for nla_track in object.animation_data.nla_tracks:
+                    state.set(nla_track, 'mute', True)
+
+
         ## join the bake proxy object
-
-
         objects_copy = deep_copy_objects(objects)
 
-        if settings.convert_materials:
-            texture_coordinates_collection = bpy_material.make_material_independent_from_object(objects_copy)
+        texture_coordinates_collection = bpy_material.make_material_independent_from_object(objects_copy)
 
         convert_to_mesh(objects_copy)
 
-        if settings.isolate_object_hierarchies:
+        if isolate_object_hierarchies:
             space_out_objects(objects_copy)
 
         bake_proxy = join_objects(objects_copy, name = '__bc_bake')
 
 
-        if settings.split_faces_by_materials:
+        if split_faces_by_materials:
             bpy_material.split_faces_by_materials(bake_proxy)
 
 
@@ -1091,26 +1102,31 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
 
 
         ## bake
+        bake_tasks, pre_bake_tasks = tasks
+
         for pre_bake_settings in pre_bake_tasks:
             bpy_bake.bake([bake_proxy], pre_bake_settings)
 
         for bake_settings in bake_tasks:
-            with Pre_Baked([bake_proxy], settings.pre_bake_labels, bake_settings):
+            with Pre_Baked([bake_proxy], pre_bake_labels, bake_settings):
                 bpy_bake.bake([bake_proxy], bake_settings)
 
 
         ## delete temporal objects
         bpy.data.batch_remove((bake_proxy.data, bake_proxy))
 
-        if settings.convert_materials:
-            bpy.data.batch_remove(set(texture_coordinates_collection.objects))
-            bpy.data.collections.remove(texture_coordinates_collection)
+        bpy.data.batch_remove(set(texture_coordinates_collection.objects))
+        bpy.data.collections.remove(texture_coordinates_collection)
 
 
-    return bake_tasks
+def assign_new_materials(
+            objects: typing.List[bpy.types.Object],
+            tasks: typing.Tuple[typing.List[tool_settings.S_Bake], typing.List[tool_settings.S_Bake]],
+        ):
 
 
-def assign_new_materials(objects: typing.List[bpy.types.Object], bake_tasks: typing.List[tool_settings.S_Bake]):
+    bake_tasks, _ = tasks
+
 
     with bpy_context.Focus(objects):
 
