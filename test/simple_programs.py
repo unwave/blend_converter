@@ -59,8 +59,9 @@ def get_bake_program(blend_dir: str, blender_executable: str):
 
     program.run(blender, bpy_utils.apply_modifiers, objects)
 
-    program.run(blender, bpy_utils.pack_copy_bake, objects, settings)
+    bake_tasks = program.run(blender, bpy_utils.pack_copy_bake, objects, settings)
 
+    program.run(blender, bpy_utils.assign_new_materials, objects, bake_tasks)
 
     program.run(blender, bpy_utils.select_uv_layer, objects, uv_layer_name)
 

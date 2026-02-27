@@ -1095,12 +1095,24 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
             bpy_bake.bake([bake_proxy], pre_bake_settings)
 
         for bake_settings in bake_tasks:
-            if settings.pre_bake_labels:
-                with Pre_Baked([bake_proxy], settings.pre_bake_labels, bake_settings):
-                    bpy_bake.bake([bake_proxy], bake_settings)
-            else:
+            with Pre_Baked([bake_proxy], settings.pre_bake_labels, bake_settings):
                 bpy_bake.bake([bake_proxy], bake_settings)
 
+
+        ## delete temporal objects
+        bpy.data.batch_remove((bake_proxy.data, bake_proxy))
+
+        if settings.convert_materials:
+            bpy.data.batch_remove(set(texture_coordinates_collection.objects))
+            bpy.data.collections.remove(texture_coordinates_collection)
+
+
+    return bake_tasks
+
+
+def assign_new_materials(objects: typing.List[bpy.types.Object], bake_tasks: typing.List[tool_settings.S_Bake]):
+
+    with bpy_context.Focus(objects):
 
         ## create new materials
         new_materials = {}
@@ -1119,26 +1131,14 @@ def pack_copy_bake(objects: typing.List[bpy.types.Object], settings: tool_settin
             )
 
 
-        ## assign the baked materials
+        ## assign the materials
         for object in objects:
             for material_slot in object.material_slots:
-                for material_key in (opaque_material_key, alpha_material_key):
+                for material_key in new_materials:
                     if material_slot.material.get(material_key):
                         material_slot.material = new_materials[material_key]
 
         bpy_material.merge_material_slots_with_the_same_materials(objects)
-
-
-        ## delete temporal objects
-
-        bpy.data.batch_remove((bake_proxy.data, bake_proxy))
-
-        if settings.convert_materials:
-            bpy.data.batch_remove(set(texture_coordinates_collection.objects))
-            bpy.data.collections.remove(texture_coordinates_collection)
-
-
-        return objects
 
 
 def is_smooth_modifier(modifier: bpy.types.Modifier):
