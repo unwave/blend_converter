@@ -1649,6 +1649,9 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
 
                     other_node['Alpha'] = mix_add.get_input(0)
 
+                    if principled_2.label == 'ShaderNodeBsdfTransparent':
+                        other_node.inputs['Alpha'].insert_new('ShaderNodeInvert', new_node_identifier = 'Color')
+
                     finish(other_node, transparent_node)
                     continue
 
