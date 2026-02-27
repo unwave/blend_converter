@@ -133,7 +133,7 @@ class Socket_Identifier:
         EMISSION = 'Emission Color'
         SPECULAR_IOR = 'Specular IOR Level'
         SUBSURFACE = 'Subsurface Weight'
-        TRANSMISSION = 'Transmission'
+        TRANSMISSION = 'Transmission Weight'
         CLEARCOAT = 'Coat Weight'
         SHEEN = 'Sheen Weight'
     else:
