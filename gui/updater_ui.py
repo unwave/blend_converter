@@ -9,11 +9,13 @@ import subprocess
 import collections
 import base64
 import shutil
+import functools
 
 import pyperclip
 import wx
 import wx.lib.newevent
 import wx.lib.agw.aui as aui
+import wx.ribbon as RB
 
 
 from .. import utils
@@ -62,6 +64,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         self.Bind(wx.EVT_LEFT_DCLICK, self._on_left_double_click)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_item_selected)
+        self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.on_item_selected)
         self.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.on_right_click)
 
         self.ignore_select_events = False
@@ -181,7 +184,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             self.on_show_source_in_explorer(entry)
 
         elif mask == (False, True, True):
-            self.on_open_result(entry)
+            self.open_result(entry)
         elif mask == (False, True, False):
             if os.path.exists(entry.program.result_path):
                 self.on_show_result_in_explorer(entry)
@@ -226,7 +229,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         menu_item = menu.append_item(f"Show Result", get_func(utils.os_show, entry.program.result_path))
         menu_item.Enable(os.path.exists(entry.program.result_path))
 
-        menu_item = menu.append_item(f"Open Result", get_func(self.on_open_result, entry))
+        menu_item = menu.append_item(f"Open Result", get_func(self.open_result, entry))
         menu_item.Enable(os.path.exists(entry.program.result_path))
 
         menu_item = menu.append_item(f"Show Result Dir", get_func(utils.os_open, os.path.dirname(entry.program.result_path)))
@@ -272,42 +275,52 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         menu.append_separator()
 
-        menu_item = menu.append_item(f"Force Execute Selected", get_func(self.on_force_execute_selected))
+        menu_item = menu.append_item(f"Force Execute Selected", self.on_force_execute_selected)
 
         menu.append_separator()
 
-        menu_item = menu.append_item(f"Set Config", get_func(self.on_set_config, entry))
+        menu_item = menu.append_item(f"Set Config", get_func(self.set_config, entry))
         menu_item.Enable(bool(entry.program.config))
 
         menu.append_separator()
-        menu_item = menu.append_item(f"Enable Live Update", get_func(self.on_enable_live_update, True))
-        menu_item = menu.append_item(f"Disable Live Update", get_func(self.on_enable_live_update, False))
+        menu_item = menu.append_item(f"Enable Live Update", get_func(self.enable_live_update, True))
+        menu_item = menu.append_item(f"Disable Live Update", get_func(self.enable_live_update, False))
 
 
         self.PopupMenu(menu)
         menu.Destroy()
 
 
-    def on_enable_live_update(self, value):
+    def enable_live_update(self, value):
         for entry in self.get_selected_items():
             entry.is_live_update = value
+        wx.CallAfter(self.main_frame.update_ribbon_state)
         self.Refresh()
+
+
+    def on_enable_live_update(self, event):
+        self.enable_live_update(True)
+
+
+    def on_disable_live_update(self, event):
+        self.enable_live_update(False)
 
 
     def on_item_selected(self, event: wx.ListEvent):
 
-        if self.ignore_select_events:
-            return
+        if not self.ignore_select_events:
 
-        entry = self.data[int(event.GetIndex())]
+            entry = self.data[int(event.GetIndex())]
 
-        self.main_frame.stdout_viewer.data = entry.stdout_lines
-        self.main_frame.stdout_viewer.update()
+            self.main_frame.stdout_viewer.data = entry.stdout_lines
+            self.main_frame.stdout_viewer.update()
 
-        self.main_frame.stderr_viewer.data = entry.stderr_lines
-        self.main_frame.stderr_viewer.update()
+            self.main_frame.stderr_viewer.data = entry.stderr_lines
+            self.main_frame.stderr_viewer.update()
 
-        self.main_frame.Refresh()
+        wx.CallAfter(self.main_frame.update_ribbon_state)
+
+        event.Skip()
 
 
     def on_poke_entries(self, entry: updater.Program_Entry):
@@ -349,7 +362,8 @@ class Model_List(wxp_utils.Item_Viewer_Native):
     def on_show_result_in_explorer(self, entry: updater.Program_Entry):
         utils.os_show(entry.program.result_path)
 
-    def on_open_result(self, entry: updater.Program_Entry):
+
+    def open_result(self, entry: updater.Program_Entry):
         path = entry.program.result_path
 
         if not os.path.exists(path):
@@ -434,7 +448,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         entry.update(main_frame.updater.poke_waiting_for_dependency)
 
 
-    def on_set_config(self, entry: updater.Program_Entry):
+    def set_config(self, entry: updater.Program_Entry):
 
         config = entry.program.config
         if not config:
@@ -475,7 +489,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.Refresh()
 
 
-    def on_force_execute_selected(self):
+    def on_force_execute_selected(self, event):
         for entry in self.get_selected_items():
             entry.is_manual_update = True
         self.Refresh()
@@ -584,6 +598,47 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             entry.program.write_report()
 
         self.main_frame.updater.poke_all()
+
+
+    def on_show_source_files(self, event):
+
+        paths = [entry.program.blend_path for entry in self.get_selected_items()]
+        paths = utils.deduplicate(paths)
+        paths = [p for p in paths if p and os.path.exists(p)]
+
+        utils.os_show(paths)
+
+
+    def on_show_result_files(self, event):
+
+        paths = [entry.program.result_path for entry in self.get_selected_items()]
+        paths = utils.deduplicate(paths)
+        paths = [p for p in paths if p and os.path.exists(p)]
+
+        utils.os_show(paths)
+
+
+    def on_open_source_files(self, event):
+
+        for entry in self.get_selected_items():
+            cmd = [entry.program.blender_executable, entry.program.blend_path]
+            utils.open_blender_detached(*cmd)
+
+
+    def on_open_result_files(self, event):
+
+        for entry in self.get_selected_items():
+            self.open_result(entry)
+
+
+    def get_active_item(self):
+        index = self.get_active_index()
+        if index >= 0:
+            return self.data[index]
+
+
+    def on_set_config(self, event):
+        self.set_config(self.get_active_item())
 
 
 class Output_Lines(wxp_utils.Item_Viewer_Native):
@@ -787,9 +842,80 @@ Event_Stdout_Line_Printed, EVT_STDOUT_LINE_PRINTED = wx.lib.newevent.NewEvent()
 Event_Stderr_Line_Printed, EVT_STDERR_LINE_PRINTED = wx.lib.newevent.NewEvent()
 
 
+@functools.lru_cache(None)
+def get_bitmap(id, size=(48, 48)):
+    bitmap: wx.Bitmap = wx.ArtProvider.GetBitmap(id, wx.ART_TOOLBAR, size)
+
+    image: wx.Image = bitmap.ConvertToImage()
+    if image.HasAlpha():
+        return bitmap
+
+    image.InitAlpha()
+
+    for y in range(image.GetHeight()):
+        for x in range(image.GetWidth()):
+            if image.GetRed(x, y) == 0 and image.GetGreen(x, y) == 0 and image.GetBlue(x, y) == 1:
+                image.SetAlpha(x, y, 0)
+
+    return image.ConvertToBitmap()
+
+
 class BC_App(wx.App):
 
     main_frame: Main_Frame
+
+
+class Button:
+
+    TERMINATE_ALL = wx.NewIdRef()
+    EXECUTE = wx.NewIdRef()
+    CONFIGURE = wx.NewIdRef()
+
+    SHOW_SOURCE_FILES = wx.NewIdRef()
+    SHOW_RESULT_FILES = wx.NewIdRef()
+
+    EDIT_SOURCE_FILES = wx.NewIdRef()
+    EDIT_RESULT_FILES = wx.NewIdRef()
+
+    PAUSE = wx.NewIdRef()
+    RESUME = wx.NewIdRef()
+
+    ENABLE_LIVE = wx.NewIdRef()
+    DISABLE_LIVE = wx.NewIdRef()
+
+    RESTART = wx.NewIdRef()
+    SETTINGS = wx.NewIdRef()
+
+
+BUTTON_TEXT = {
+    Button.TERMINATE_ALL: "Terminate All",
+    Button.EXECUTE: "Execute",
+    Button.CONFIGURE: "Configure",
+
+    Button.SHOW_SOURCE_FILES: "🌱 Source Show",
+    Button.SHOW_RESULT_FILES: "🏆 Result Show",
+
+    Button.EDIT_SOURCE_FILES: "🌱 Source Edit",
+    Button.EDIT_RESULT_FILES: "🏆 Result Edit",
+
+    Button.PAUSE: "⏸️ Pause",
+    Button.RESUME: "▶️ Resume",
+
+    Button.ENABLE_LIVE: "Enable",
+    Button.DISABLE_LIVE: "Disable",
+
+    Button.RESTART: "Restart",
+    Button.SETTINGS: "Settings",
+}
+
+
+BUTTONS_WITH_COUNT =[
+    Button.EXECUTE,
+    Button.SHOW_SOURCE_FILES,
+    Button.SHOW_RESULT_FILES,
+    Button.EDIT_SOURCE_FILES,
+    Button.EDIT_RESULT_FILES,
+]
 
 
 class Main_Frame(wxp_utils.Generic_Frame):
@@ -829,7 +955,12 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
 
+        self.init_ribbon_ui()
         self.init_ui()
+        self.init_ribbon_events()
+        self.map_button_to_id()
+        self.update_ribbon_state()
+        self.ribbon.Realize()
 
         self.SetSizer(self.sizer)
 
@@ -876,6 +1007,170 @@ class Main_Frame(wxp_utils.Generic_Frame):
             frame.show_console(False)
 
         return app
+
+
+    def init_ribbon_ui(self):
+
+        self.ribbon = RB.RibbonBar(self, style = RB.RIBBON_BAR_DEFAULT_STYLE)
+        self.sizer.Add(self.ribbon, 0, wx.EXPAND)
+
+
+
+        main_page = RB.RibbonPage(self.ribbon, wx.ID_ANY, "Main")
+
+
+        execution = RB.RibbonPanel(main_page, wx.ID_ANY, "Execution", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(execution)
+        bar.AddButton(Button.TERMINATE_ALL, BUTTON_TEXT[Button.TERMINATE_ALL], get_bitmap(wx.ART_DELETE), "Terminate all entries and pause.")
+        bar.AddButton(Button.EXECUTE, "", get_bitmap(wx.ART_REDO), "Execute selected entries.")
+        bar.AddButton(Button.CONFIGURE, BUTTON_TEXT[Button.CONFIGURE], get_bitmap(wx.ART_REPORT_VIEW), "Open the entry;s configuration.")
+
+
+        live = RB.RibbonPanel(main_page, wx.ID_ANY, "Live", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(live)
+        bar.AddButton(Button.PAUSE, BUTTON_TEXT[Button.PAUSE], get_bitmap(wx.ART_CLOSE), "Pause the live execution.")
+        bar.AddButton(Button.RESUME, BUTTON_TEXT[Button.RESUME], get_bitmap(wx.ART_TICK_MARK), "Resume the live execution.")
+        bar.AddButton(Button.ENABLE_LIVE, "", get_bitmap(wx.ART_ADD_BOOKMARK), "")
+        bar.AddButton(Button.DISABLE_LIVE, "", get_bitmap(wx.ART_DEL_BOOKMARK), "")
+
+
+        files = RB.RibbonPanel(main_page, wx.ID_ANY, "Files", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(files)
+        bar.AddButton(Button.SHOW_SOURCE_FILES, "", get_bitmap(wx.ART_FIND), "Show source files in the file explorer.")
+        bar.AddButton(Button.EDIT_SOURCE_FILES, "", get_bitmap(wx.ART_FIND_AND_REPLACE), "Open source files.")
+        bar.AddButton(Button.SHOW_RESULT_FILES, "", get_bitmap(wx.ART_FIND), "Show result files in the file explorer.")
+        bar.AddButton(Button.EDIT_RESULT_FILES, "", get_bitmap(wx.ART_CUT), "Open result files.")
+        # bar.AddButton(wx.ID_NEW, "Open Folder", get_bitmap(wx.ART_FOLDER_OPEN), "")
+
+
+        app_misc = RB.RibbonPanel(main_page, wx.ID_ANY, "App", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(app_misc)
+        bar.AddButton(Button.RESTART, BUTTON_TEXT[Button.RESTART], get_bitmap(wx.ART_UNDO), "Restart the GUI.")
+        bar.AddButton(Button.SETTINGS, BUTTON_TEXT[Button.SETTINGS], get_bitmap(wx.ART_EDIT), "Open the GUI settings.")
+
+
+
+        inspect_page = RB.RibbonPage(self.ribbon, wx.ID_ANY, "Inspect")
+
+        stdout = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Output", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(stdout)
+        bar.AddButton(wx.ID_NEW, "Stdout", get_bitmap(wx.ART_FIND), "")
+        bar.AddButton(wx.ID_NEW, "Stderr", get_bitmap(wx.ART_FIND), "")
+
+        script = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Script", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(script)
+        bar.AddButton(wx.ID_NEW, "Show", get_bitmap(wx.ART_FIND), "")
+
+        compare = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Compare", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(compare)
+        bar.AddButton(wx.ID_NEW, "Compare", get_bitmap(wx.ART_FULL_SCREEN), "")
+
+        difference = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Difference", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(difference)
+        bar.AddButton(wx.ID_NEW, "VSCode (Single Entry)", get_bitmap(wx.ART_MISSING_IMAGE), "")
+        bar.AddButton(wx.ID_NEW, "Diff", get_bitmap(wx.ART_MISSING_IMAGE), "")
+        bar.AddButton(wx.ID_NEW, "Diff Inline", get_bitmap(wx.ART_MISSING_IMAGE), "")
+
+        status = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Status", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(status)
+        bar.AddButton(wx.ID_NEW, "Set As Updated", get_bitmap(wx.ART_TICK_MARK), "")
+        bar.AddButton(wx.ID_NEW, "Set As Needs Update", get_bitmap(wx.ART_CLOSE), "")
+        bar.AddButton(wx.ID_NEW, "Poke", get_bitmap(wx.ART_QUESTION), "")
+
+        copy = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Copy", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(copy)
+        bar.AddButton(wx.ID_NEW, "Command", get_bitmap(wx.ART_COPY), "")
+        bar.AddButton(wx.ID_NEW, "Folder Basename", get_bitmap(wx.ART_COPY), "")
+        bar.AddButton(wx.ID_NEW, "Source Path", get_bitmap(wx.ART_COPY), "")
+
+
+        layout = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Layout", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(layout)
+        bar.AddButton(wx.ID_NEW, "Print", get_bitmap(wx.ART_PASTE), "")
+        bar.AddButton(wx.ID_NEW, "Restore", get_bitmap(wx.ART_GO_HOME), "")
+
+        console = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Console", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(console)
+        bar.AddButton(wx.ID_NEW, "Show On Top", get_bitmap(wx.ART_GO_TO_PARENT), "")
+        bar.AddButton(wx.ID_NEW, "Toggle", get_bitmap(wx.ART_HELP_SETTINGS), "")
+
+
+    def map_button_to_id(self):
+
+        self.button_id_to_bar: typing.Dict[wx.WindowIDRef, RB.RibbonButtonBar] = {}
+
+        for page in self.ribbon.GetChildren():
+            if isinstance(page, RB.RibbonPage):
+                for panel in page.GetChildren():
+                    if isinstance(panel, RB.RibbonPanel):
+                        for bar in panel.GetChildren():
+                            if isinstance(bar, RB.RibbonButtonBar):
+                                for i in range(bar.GetButtonCount()):
+                                    self.button_id_to_bar[bar.GetItemId(bar.GetItem(i))] = bar
+
+
+    def enable_button(self, id: wx.WindowIDRef, enable: bool):
+        bar = self.button_id_to_bar[id]
+        bar.EnableButton(id, enable)
+
+
+    def set_button_text(self, id: wx.WindowIDRef, text: str):
+        bar = self.button_id_to_bar[id]
+        bar.SetButtonText(id, text)
+
+
+    def update_ribbon_state(self):
+
+        self.ribbon.Freeze()
+
+        active = self.result_panel.model_list.get_active_item()
+        selected = self.result_panel.model_list.get_selected_items()
+
+        for id in BUTTONS_WITH_COUNT:
+            self.set_button_text(id, BUTTON_TEXT[id] + f" ({len(selected)})")
+            self.enable_button(id, bool(len(selected)))
+
+        is_configurable = bool(active and active.program.config)
+        self.enable_button(Button.CONFIGURE, is_configurable)
+        self.set_button_text(Button.CONFIGURE, BUTTON_TEXT[Button.CONFIGURE] + f"{' 🚫' if not is_configurable else ''}")
+
+
+        enabled_live_count = sum(entry.is_live_update for entry in selected)
+        disabled_live_count = len(selected) - enabled_live_count
+
+        self.enable_button(Button.ENABLE_LIVE, bool(disabled_live_count))
+        self.enable_button(Button.DISABLE_LIVE, bool(enabled_live_count))
+        self.set_button_text(Button.ENABLE_LIVE, BUTTON_TEXT[Button.ENABLE_LIVE] + f" ({disabled_live_count}/{len(selected)})")
+        self.set_button_text(Button.DISABLE_LIVE, BUTTON_TEXT[Button.DISABLE_LIVE] + f" ({enabled_live_count}/{len(selected)})")
+
+
+        self.ribbon.Realize()
+
+        self.ribbon.Thaw()
+
+
+    def init_ribbon_events(self):
+
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_terminate_and_pause, Button.TERMINATE_ALL)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_force_execute_selected, Button.EXECUTE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_set_config, Button.CONFIGURE)
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_source_files, Button.SHOW_SOURCE_FILES)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_open_source_files, Button.EDIT_SOURCE_FILES)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_result_files,  Button.SHOW_RESULT_FILES)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_open_result_files,  Button.EDIT_RESULT_FILES)
+
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_pause, Button.PAUSE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_resume, Button.RESUME)
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_enable_live_update, Button.ENABLE_LIVE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_disable_live_update, Button.DISABLE_LIVE)
+
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_restart, Button.RESTART)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_settings, Button.SETTINGS)
 
 
     def init_ui(self):
@@ -992,6 +1287,14 @@ class Main_Frame(wxp_utils.Generic_Frame):
             self.pause_menu_item.SetItemLabel("Pause\tCtrl+P")
 
 
+    def on_pause(self, event):
+        self.pause(True)
+
+
+    def on_resume(self, event):
+        self.pause(False)
+
+
     def on_mark_update_all(self, event):
 
         for entry in self.updater.entries:
@@ -1059,7 +1362,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
                     'show_source_in_explorer': self.result_panel.model_list.on_show_source_in_explorer,
                     'open_source': self.result_panel.model_list.on_open_source,
                     'show_result_in_explorer': self.result_panel.model_list.on_show_result_in_explorer,
-                    'open_result': self.result_panel.model_list.on_open_result,
+                    'open_result': self.result_panel.model_list.open_result,
                     'nothing': self.result_panel.model_list.on_empty_double_click_function,
                 },
                 self.result_panel.model_list.double_click_function
