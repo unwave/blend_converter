@@ -293,11 +293,15 @@ def unify_color_attributes_format(objects: typing.List[bpy.types.Object]):
         if len(formats) <= 1:
             continue
 
-        for object in objects:
-            if color_attribute_name in object.data.color_attributes.keys():
+        with bpy_context.Focus(objects):
+
+            for object in objects:
+
+                if not color_attribute_name in object.data.color_attributes.keys():
+                    continue
+
                 object.data.color_attributes.active_color = object.data.color_attributes[color_attribute_name]
-                with bpy_context.Focus(object):
-                    bpy_context.call_for_object(object, bpy.ops.geometry.color_attribute_convert, domain='CORNER', data_type='FLOAT_COLOR')
+                bpy_context.call_for_object(object, bpy.ops.geometry.color_attribute_convert, domain='CORNER', data_type='FLOAT_COLOR')
 
 
 def make_materials_unique(object: bpy.types.Object, filter_func: typing.Optional[typing.Callable[[bpy.types.MaterialSlot], bool]] = None):
@@ -333,15 +337,17 @@ def convert_materials_to_principled(objects: typing.List[bpy.types.Object], remo
 
     if remove_unused:
 
-        for object in objects:
+        with bpy_context.Focus(objects):
 
-            if not hasattr(object, 'material_slots'):
-                continue
+            for object in objects:
 
-            if not object.material_slots:
-                continue
+                if not hasattr(object, 'material_slots'):
+                    continue
 
-            with bpy_context.Focus(object):
+                if not object.material_slots:
+                    continue
+
+                bpy_context.simple_select(object)
                 bpy.ops.object.material_slot_remove_unused()
 
 
@@ -826,13 +832,16 @@ def make_material_independent_from_object(objects: typing.List[bpy.types.Object]
 
 def merge_material_slots_with_the_same_materials(objects: typing.List[bpy.types.Object]):
 
-    for object in bpy_utils.get_unique_data_objects(objects):
+    objects = bpy_utils.get_unique_data_objects(objects)
 
-        index_to_polygons = utils.list_by_key(object.data.polygons.values(), operator.attrgetter('material_index'))
-        material_to_indexes = utils.list_by_key(index_to_polygons, lambda i: object.material_slots[i].material)
+    with bpy_context.Focus(objects):
 
+        for object in objects:
+            bpy_context.simple_select(object)
 
-        with bpy_context.Focus(object):
+            index_to_polygons = utils.list_by_key(object.data.polygons.values(), operator.attrgetter('material_index'))
+            material_to_indexes = utils.list_by_key(index_to_polygons, lambda i: object.material_slots[i].material)
+
             bpy.ops.object.material_slot_remove_all()
 
             index_to_new_index = {}

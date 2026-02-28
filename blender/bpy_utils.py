@@ -1176,28 +1176,33 @@ def apply_modifiers(objects: typing.List[bpy.types.Object], *, ignore_name = '',
     E.g. `ignore_name = '@'` — ignore all modifiers starting with "@".
     """
 
-    for object in objects:
+    with bpy_context.Focus(objects):
+
+        for object in objects:
 
 
-        modifiers_to_apply = []
+            modifiers_to_apply = []
 
-        for modifier in list(object.modifiers):
+            for modifier in list(object.modifiers):
 
-            if ignore_type and modifier.type in ignore_type:
+                if ignore_type and modifier.type in ignore_type:
+                    continue
+
+                if include_type and modifier.type not in include_type:
+                    continue
+
+                if ignore_name and re.match(ignore_name, modifier.name):
+                    continue
+
+                if include_name and not re.match(include_name, modifier.name):
+                    continue
+
+                modifiers_to_apply.append(modifier.name)
+
+            if not modifiers_to_apply:
                 continue
 
-            if include_type and modifier.type not in include_type:
-                continue
 
-            if ignore_name and re.match(ignore_name, modifier.name):
-                continue
-
-            if include_name and not re.match(include_name, modifier.name):
-                continue
-
-            modifiers_to_apply.append(modifier.name)
-
-        with bpy_context.Focus(object):
             for name in modifiers_to_apply:
                 bpy_modifier.apply_modifier(object.modifiers[name])
 
@@ -1547,28 +1552,35 @@ def bisect_by_mirror_modifiers(objects: typing.List[bpy.types.Object]):
 def clean_up_topology_and_triangulate_ngons(objects: typing.List[bpy.types.Object], split_concave_faces = True, tris_to_quads = True):
     """ The Ministry of Flat unwrapping can produce bad results if ngons or loose geometry is present. """
 
-    for object in get_unique_mesh_objects(objects):
+    objects = get_unique_mesh_objects(objects)
 
-        with bpy_context.Focus(object):
+    if not objects:
+        utils.print_in_color(utils.get_color_code(245, 115, 30, 10, 10, 10), "No mesh objects to cleanup.")
+        return
 
-            with bpy_context.Focus(object, mode = 'EDIT'):
-                bpy.ops.mesh.reveal()
-                bpy.ops.mesh.select_all(action='SELECT')
-                bpy.ops.mesh.delete_loose()
-                bpy.ops.mesh.select_all(action='SELECT')
-                bpy.ops.mesh.dissolve_degenerate()
+    with bpy_context.Focus(objects):
 
+        with bpy_context.Focus(objects, mode = 'EDIT'):
+            bpy.ops.mesh.reveal()
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.delete_loose()
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.dissolve_degenerate()
+
+        for object in objects:
             bpy_modifier.apply_triangulate(object, keep_custom_normals = True, min_vertices = 5)
 
-            if split_concave_faces or tris_to_quads:
-                with bpy_context.Focus(object, mode = 'EDIT'):
-                    bpy.ops.mesh.select_all(action='SELECT')
-                    if tris_to_quads:
-                        # TODO: ideally should be applied only to the former ngons
-                        bpy.ops.mesh.tris_convert_to_quads(uvs=True, vcols=True, seam=True, sharp=True, materials=True)
-                    if split_concave_faces:
-                        # might not be necessary but just in case
-                        bpy.ops.mesh.vert_connect_concave()
+        if not (split_concave_faces or tris_to_quads):
+            return
+
+        with bpy_context.Focus(objects, mode = 'EDIT'):
+            bpy.ops.mesh.select_all(action='SELECT')
+            if tris_to_quads:
+                # TODO: ideally should be applied only to the former ngons
+                bpy.ops.mesh.tris_convert_to_quads(uvs=True, vcols=True, seam=True, sharp=True, materials=True)
+            if split_concave_faces:
+                # might not be necessary but just in case
+                bpy.ops.mesh.vert_connect_concave()
 
 
 def do_nothing(*args, **kwargs):

@@ -1483,6 +1483,18 @@ class Focus:
         self.references.__exit__(type, value, traceback)
 
 
+def simple_select(object: bpy.types.Object, view_layer: 'bpy.types.ViewLayer' = None):
+
+    if view_layer is None:
+        view_layer = bpy.context.view_layer
+
+    for o in bpy.context.selected_objects:
+        o.select_set(False, view_layer = view_layer)
+
+    object.select_set(True, view_layer = view_layer)
+    view_layer.objects.active = object
+
+
 class Light_Map_Bake_Settings(State):
 
 
