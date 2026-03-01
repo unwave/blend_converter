@@ -42,11 +42,11 @@ class Status:
     UNKNOWN = 'unknown'
 
 STATUS_ICON = {
-    Status.OK: '✔️',
+    Status.OK: '👍',
     Status.STALE: '🦕',
     Status.UPDATING: '🔨',
     Status.YIELDING: '⛔',
-    Status.ERROR: '❌',
+    Status.ERROR: '❗',
     Status.DOES_NOT_EXIST: '👻',
     Status.WAITING_FOR_DEPENDENCY: '🔒',
     Status.UNKNOWN: '❓',
