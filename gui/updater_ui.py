@@ -24,7 +24,6 @@ from .. import updater
 
 from ..blender import blender_server
 
-from . import wx_blend
 from . import wxp_utils
 
 
