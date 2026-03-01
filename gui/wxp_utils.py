@@ -128,10 +128,10 @@ class Item_Viewer(ULC.UltimateListCtrl):
     def _on_left_double_click(self, event: wx.MouseEvent):
         item, flags = self.HitTest(event.GetPosition())
         if flags and flags & ULC.ULC_HITTEST_ONITEM:
-            self.on_left_double_click(item, event)
+            self.left_double_click(item, event)
 
 
-    def on_left_double_click(self, index: int, event: wx.MouseEvent):
+    def left_double_click(self, index: int, event: wx.MouseEvent):
         print('on_left_double_click', index)
 
 
@@ -174,10 +174,10 @@ class Item_Viewer_Native(wx.ListCtrl):
     def _on_left_double_click(self, event: wx.MouseEvent):
         item, flags = self.HitTest(event.GetPosition())
         if flags & wx.LIST_HITTEST_ONITEM:
-            self.on_left_double_click(item, event)
+            self.left_double_click(item, event)
 
 
-    def on_left_double_click(self, index: int, event: wx.MouseEvent):
+    def left_double_click(self, index: int, event: wx.MouseEvent):
         print('on_left_double_click', index)
 
 

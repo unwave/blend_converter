@@ -73,7 +73,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         self.Bind(wx.EVT_KEY_DOWN, self.on_key)
 
-        self.double_click_function: typing.Optional[typing.Callable[[updater.Program_Entry]]] = self.on_empty_double_click_function
+        self.double_click_function: typing.Optional[typing.Callable[[updater.Program_Entry]]] = self.empty_double_click_function
 
         self.Bind(wx.EVT_LEFT_DCLICK, self._on_left_double_click)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_item_selected)
@@ -89,7 +89,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             self.SetColumnWidth(i, column[1])
 
 
-    def on_empty_double_click_function(self, entry):
+    def empty_double_click_function(self, entry):
         pass
 
 
@@ -180,7 +180,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         return None
 
 
-    def on_left_double_click(self, index: int, event: wx.MouseEvent):
+    def left_double_click(self, index: int, event: wx.MouseEvent):
 
         entry = self.data[index]
 
@@ -192,15 +192,15 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         # shift - open
 
         if mask == (True, False, True):
-            self.on_open_source(entry)
+            self.open_source(entry)
         elif mask == (True, False, False):
-            self.on_show_source_in_explorer(entry)
+            self.show_source_in_explorer(entry)
 
         elif mask == (False, True, True):
             self.open_result(entry)
         elif mask == (False, True, False):
             if os.path.exists(entry.program.result_path):
-                self.on_show_result_in_explorer(entry)
+                self.show_result_in_explorer(entry)
             elif os.path.exists(os.path.dirname(entry.program.result_path)):
                 utils.os_open(os.path.dirname(entry.program.result_path))
             else:
@@ -234,7 +234,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         menu_item = menu.append_item(f"Show Blend", get_func(utils.os_show, blend_path))
         menu_item.Enable(os.path.exists(blend_path))
 
-        menu_item = menu.append_item(f"Open Blend", get_func(self.on_open_source, entry))
+        menu_item = menu.append_item(f"Open Blend", get_func(self.open_source, entry))
         menu_item.Enable(os.path.exists(blend_path))
 
         menu.append_separator()
@@ -283,7 +283,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         # menu_item = menu.append_item(f"Force Update", get_func(self.on_entry_force_update, entry))
 
-        menu_item = menu.append_item(f"Update Selected", get_func(self.on_update_selected))
+        menu_item = menu.append_item(f"Update Selected", self.on_update_selected)
 
         menu.append_separator()
 
@@ -364,14 +364,14 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         wxp_utils.set_clipboard_text(self.get_conversion_command(self.get_selected_items()))
 
 
-    def on_show_source_in_explorer(self, entry: updater.Program_Entry):
+    def show_source_in_explorer(self, entry: updater.Program_Entry):
         utils.os_show(entry.program.blend_path)
 
-    def on_open_source(self, entry: updater.Program_Entry):
+    def open_source(self, entry: updater.Program_Entry):
         self.GetTopLevelParent().blender_server.ensure()
         self.GetTopLevelParent().blender_server.open_mainfile(entry.program.blend_path)
 
-    def on_show_result_in_explorer(self, entry: updater.Program_Entry):
+    def show_result_in_explorer(self, entry: updater.Program_Entry):
         utils.os_show(entry.program.result_path)
 
 
@@ -393,7 +393,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             utils.os_open(path)
 
 
-    def on_show_item(self, item):
+    def show_item(self, item):
         self.deselect_all()
         index = self.data.index(item)
         self.Select(index)
@@ -428,7 +428,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         utils.open_blender_detached(*cmd)
 
 
-    def on_open_source(self, entry: updater.Program_Entry):
+    def open_source(self, entry: updater.Program_Entry):
 
         cmd = [entry.program.blender_executable, entry.program.blend_path]
 
@@ -449,7 +449,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.Refresh()
 
 
-    def on_entry_force_update(self, entry: updater.Program_Entry):
+    def force_update_entry(self, entry: updater.Program_Entry):
 
         main_frame: Main_Frame = self.GetTopLevelParent()
 
@@ -495,7 +495,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.main_frame.on_restart()
 
 
-    def on_update_selected(self):
+    def on_update_selected(self, event):
         for entry in self.get_selected_items():
             if entry.status in (updater.Status.STALE, updater.Status.ERROR):
                 entry.is_manual_update = True
@@ -1525,11 +1525,11 @@ class Main_Frame(wxp_utils.Generic_Frame):
         settings = {
             'double_click_action': (
                 {
-                    'show_source_in_explorer': self.result_panel.model_list.on_show_source_in_explorer,
-                    'open_source': self.result_panel.model_list.on_open_source,
-                    'show_result_in_explorer': self.result_panel.model_list.on_show_result_in_explorer,
+                    'show_source_in_explorer': self.result_panel.model_list.show_source_in_explorer,
+                    'open_source': self.result_panel.model_list.open_source,
+                    'show_result_in_explorer': self.result_panel.model_list.show_result_in_explorer,
                     'open_result': self.result_panel.model_list.open_result,
-                    'nothing': self.result_panel.model_list.on_empty_double_click_function,
+                    'nothing': self.result_panel.model_list.empty_double_click_function,
                 },
                 self.result_panel.model_list.double_click_function
             ),

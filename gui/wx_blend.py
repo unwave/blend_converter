@@ -1117,7 +1117,7 @@ class URL_List(wx.ListCtrl):
     def _on_left_double_click(self, event: wx.MouseEvent):
         item, flags = self.HitTest(event.GetPosition())
         if flags & wx.LIST_HITTEST_ONITEM:
-            self.on_left_double_click(item, event)
+            self.left_double_click(item, event)
 
     def deselect_all(self):
         index = self.GetFirstSelected()
@@ -1142,9 +1142,9 @@ class URL_List(wx.ListCtrl):
         key_code = event.GetKeyCode()
 
         if key_code == ord('C'):
-            self.on_copy_to_clipboard()
+            self.copy_to_clipboard()
         elif key_code == ord('V'):
-            self.on_add_from_clipboard()
+            self.add_from_clipboard()
 
     def set_data(self, data: typing.List[dict]):
 
@@ -1185,7 +1185,7 @@ class URL_List(wx.ListCtrl):
         self.selected_url = url
         event.Skip()
 
-    def on_left_double_click(self, index: int, event: wx.MouseEvent):
+    def left_double_click(self, index: int, event: wx.MouseEvent):
         url = self.data[index]
         webbrowser.open(url['path'], new = 2, autoraise=True)
 
@@ -1208,21 +1208,21 @@ class URL_List(wx.ListCtrl):
             return wrapper
 
         add_action('Open', get_func(webbrowser.open, url['path'], new = 2, autoraise=True))
-        add_action('Comment', get_func(self.on_url_comment, url, index))
-        add_action('Uncheck' if url.get('is_read', False) else 'Check', get_func(self.on_item_check, url, index))
-        add_action('Edit', get_func(self.on_url_edit, url, index))
-        add_action('Delete', get_func(self.on_delete, url, index))
+        add_action('Comment', get_func(self.comment_url, url, index))
+        add_action('Uncheck' if url.get('is_read', False) else 'Check', get_func(self.check_item, url, index))
+        add_action('Edit', get_func(self.edit_url, url, index))
+        add_action('Delete', get_func(self.delete_url, url, index))
 
         menu.AppendSeparator()
 
-        add_action('Copy To Clipboard', get_func(self.on_copy_to_clipboard))
-        add_action('Add From Clipboard', get_func(self.on_add_from_clipboard))
-        add_action('Add From File', get_func(self.on_add_from_file))
+        add_action('Copy To Clipboard', get_func(self.copy_to_clipboard))
+        add_action('Add From Clipboard', get_func(self.add_from_clipboard))
+        add_action('Add From File', get_func(self.add_from_file))
 
         self.PopupMenu(menu)
         menu.Destroy()
 
-    def on_copy_to_clipboard(self):
+    def copy_to_clipboard(self):
 
         text = []
         for index in self.get_selected_indexes():
@@ -1235,7 +1235,7 @@ class URL_List(wx.ListCtrl):
         if text:
             wxp_utils.set_clipboard_text('\n'.join(text))
 
-    def on_add_from_clipboard(self):
+    def add_from_clipboard(self):
 
         text = wxp_utils.get_clipboard_text()
 
@@ -1249,7 +1249,7 @@ class URL_List(wx.ListCtrl):
 
         self.parent.search.on_search()
 
-    def on_add_from_file(self):
+    def add_from_file(self):
 
         dlg = wx.FileDialog(self, defaultDir = os.getcwd(), wildcard = "All Files|*", style = wx.FD_OPEN | wx.FD_CHANGE_DIR)
         result = dlg.ShowModal()
@@ -1272,7 +1272,7 @@ class URL_List(wx.ListCtrl):
 
         self.parent.search.on_search()
 
-    def on_item_check(self, url: dict, index: int):
+    def check_item(self, url: dict, index: int):
         url['is_read'] = not url.get('is_read', False)
         url['mtime'] = sys_time.time()
 
@@ -1282,7 +1282,7 @@ class URL_List(wx.ListCtrl):
 
         self.parent.search.on_search()
 
-    def on_url_comment(self, url: dict, index: int):
+    def comment_url(self, url: dict, index: int):
 
         data = {
             'comment': url.get('comment', ''),
@@ -1301,7 +1301,7 @@ class URL_List(wx.ListCtrl):
 
         self.parent.search.on_search()
 
-    def on_url_edit(self, url: dict, index: int):
+    def edit_url(self, url: dict, index: int):
 
         data = {
             'name': url.get('name', ''),
@@ -1323,7 +1323,7 @@ class URL_List(wx.ListCtrl):
 
         self.parent.search.on_search()
 
-    def on_delete(self, url: dict, index: int):
+    def delete_url(self, url: dict, index: int):
         name = url.get('name', '')
 
         text = f"Do you want to permanently delete this url?\n\
@@ -1700,7 +1700,7 @@ class Item_List(wxp_utils.Item_Viewer_Native):
         event.Skip()
 
 
-    def on_left_double_click(self, index: int, event: wx.MouseEvent):
+    def left_double_click(self, index: int, event: wx.MouseEvent):
         item: Item = self.data[index]
 
         self.GetTopLevelParent().blender_server.ensure()
