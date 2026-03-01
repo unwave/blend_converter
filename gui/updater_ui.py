@@ -62,7 +62,6 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             ('path', 800, self.get_column_path),
             # ('path_parts', 600, self.get_column_path_parts),
             ('ext', 100, self.get_column_result_type),
-            # ('poke_time', 200, self.get_column_poke_time),
         ]
 
         self.columns.extend(columns)
@@ -155,9 +154,6 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def get_column_result_type(self, item: updater.Program_Entry):
         return os.path.splitext(item.program.result_path)[1]
-
-    def get_column_poke_time(self, item: updater.Program_Entry):
-        return utils.get_time_str_from(item.poke_time)
 
     def get_column_status(self, item: updater.Program_Entry):
         return item.status
@@ -311,6 +307,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def on_enable_live_update(self, event):
         self.enable_live_update(True)
+        self.main_frame.updater.despatch()
 
 
     def on_disable_live_update(self, event):
@@ -337,6 +334,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
     def on_poke_entries(self, event):
         for entry in self.get_selected_items():
             self.main_frame.updater.poke_entry(entry)
+        self.main_frame.updater.despatch()
 
 
     def get_conversion_command(self, entries: typing.Iterable[updater.Program_Entry]):
@@ -445,6 +443,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
     def on_mark_as_needs_update(self, event):
         for entry in self.get_selected_items():
             entry.status = updater.Status.STALE
+        self.main_frame.updater.despatch()
         self.Refresh()
 
 
@@ -486,12 +485,14 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         for entry in self.get_selected_items():
             if entry.status in (updater.Status.STALE, updater.Status.ERROR):
                 entry.is_manual_update = True
+        self.main_frame.updater.despatch()
         self.Refresh()
 
 
     def on_force_execute_selected(self, event):
         for entry in self.get_selected_items():
             entry.is_manual_update = True
+        self.main_frame.updater.despatch()
         self.Refresh()
 
 
@@ -1440,6 +1441,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         else:
             self.SetTitle(self.init_title)
             self.pause_menu_item.SetItemLabel("Pause\tCtrl+P")
+        self.updater.despatch()
 
 
     def on_pause(self, event):
@@ -1455,19 +1457,17 @@ class Main_Frame(wxp_utils.Generic_Frame):
         for entry in self.updater.entries:
             entry.status = updater.Status.STALE
 
+        self.updater.despatch()
         updater.update_ui()
 
 
     def on_terminate_and_pause(self, event):
 
-        if not self.updater.is_paused:
-            self.on_updater_pause_toggle()
+        self.pause(True)
 
         for entry in self.updater.entries:
             entry.is_manual_update = False
             entry.terminate()
-
-        self.updater.poke_all()
 
 
     def on_restart(self, event = None):

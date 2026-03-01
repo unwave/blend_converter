@@ -24,9 +24,6 @@ from . import update_process
 from . import program_getter_process
 
 
-UPDATE_DELAY = 2
-""" For update debouncing. """
-
 SENTINEL = object()
 
 LOG_DIR = os.path.join(utils.BLEND_CONVERTER_USER_DIR, 'logs')
@@ -62,8 +59,6 @@ class Program_Entry:
         self.entry_id = uuid.uuid1().hex
 
         self.program = common.Program(blend_path = '', result_path = '', blender_executable = '')
-
-        self.poke_time = 0
 
         self.stdout_file = ''
         self.stderr_file = ''
@@ -129,14 +124,7 @@ class Program_Entry:
         else:
             self.status = Status.DOES_NOT_EXIST
 
-        self.poke_time = time.time()
-
-        update_ui()
-
-
-    @property
-    def poke_timeout(self):
-        return (time.time() - self.poke_time) > UPDATE_DELAY
+        update_item(self)
 
 
     def _run(self, *, callback: typing.Callable, thread_identity: uuid.UUID, updater_command_queue: 'multiprocessing.SimpleQueue[dict]' = None):
@@ -381,9 +369,9 @@ class Updater:
         def callback(entry: Program_Entry, program: common.Program):
             entry.program = program
             entry.poke(self.has_non_updated_dependency(entry))
-            update_item(entry)
             if program.blend_path and os.path.exists(program.blend_path):
                 self.observer.schedule(self.event_handler, os.path.dirname(program.blend_path))
+            self.despatch()
 
         for entry in self.entries:
 
@@ -409,9 +397,6 @@ class Updater:
         self.poker = threading.Thread(target=self.poking, daemon=True)
         self.poker.start()
 
-        self.dispatcher = threading.Thread(target=self.despatching, daemon=True)
-        self.dispatcher.start()
-
 
     @classmethod
     def from_entries(cls, entries: typing.List[Program_Entry]):
@@ -420,11 +405,8 @@ class Updater:
 
         updater.entries = entries
 
-        updater.poke_all()
-
         updater.init_observer()
 
-        update_ui()
 
         return updater
 
@@ -445,11 +427,15 @@ class Updater:
     def poke_entry(self, entry: Program_Entry):
         entry.poke(self.has_non_updated_dependency(entry))
 
-    def poke_waiting_for_dependency(self):
+
+    def callback(self):
 
         for entry in self.entries:
             if entry.status == Status.WAITING_FOR_DEPENDENCY:
                 self.poke_entry(entry)
+
+        self.despatch()
+
 
     def poke_all(self):
 
@@ -462,94 +448,96 @@ class Updater:
         for entry in entries:
             self.poke_entry(entry)
 
+        self.despatch()
+
 
     def poking(self):
         for path in iter(self.queue.get, None):
+
+            has_poked = False
+
             for entry in self.entries:
                 if entry.program.blend_path == path:
                     self.poke_entry(entry)
+                    has_poked = True
+
+            if has_poked:
+                self.despatch()
 
 
     def total_max_parallel_executions_exceeded(self):
         return sum(entry.status in (Status.UPDATING, Status.YIELDING) for entry in self.entries) >= self.total_max_parallel_executions
 
 
-    def despatching(self):
+    def despatch(self):
 
-        while 1:
+        failed_tags = set()
 
-            time.sleep(1)
+        for entry in self.entries:
 
+            if entry.status != Status.ERROR:
+                continue
 
-            failed_tags = set()
+            failed_tags.update(self.shared_failure_tags.intersection(entry.program.tags))
 
-            for entry in self.entries:
-
-                if entry.status != Status.ERROR:
-                    continue
-
-                failed_tags.update(self.shared_failure_tags.intersection(entry.program.tags))
-
-            if failed_tags:
-
-                for entry in self.entries:
-                    if not entry.program.tags.isdisjoint(failed_tags):
-                        entry.status = Status.ERROR
-
-                update_ui()
-
+        if failed_tags:
 
             for entry in self.entries:
+                if not entry.program.tags.isdisjoint(failed_tags):
+                    entry.status = Status.ERROR
 
-                if entry.status == Status.UNKNOWN:
-                    continue
-
-                if not entry.is_manual_update:
-                    continue
-
-                if self.total_max_parallel_executions_exceeded():
-                    break
-
-                if self.max_executions_per_tag_exceeded(entry.program.tags):
-                    continue
-
-                if self.has_non_updated_dependency(entry):
-                    self.poke_entry(entry)
-                    continue
-
-                entry.is_manual_update = False
-                entry.update(updater_command_queue = self.updater_command_queue, callback = self.poke_waiting_for_dependency)
+            update_ui()
 
 
-            if self.is_paused:
+        for entry in self.entries:
+
+            if entry.status == Status.UNKNOWN:
+                continue
+
+            if not entry.is_manual_update:
+                continue
+
+            if self.total_max_parallel_executions_exceeded():
+                break
+
+            if self.max_executions_per_tag_exceeded(entry.program.tags):
+                continue
+
+            if self.has_non_updated_dependency(entry):
+                self.poke_entry(entry)
+                continue
+
+            entry.is_manual_update = False
+            entry.update(updater_command_queue = self.updater_command_queue, callback = self.callback)
+
+
+        if self.is_paused:
+            return result
+
+
+        for entry in self.entries:
+
+            if entry.status == Status.UNKNOWN:
+                continue
+
+            if not entry.is_live_update:
+                continue
+
+            if entry.status != Status.STALE:
+                continue
+
+            if self.total_max_parallel_executions_exceeded():
+                break
+
+            if self.max_executions_per_tag_exceeded(entry.program.tags):
+                continue
+
+            if self.has_non_updated_dependency(entry):
+                self.poke_entry(entry)
                 continue
 
 
-            for entry in self.entries:
-
-                if entry.status == Status.UNKNOWN:
-                    continue
-
-                if not entry.is_live_update:
-                    continue
-
-                if entry.status != Status.STALE:
-                    continue
-
-                if self.total_max_parallel_executions_exceeded():
-                    break
-
-                if self.max_executions_per_tag_exceeded(entry.program.tags):
-                    continue
-
-                if self.has_non_updated_dependency(entry):
-                    self.poke_entry(entry)
-                    continue
-
-                if not entry.poke_timeout:
-                    continue
-
-                entry.update(updater_command_queue = self.updater_command_queue, callback = self.poke_waiting_for_dependency)
+            entry.update(updater_command_queue = self.updater_command_queue, callback = self.callback)
 
 
     def terminate_observer(self):
