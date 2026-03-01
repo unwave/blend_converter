@@ -21,6 +21,8 @@ from . import common
 from . import utils
 from .blender import communication
 from . import update_process
+from . import program_getter_process
+
 
 UPDATE_DELAY = 2
 """ For update debouncing. """
@@ -55,18 +57,16 @@ STATUS_ICON = {
 class Program_Entry:
 
 
-    def __init__(self, program: common.Program, from_module_file: str, programs_getter_name: str, keyword_arguments: dict):
+    def __init__(self, module_file_path: str, programs_getter_name: str, keyword_arguments: dict):
 
         self.entry_id = uuid.uuid1().hex
 
-        self.program = program
+        self.program = common.Program(blend_path = '', result_path = '', blender_executable = '')
 
         self.poke_time = 0
 
-        report_stem = os.path.splitext(os.path.basename(program.report_path))[0]
-
-        self.stdout_file = os.path.join(LOG_DIR, f"{report_stem}_stdout_{uuid.uuid1().hex}.txt")
-        self.stderr_file = os.path.join(LOG_DIR, f"{report_stem}_stderr_{uuid.uuid1().hex}.txt")
+        self.stdout_file = ''
+        self.stderr_file = ''
 
         self.status = Status.UNKNOWN
 
@@ -78,32 +78,49 @@ class Program_Entry:
         self.keyword_arguments = keyword_arguments
         """ The program keyword arguments. """
 
-        self.from_module_file = from_module_file
+        self.module_file_path = module_file_path
         """ A module file which the common.Program was collected from. """
 
         self.programs_getter_name = programs_getter_name
         """ Name of a function that will return a dictionary with programs """
 
 
-        # self.path_list = os.path.realpath(program.blend_path).split(os.path.sep)
-
         self.lock = threading.RLock()
-
-        self.stdout_queue = multiprocessing.SimpleQueue()
-        self.stderr_queue = multiprocessing.SimpleQueue()
 
         self.stdout_lines = []
         self.stderr_lines = []
 
-        self.updater_response_queue: 'multiprocessing.SimpleQueue[dict]' = multiprocessing.SimpleQueue()
-
         self.psutil_process: psutil.Process = None
+
+        self.post_initialized = False
+
+
+    def post_init(self):
+
+        with self.lock:
+
+            if self.post_initialized:
+                return
+
+            report_stem = os.path.splitext(os.path.basename(self.program.report_path))[0]
+
+            self.stdout_file = os.path.join(LOG_DIR, f"{report_stem}_stdout_{uuid.uuid1().hex}.txt")
+            self.stderr_file = os.path.join(LOG_DIR, f"{report_stem}_stderr_{uuid.uuid1().hex}.txt")
+
+            self.stdout_queue = multiprocessing.SimpleQueue()
+            self.stderr_queue = multiprocessing.SimpleQueue()
+
+            self.updater_response_queue: 'multiprocessing.SimpleQueue[dict]' = multiprocessing.SimpleQueue()
+
+            self.post_initialized = True
 
 
     def poke(self, has_non_updated_dependency: bool):
 
         if has_non_updated_dependency:
             self.status = Status.WAITING_FOR_DEPENDENCY
+        elif not self.program.blend_path:
+            pass
         elif os.path.exists(self.program.blend_path):
             if self.program.are_instructions_changed:
                 self.status = Status.STALE
@@ -153,7 +170,9 @@ class Program_Entry:
                     entry_id = self.entry_id,
                     updater_command_queue = updater_command_queue,
                     updater_response_queue = self.updater_response_queue,
-                    program = self.program,
+                    module_file_path = self.module_file_path,
+                    programs_getter_name = self.programs_getter_name,
+                    keyword_arguments = self.keyword_arguments,
                 ),
                 daemon=True,
             )
@@ -203,6 +222,8 @@ class Program_Entry:
     def update(self, *, updater_command_queue: 'multiprocessing.SimpleQueue[dict]' = None, callback: typing.Optional[typing.Callable] = None):
 
         with self.lock:
+
+            self.post_init()
 
             print(f"Processing [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
 
@@ -318,15 +339,12 @@ def get_program_entries(definitions: typing.List[common.Program_Definition]):
 
         module = path_to_module_map[os.path.realpath(d.file_name)]
 
-        program_getter = getattr(module, d.program_getter_name)
-
         arguments_getter = getattr(module, d.arguments_getter_name)
 
         for arguments in arguments_getter(*d.args, **d.kwargs):
 
-            program = program_getter(**arguments)
 
-            entries.append(Program_Entry(program, module.__file__, d.program_getter_name, arguments))
+            entries.append(Program_Entry(module.__file__, d.program_getter_name, arguments))
 
     return entries
 
@@ -355,6 +373,30 @@ class Updater:
 
         threading.Thread(target = self.command_queue_runner, daemon=True).start()
 
+        self.program_getting_pool = multiprocessing.Pool(processes=os.cpu_count()//2)
+
+
+    def update_entries(self):
+
+        def callback(entry: Program_Entry, program: common.Program):
+            entry.program = program
+            entry.poke(self.has_non_updated_dependency(entry))
+            update_item(entry)
+            if program.blend_path and os.path.exists(program.blend_path):
+                self.observer.schedule(self.event_handler, os.path.dirname(program.blend_path))
+
+        for entry in self.entries:
+
+            self.program_getting_pool.apply_async(
+                program_getter_process.get_program,
+                kwds = dict(
+                    module_file_path = entry.module_file_path,
+                    program_getter_name = entry.programs_getter_name,
+                    keyword_arguments = entry.keyword_arguments,
+                ),
+                callback = lambda program, entry=entry: callback(entry, program),
+            )
+
 
     def init_observer(self):
 
@@ -371,16 +413,6 @@ class Updater:
         self.dispatcher.start()
 
 
-    def schedule_observer(self):
-
-        self.observer.unschedule_all()
-
-        dirs = set(os.path.dirname(entry.program.blend_path) for entry in self.entries)
-        for dir in dirs:
-            os.makedirs(dir, exist_ok=True)
-            self.observer.schedule(self.event_handler, dir, recursive=True)
-
-
     @classmethod
     def from_entries(cls, entries: typing.List[Program_Entry]):
 
@@ -391,7 +423,6 @@ class Updater:
         updater.poke_all()
 
         updater.init_observer()
-        updater.schedule_observer()
 
         update_ui()
 
@@ -400,7 +431,13 @@ class Updater:
 
     def has_non_updated_dependency(self, entry: Program_Entry):
         return any(
-            _entry.program.result_path == entry.program.blend_path
+            (
+                _entry.program.result_path
+                and
+                entry.program.blend_path
+                and
+                _entry.program.result_path == entry.program.blend_path
+            )
             for _entry in self.entries
             if not _entry is entry and _entry.status != Status.OK
         )
@@ -464,6 +501,9 @@ class Updater:
 
             for entry in self.entries:
 
+                if entry.status == Status.UNKNOWN:
+                    continue
+
                 if not entry.is_manual_update:
                     continue
 
@@ -486,6 +526,9 @@ class Updater:
 
 
             for entry in self.entries:
+
+                if entry.status == Status.UNKNOWN:
+                    continue
 
                 if not entry.is_live_update:
                     continue
@@ -602,6 +645,11 @@ class Updater:
 
 
 def update_ui():
+    """ Replace it with a custom update function. """
+    pass
+
+
+def update_item(entry):
     """ Replace it with a custom update function. """
     pass
 

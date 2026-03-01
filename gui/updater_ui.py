@@ -346,7 +346,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         for entry in entries:
             programs.append([
-                entry.from_module_file,
+                entry.module_file_path,
                 entry.programs_getter_name,
                 entry.keyword_arguments,
             ])
@@ -447,18 +447,6 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         for entry in self.get_selected_items():
             entry.status = updater.Status.STALE
         self.Refresh()
-
-
-    def force_update_entry(self, entry: updater.Program_Entry):
-
-        main_frame: Main_Frame = self.GetTopLevelParent()
-
-        if main_frame.updater.total_max_parallel_executions_exceeded():
-            wx.MessageBox("Max amount of simultaneous updates exceeded.", "Error", style= wx.OK | wx.ICON_ERROR)
-            return
-
-        entry.status = updater.Status.STALE
-        entry.update(main_frame.updater.poke_waiting_for_dependency)
 
 
     def set_config(self, entry: updater.Program_Entry):
@@ -1086,6 +1074,13 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         updater.update_ui = lambda: wx.CallAfter(refresh)
 
+        def refresh_item(entry):
+            if entry in self.result_panel.model_list.data:
+                index = self.result_panel.model_list.data.index(entry)
+                self.result_panel.model_list.RefreshItem(index)
+
+        updater.update_item = lambda entry: wx.CallAfter(refresh_item, entry)
+
         updater.stdout_line_printed = lambda entry: wx.PostEvent(self, Event_Stdout_Line_Printed(entry=entry))
         updater.stderr_line_printed = lambda entry: wx.PostEvent(self, Event_Stderr_Line_Printed(entry=entry))
 
@@ -1107,12 +1102,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         self.pause(self.updater.is_paused)
 
-        # self.set_blends()
-
-
-    # def set_blends(self):
-    #     blend_paths = utils.list_by_key(self.updater.entries, lambda entry: os.path.realpath(entry.program.blend_path))
-    #     self.blend_panel.load_data(blend_paths)
+        self.updater.update_entries()
 
 
     @classmethod
@@ -1426,12 +1416,12 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     def on_show_app_scripts(self, event = None):
-        utils.os_show(utils.deduplicate(utils.deduplicate(e.from_module_file for e in self.updater.entries)))
+        utils.os_show(utils.deduplicate(utils.deduplicate(e.module_file_path for e in self.updater.entries)))
 
 
     def on_open_VSCode_workspace(self, event = None):
 
-        folders = utils.deduplicate(os.path.dirname(e.from_module_file) for e in self.updater.entries)
+        folders = utils.deduplicate(os.path.dirname(e.module_file_path) for e in self.updater.entries)
 
         for folder in folders:
             for path in os.scandir(folder):

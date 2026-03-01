@@ -7,7 +7,7 @@ import multiprocessing
 from datetime import datetime, timezone
 
 from . import utils
-from . import common
+from . import program_getter_process
 
 
 def capturing(*, file_path: str, capture_queue: queue.SimpleQueue, output_queue: multiprocessing.SimpleQueue):
@@ -39,7 +39,9 @@ def run(*,
             entry_id: str,
             updater_command_queue: multiprocessing.SimpleQueue,
             updater_response_queue: multiprocessing.SimpleQueue,
-            program: common.Program,
+            module_file_path: str,
+            programs_getter_name: str,
+            keyword_arguments: str,
         ):
 
 
@@ -95,6 +97,12 @@ def run(*,
 
         stderr_capturing.start()
         stdout_capturing.start()
+
+        program = program_getter_process.get_program(
+            module_file_path = module_file_path,
+            program_getter_name = programs_getter_name,
+            keyword_arguments = keyword_arguments,
+        )
 
         try:
             program.execute(entry_command_queue = entry_command_queue, updater_response_queue = updater_response_queue)
