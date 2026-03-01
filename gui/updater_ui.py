@@ -32,6 +32,14 @@ def get_valid_paths(items: typing.List[str]):
     return [p for p in utils.deduplicate(items) if p and os.path.exists(p)]
 
 
+def ask_conformation(message: str, caption = "Confirmation required"):
+
+    with wx.MessageDialog(None, message, caption, wx.YES | wx.NO | wx.NO_DEFAULT | wx.ICON_WARNING) as dialog:
+        result = dialog.ShowModal()
+
+        return result == wx.ID_YES
+
+
 class Model_List(wxp_utils.Item_Viewer_Native):
 
     parent: Result_Panel
@@ -508,6 +516,11 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def on_show_difference(self, event):
 
+        selected_items = self.get_selected_items()
+
+        if len(selected_items) > 10 and not ask_conformation(f"Show the difference for {len(selected_items)} entires?"):
+            return
+
         import difflib
 
         def get_difference(entry: updater.Program_Entry):
@@ -539,6 +552,11 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def on_show_inline_difference(self, event):
+
+        selected_items = self.get_selected_items()
+
+        if len(selected_items) > 5 and not ask_conformation(f"Show the inline difference for {len(selected_items)} entires?"):
+            return
 
         import difflib
 
@@ -587,7 +605,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         selected_entries =  self.get_selected_items()
 
         text = (
-            f"Are you sure you want to set the entries as up to date?"
+            f"Set the entries as up to date?"
             '\n\n'
             +
             '\n'.join([entry.program.blend_path for entry in selected_entries])
@@ -606,23 +624,45 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def on_show_source_files(self, event):
-        utils.os_show(get_valid_paths(entry.program.blend_path for entry in self.get_selected_items()))
+
+        selected_items = self.get_selected_items()
+
+        if len(selected_items) > 5 and not ask_conformation(f"Show {len(selected_items)} source files in the file explorer?"):
+            return
+
+        utils.os_show(get_valid_paths(entry.program.blend_path for entry in selected_items))
 
 
     def on_show_result_files(self, event):
-        utils.os_show(get_valid_paths(entry.program.result_path for entry in self.get_selected_items()))
+
+        selected_items = self.get_selected_items()
+
+        if len(selected_items) > 5 and not ask_conformation(f"Show {len(selected_items)} result files in the file explorer?"):
+            return
+
+        utils.os_show(get_valid_paths(entry.program.result_path for entry in selected_items))
 
 
     def on_open_source_files(self, event):
 
-        for entry in self.get_selected_items():
+        selected_items = self.get_selected_items()
+
+        if len(selected_items) > 3 and not ask_conformation(f"Open {len(selected_items)} source files?"):
+            return
+
+        for entry in selected_items:
             cmd = [entry.program.blender_executable, entry.program.blend_path]
             utils.open_blender_detached(*cmd)
 
 
     def on_open_result_files(self, event):
 
-        for entry in self.get_selected_items():
+        selected_items = self.get_selected_items()
+
+        if len(selected_items) > 3 and not ask_conformation(f"Open {len(selected_items)} result files?"):
+            return
+
+        for entry in selected_items:
             self.open_result(entry)
 
 
@@ -637,11 +677,23 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def on_show_stdout_file_files(self, event):
-        utils.os_show(get_valid_paths(entry.stdout_file for entry in self.get_selected_items()))
+
+        selected_items = self.get_selected_items()
+
+        if len(selected_items) > 5 and not ask_conformation(f"Show {len(selected_items)} stdout files in the file explorer?"):
+            return
+
+        utils.os_show(get_valid_paths(entry.stdout_file for entry in selected_items))
 
 
     def on_show_stderr_file_files(self, event):
-        utils.os_show(get_valid_paths(entry.stderr_file for entry in self.get_selected_items()))
+
+        selected_items = self.get_selected_items()
+
+        if len(selected_items) > 5 and not ask_conformation(f"Show {len(selected_items)} stderr files in the file explorer?"):
+            return
+
+        utils.os_show(get_valid_paths(entry.stderr_file for entry in selected_items))
 
 
     def on_compare_model(self, event):
@@ -649,7 +701,13 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def on_show_diff_vscode(self, event):
-        for entry in self.get_selected_items():
+
+        selected_items = self.get_selected_items()
+
+        if len(selected_items) > 5 and not ask_conformation(f"Show the difference in VSCode for {len(selected_items)} entires?"):
+            return
+
+        for entry in selected_items:
             self.show_diff_vscode(entry)
 
 
