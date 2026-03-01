@@ -27,6 +27,11 @@ from ..blender import blender_server
 from . import wx_blend
 from . import wxp_utils
 
+
+def get_valid_paths(items: typing.List[str]):
+    return [p for p in utils.deduplicate(items) if p and os.path.exists(p)]
+
+
 class Model_List(wxp_utils.Item_Viewer_Native):
 
     parent: Result_Panel
@@ -194,7 +199,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
                 wx.MessageBox(f"The result path does not exist yet:\n{entry.program.result_path}", 'File does not exist', style= wx.OK | wx.ICON_ERROR)
 
         elif mask == (True, True, True):
-            self.on_compare_model(entry)
+            self.compare_model(entry)
 
         elif mask == (True, True, False):
             utils.os_show([entry.program.blend_path, entry.program.result_path if os.path.exists(entry.program.result_path) else entry.program.report_path])
@@ -245,27 +250,26 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         menu_item = menu.append_item(f"Show Stderr file", get_func(utils.os_show, output_file))
         menu_item.Enable(os.path.exists(output_file))
 
-        menu_item = menu.append_item(f"Compare", get_func(self.on_compare_model, entry))
+        menu_item = menu.append_item(f"Compare", get_func(self.compare_model, entry))
         menu_item.Enable(os.path.exists(blend_path) and os.path.exists(entry.program.result_path))
 
         menu.append_separator()
 
-        menu_item = menu.append_item(f"Copy Command", get_func(self.on_copy_conversion_command, entry))
-        menu_item = menu.append_item(f"Copy Folder Basename", get_func(self.on_copy_folder_basename, entry))
-        menu_item = menu.append_item(f"Copy Blend Path", get_func(self.on_copy_blend_path, entry))
+        menu_item = menu.append_item(f"Copy Command", self.on_copy_conversion_command)
+        menu_item = menu.append_item(f"Copy Folder Basename", self.on_copy_folder_basename)
+        menu_item = menu.append_item(f"Copy Blend Path", self.on_copy_blend_path,)
 
         menu.append_separator()
 
-        menu_item = menu.append_item(f"Show Difference VSCode (Single Entry)", get_func(self.on_show_diff_vscode, entry))
-        menu_item = menu.append_item(f"Show Difference", get_func(self.on_show_difference, entry))
-        menu_item = menu.append_item(f"Show Difference Inline", get_func(self.on_show_inline_difference, entry))
-
-        menu_item = menu.append_item(f"Set As Updated", get_func(self.on_set_as_updated, entry))
+        menu_item = menu.append_item(f"Show Difference VSCode (Single Entry)", get_func(self.show_diff_vscode, entry))
+        menu_item = menu.append_item(f"Show Difference", self.on_show_difference)
+        menu_item = menu.append_item(f"Show Difference Inline", self.on_show_inline_difference)
 
         menu.append_separator()
 
-        menu_item = menu.append_item(f"Mark As Needs Update", get_func(self.on_mark_as_needs_update))
-        menu_item = menu.append_item(f"Poke Selected", get_func(self.on_poke_entries, entry))
+        menu_item = menu.append_item(f"Set As Updated", self.on_set_as_updated)
+        menu_item = menu.append_item(f"Mark As Needs Update", self.on_mark_as_needs_update)
+        menu_item = menu.append_item(f"Poke Selected", self.on_poke_entries)
 
         menu.append_separator()
 
@@ -323,7 +327,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         event.Skip()
 
 
-    def on_poke_entries(self, entry: updater.Program_Entry):
+    def on_poke_entries(self, event):
         for entry in self.get_selected_items():
             self.main_frame.updater.poke_entry(entry)
 
@@ -348,7 +352,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         return command
 
 
-    def on_copy_conversion_command(self, entry: updater.Program_Entry):
+    def on_copy_conversion_command(self, event):
         wxp_utils.set_clipboard_text(self.get_conversion_command(self.get_selected_items()))
 
 
@@ -404,7 +408,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             self.ignore_select_events = False
 
 
-    def on_compare_model(self, entry: updater.Program_Entry):
+    def compare_model(self, entry: updater.Program_Entry):
 
         args = {
             'blend_path': entry.program.blend_path,
@@ -423,17 +427,18 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         utils.open_blender_detached(*cmd)
 
 
-    def on_copy_folder_basename(self, entry: updater.Program_Entry):
+    def on_copy_folder_basename(self, event):
         wxp_utils.set_clipboard_text("\n".join((os.path.basename(os.path.dirname(entry.program.blend_path)) for entry in self.get_selected_items())))
 
 
-    def on_copy_blend_path(self, entry: updater.Program_Entry):
+    def on_copy_blend_path(self, event):
         wxp_utils.set_clipboard_text("\n".join((entry.program.blend_path for entry in self.get_selected_items())))
 
 
-    def on_mark_as_needs_update(self):
+    def on_mark_as_needs_update(self, event):
         for entry in self.get_selected_items():
             entry.status = updater.Status.STALE
+        self.Refresh()
 
 
     def on_entry_force_update(self, entry: updater.Program_Entry):
@@ -495,13 +500,13 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.Refresh()
 
 
-    def on_show_diff_vscode(self, entry: updater.Program_Entry):
+    def show_diff_vscode(self, entry: updater.Program_Entry):
         from .. import diff_utils
         import threading
         threading.Thread(target=diff_utils.show_program_diff_vscode, args=[entry.program]).start()
 
 
-    def on_show_difference(self, entry: updater.Program_Entry):
+    def on_show_difference(self, event):
 
         import difflib
 
@@ -533,7 +538,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         dialog.Show()
 
 
-    def on_show_inline_difference(self, entry: updater.Program_Entry):
+    def on_show_inline_difference(self, event):
 
         import difflib
 
@@ -577,7 +582,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         dialog.Show()
 
 
-    def on_set_as_updated(self, entry: updater.Program_Entry):
+    def on_set_as_updated(self, event):
 
         selected_entries =  self.get_selected_items()
 
@@ -601,21 +606,11 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def on_show_source_files(self, event):
-
-        paths = [entry.program.blend_path for entry in self.get_selected_items()]
-        paths = utils.deduplicate(paths)
-        paths = [p for p in paths if p and os.path.exists(p)]
-
-        utils.os_show(paths)
+        utils.os_show(get_valid_paths(entry.program.blend_path for entry in self.get_selected_items()))
 
 
     def on_show_result_files(self, event):
-
-        paths = [entry.program.result_path for entry in self.get_selected_items()]
-        paths = utils.deduplicate(paths)
-        paths = [p for p in paths if p and os.path.exists(p)]
-
-        utils.os_show(paths)
+        utils.os_show(get_valid_paths(entry.program.result_path for entry in self.get_selected_items()))
 
 
     def on_open_source_files(self, event):
@@ -639,6 +634,23 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def on_set_config(self, event):
         self.set_config(self.get_active_item())
+
+
+    def on_show_stdout_file_files(self, event):
+        utils.os_show(get_valid_paths(entry.stdout_file for entry in self.get_selected_items()))
+
+
+    def on_show_stderr_file_files(self, event):
+        utils.os_show(get_valid_paths(entry.stderr_file for entry in self.get_selected_items()))
+
+
+    def on_compare_model(self, event):
+        self.compare_model(self.get_active_item())
+
+
+    def on_show_diff_vscode(self, event):
+        for entry in self.get_selected_items():
+            self.show_diff_vscode(entry)
 
 
 class Output_Lines(wxp_utils.Item_Viewer_Native):
@@ -887,6 +899,32 @@ class Button:
     SETTINGS = wx.NewIdRef()
 
 
+    SHOW_STDOUT_FILE = wx.NewIdRef()
+    SHOW_STDERR_FILE = wx.NewIdRef()
+
+    SHOW_PYTHON_SCRIPTS = wx.NewIdRef()
+
+    COMPARE = wx.NewIdRef()
+
+    DIFF_VSCODE = wx.NewIdRef()
+    DIFF = wx.NewIdRef()
+    DIFF_INLINE = wx.NewIdRef()
+
+    SET_AS_UPDATED = wx.NewIdRef()
+    SET_AS_NEEDS_UPDATE = wx.NewIdRef()
+    POKE = wx.NewIdRef()
+
+    COPY_COMMAND = wx.NewIdRef()
+    COPY_FOLDER_BASENAME = wx.NewIdRef()
+    COPY_SOURCE_PATH = wx.NewIdRef()
+
+    LAYOUT_PRINT = wx.NewIdRef()
+    LAYOUT_RESTORE = wx.NewIdRef()
+
+    CONSOLE_SHOW_ON_TOP = wx.NewIdRef()
+    CONSOLE_TOGGLE = wx.NewIdRef()
+
+
 BUTTON_TEXT = {
     Button.TERMINATE_ALL: "Terminate All",
     Button.EXECUTE: "Execute",
@@ -906,6 +944,32 @@ BUTTON_TEXT = {
 
     Button.RESTART: "Restart",
     Button.SETTINGS: "Settings",
+
+
+    Button.SHOW_STDOUT_FILE: "Stdout",
+    Button.SHOW_STDERR_FILE: "Stderr",
+
+    Button.SHOW_PYTHON_SCRIPTS: "Show",
+
+    Button.COMPARE: "Compare",
+
+    Button.DIFF_VSCODE: "Diff VSCode",
+    Button.DIFF: "Diff",
+    Button.DIFF_INLINE: "Diff Inline",
+
+    Button.SET_AS_UPDATED: "Set As Updated",
+    Button.SET_AS_NEEDS_UPDATE: "Set As Needs Update",
+    Button.POKE: "Poke",
+
+    Button.COPY_COMMAND: "Command",
+    Button.COPY_FOLDER_BASENAME: "Folder Basename",
+    Button.COPY_SOURCE_PATH: "Source Path",
+
+    Button.LAYOUT_PRINT: "Print",
+    Button.LAYOUT_RESTORE: "Restore",
+
+    Button.CONSOLE_SHOW_ON_TOP: "Show On Top",
+    Button.CONSOLE_TOGGLE: "Toggle",
 }
 
 
@@ -915,6 +979,21 @@ BUTTONS_WITH_COUNT =[
     Button.SHOW_RESULT_FILES,
     Button.EDIT_SOURCE_FILES,
     Button.EDIT_RESULT_FILES,
+
+    Button.SHOW_STDOUT_FILE,
+    Button.SHOW_STDERR_FILE,
+
+    Button.DIFF_VSCODE,
+    Button.DIFF,
+    Button.DIFF_INLINE,
+
+    Button.SET_AS_UPDATED,
+    Button.SET_AS_NEEDS_UPDATE,
+    Button.POKE,
+
+    Button.COPY_COMMAND,
+    Button.COPY_FOLDER_BASENAME,
+    Button.COPY_SOURCE_PATH,
 ]
 
 
@@ -1040,7 +1119,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         bar.AddButton(Button.EDIT_SOURCE_FILES, "", get_bitmap(wx.ART_FIND_AND_REPLACE), "Open source files.")
         bar.AddButton(Button.SHOW_RESULT_FILES, "", get_bitmap(wx.ART_FIND), "Show result files in the file explorer.")
         bar.AddButton(Button.EDIT_RESULT_FILES, "", get_bitmap(wx.ART_CUT), "Open result files.")
-        # bar.AddButton(wx.ID_NEW, "Open Folder", get_bitmap(wx.ART_FOLDER_OPEN), "")
+        # bar.AddButton(Button.SET_AS_UPDATED, "Open Folder", get_bitmap(wx.ART_FOLDER_OPEN), "")
 
 
         app_misc = RB.RibbonPanel(main_page, wx.ID_ANY, "App", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
@@ -1054,45 +1133,46 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         stdout = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Output", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(stdout)
-        bar.AddButton(wx.ID_NEW, "Stdout", get_bitmap(wx.ART_FIND), "")
-        bar.AddButton(wx.ID_NEW, "Stderr", get_bitmap(wx.ART_FIND), "")
+        bar.AddButton(Button.SHOW_STDOUT_FILE, "", get_bitmap(wx.ART_FIND), "")
+        bar.AddButton(Button.SHOW_STDERR_FILE, "", get_bitmap(wx.ART_FIND), "")
 
         script = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Script", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(script)
-        bar.AddButton(wx.ID_NEW, "Show", get_bitmap(wx.ART_FIND), "")
+        bar.AddButton(Button.SHOW_PYTHON_SCRIPTS, BUTTON_TEXT[Button.SHOW_PYTHON_SCRIPTS], get_bitmap(wx.ART_FIND), "")
 
         compare = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Compare", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(compare)
-        bar.AddButton(wx.ID_NEW, "Compare", get_bitmap(wx.ART_FULL_SCREEN), "")
+        bar.AddButton(Button.COMPARE, "", get_bitmap(wx.ART_FULL_SCREEN), "")
 
         difference = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Difference", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(difference)
-        bar.AddButton(wx.ID_NEW, "VSCode (Single Entry)", get_bitmap(wx.ART_MISSING_IMAGE), "")
-        bar.AddButton(wx.ID_NEW, "Diff", get_bitmap(wx.ART_MISSING_IMAGE), "")
-        bar.AddButton(wx.ID_NEW, "Diff Inline", get_bitmap(wx.ART_MISSING_IMAGE), "")
+        bar.AddButton(Button.DIFF_VSCODE, "", get_bitmap(wx.ART_MISSING_IMAGE), "")
+        bar.AddButton(Button.DIFF, "", get_bitmap(wx.ART_MISSING_IMAGE), "")
+        bar.AddButton(Button.DIFF_INLINE, "", get_bitmap(wx.ART_MISSING_IMAGE), "")
 
         status = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Status", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(status)
-        bar.AddButton(wx.ID_NEW, "Set As Updated", get_bitmap(wx.ART_TICK_MARK), "")
-        bar.AddButton(wx.ID_NEW, "Set As Needs Update", get_bitmap(wx.ART_CLOSE), "")
-        bar.AddButton(wx.ID_NEW, "Poke", get_bitmap(wx.ART_QUESTION), "")
+        bar.AddButton(Button.SET_AS_UPDATED, "", get_bitmap(wx.ART_TICK_MARK), "")
+        bar.AddButton(Button.SET_AS_NEEDS_UPDATE, "", get_bitmap(wx.ART_CLOSE), "")
+        bar.AddButton(Button.POKE, "", get_bitmap(wx.ART_QUESTION), "")
 
         copy = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Copy", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(copy)
-        bar.AddButton(wx.ID_NEW, "Command", get_bitmap(wx.ART_COPY), "")
-        bar.AddButton(wx.ID_NEW, "Folder Basename", get_bitmap(wx.ART_COPY), "")
-        bar.AddButton(wx.ID_NEW, "Source Path", get_bitmap(wx.ART_COPY), "")
+        bar.AddButton(Button.COPY_COMMAND, "", get_bitmap(wx.ART_COPY), "")
+        bar.AddButton(Button.COPY_FOLDER_BASENAME, "", get_bitmap(wx.ART_COPY), "")
+        bar.AddButton(Button.COPY_SOURCE_PATH, "", get_bitmap(wx.ART_COPY), "")
 
 
         layout = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Layout", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(layout)
-        bar.AddButton(wx.ID_NEW, "Print", get_bitmap(wx.ART_PASTE), "")
-        bar.AddButton(wx.ID_NEW, "Restore", get_bitmap(wx.ART_GO_HOME), "")
+        bar.AddButton(Button.LAYOUT_PRINT, BUTTON_TEXT[Button.LAYOUT_PRINT], get_bitmap(wx.ART_PASTE), "")
+        bar.AddButton(Button.LAYOUT_RESTORE, BUTTON_TEXT[Button.LAYOUT_RESTORE], get_bitmap(wx.ART_GO_HOME), "")
 
         console = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Console", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(console)
-        bar.AddButton(wx.ID_NEW, "Show On Top", get_bitmap(wx.ART_GO_TO_PARENT), "")
-        bar.AddButton(wx.ID_NEW, "Toggle", get_bitmap(wx.ART_HELP_SETTINGS), "")
+        bar.AddButton(Button.CONSOLE_SHOW_ON_TOP, BUTTON_TEXT[Button.CONSOLE_SHOW_ON_TOP], get_bitmap(wx.ART_GO_TO_PARENT), "")
+        if not utils.Console_Shown.get_is_using_terminal():
+            bar.AddButton(Button.CONSOLE_TOGGLE, BUTTON_TEXT[Button.CONSOLE_TOGGLE], get_bitmap(wx.ART_HELP_SETTINGS), "")
 
 
     def map_button_to_id(self):
@@ -1171,6 +1251,34 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_restart, Button.RESTART)
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_settings, Button.SETTINGS)
+
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_stdout_file_files, Button.SHOW_STDOUT_FILE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_stderr_file_files, Button.SHOW_STDERR_FILE)
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_show_app_scripts, Button.SHOW_PYTHON_SCRIPTS)
+
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_compare_model, Button.COMPARE)
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_diff_vscode, Button.DIFF_VSCODE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_difference, Button.DIFF)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_inline_difference, Button.DIFF_INLINE)
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_set_as_updated, Button.SET_AS_UPDATED)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_mark_as_needs_update, Button.SET_AS_NEEDS_UPDATE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_poke_entries, Button.POKE)
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_copy_conversion_command, Button.COPY_COMMAND)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_copy_folder_basename, Button.COPY_FOLDER_BASENAME)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_copy_blend_path, Button.COPY_SOURCE_PATH)
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_print_layout, Button.LAYOUT_PRINT)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_restore_default_layout, Button.LAYOUT_RESTORE)
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_show_console_on_top, Button.CONSOLE_SHOW_ON_TOP)
+        if not utils.Console_Shown.get_is_using_terminal():
+            self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_toggle_console, Button.CONSOLE_TOGGLE)
 
 
     def init_ui(self):
