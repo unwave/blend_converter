@@ -21,6 +21,7 @@ from . import bpy_uv
 from . import bpy_modifier
 from . import bpy_material
 from . import bpy_mesh
+from . import communication
 
 from .. import tool_settings
 from .. import utils
@@ -1104,12 +1105,14 @@ def copy_and_bake(
         ## bake
         bake_tasks, pre_bake_tasks = tasks
 
-        for pre_bake_settings in pre_bake_tasks:
-            bpy_bake.bake([bake_proxy], pre_bake_settings)
+        with communication.Suspend_Others():
 
-        for bake_settings in bake_tasks:
-            with Pre_Baked([bake_proxy], pre_bake_labels, bake_settings):
-                bpy_bake.bake([bake_proxy], bake_settings)
+            for pre_bake_settings in pre_bake_tasks:
+                bpy_bake.bake([bake_proxy], pre_bake_settings)
+
+            for bake_settings in bake_tasks:
+                with Pre_Baked([bake_proxy], pre_bake_labels, bake_settings):
+                    bpy_bake.bake([bake_proxy], bake_settings)
 
 
         ## delete temporal objects
