@@ -22,7 +22,6 @@ from .. import utils
 from .. import common
 from .. import updater
 
-from ..blender import blender_server
 
 from . import wxp_utils
 
@@ -367,9 +366,6 @@ class Model_List(wxp_utils.Item_Viewer_Native):
     def show_source_in_explorer(self, entry: updater.Program_Entry):
         utils.os_show(entry.program.blend_path)
 
-    def open_source(self, entry: updater.Program_Entry):
-        self.GetTopLevelParent().blender_server.ensure()
-        self.GetTopLevelParent().blender_server.open_mainfile(entry.program.blend_path)
 
     def show_result_in_explorer(self, entry: updater.Program_Entry):
         utils.os_show(entry.program.result_path)
@@ -1075,10 +1071,6 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         if not self.updater.entries:
             raise Exception(f"No programs provided in files: {definitions}")
-
-        blender_executable = collections.Counter([entry.program.blender_executable for entry in self.updater.entries]).most_common(1)[0][0]
-
-        self.blender_server = blender_server.Blender_Server(blender_executable)
 
         self.init_title = "Blend Converter"
 
