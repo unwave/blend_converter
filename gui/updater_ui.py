@@ -1274,7 +1274,6 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
     def update_ribbon_state(self):
 
-        self.ribbon.Freeze()
 
         active = self.result_panel.model_list.get_active_item()
         selected = self.result_panel.model_list.get_selected_items()
@@ -1297,10 +1296,6 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.set_button_text(Button.DISABLE_LIVE, BUTTON_TEXT[Button.DISABLE_LIVE] + f" ({enabled_live_count}/{len(selected)})")
 
         self.update_terminate_button()
-
-        self.ribbon.Realize()
-
-        self.ribbon.Thaw()
 
 
     def update_terminate_button(self):
