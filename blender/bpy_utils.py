@@ -994,7 +994,11 @@ def pack_and_task(
             bake_types = []
 
             orma = [
-                tool_settings_bake.S_AO_Diffuse(faster=settings.faster_ao_bake, environment_has_transparent_materials = environment_has_transparent_materials),
+                tool_settings_bake.S_AO_Diffuse(
+                    faster = settings.faster_ao_bake,
+                    environment_has_transparent_materials = environment_has_transparent_materials,
+                    use_normals = settings.ao_bake_use_normals,
+                ),
                 tool_settings_bake.S_Roughness(use_denoise=need_denoise['Roughness']),
                 tool_settings_bake.S_Metallic(use_denoise=need_denoise['Metallic'])
             ]
