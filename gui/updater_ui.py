@@ -935,6 +935,39 @@ def get_bitmap(id, size=(48, 48)):
     return image.ConvertToBitmap()
 
 
+def get_bitmap_from_text(text: str, color = (0, 0, 0)):
+
+    draw_size = 64
+
+    bitmap: wx.Bitmap = wx.Bitmap(draw_size, draw_size)
+
+    dc = wx.MemoryDC()
+
+    font = wx.Font()
+    font.SetPointSize(36)
+    dc.SetFont(font)
+
+    dc.SelectObject(bitmap)
+    dc.Clear()
+
+    x, y = dc.GetTextExtent(text)
+    dc.DrawText(text, (draw_size - x) / 2 ,  (draw_size - y) / 2)
+
+    image: wx.Image = bitmap.ConvertToImage()
+    image.InitAlpha()
+
+    alpha_buffer = image.GetAlphaBuffer()
+
+    for index, rgb in enumerate(zip(*(iter(image.GetData()),) * 3)):
+        alpha_buffer[index] = max(255 - rgb[0], 255 - rgb[1], 255 - rgb[2])
+
+    image.SetRGB(wx.Rect(0, 0, draw_size, draw_size), *color)
+
+    bitmap = image.ConvertToBitmap()
+
+    return bitmap
+
+
 class BC_App(wx.App):
 
     main_frame: Main_Frame
@@ -1000,8 +1033,8 @@ BUTTON_TEXT = {
     Button.EDIT_SOURCE_FILES: "🌱 Source Edit",
     Button.EDIT_RESULT_FILES: "🏆 Result Edit",
 
-    Button.PAUSE: "⏸️ Pause",
-    Button.RESUME: "▶️ Resume",
+    Button.PAUSE: "Pause",
+    Button.RESUME: "Resume",
 
     Button.ENABLE_LIVE: "Enable",
     Button.DISABLE_LIVE: "Disable",
@@ -1171,10 +1204,10 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         live = RB.RibbonPanel(main_page, wx.ID_ANY, "Live", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(live)
-        bar.AddButton(Button.PAUSE, BUTTON_TEXT[Button.PAUSE], get_bitmap(wx.ART_CLOSE), "Pause the live execution.")
-        bar.AddButton(Button.RESUME, BUTTON_TEXT[Button.RESUME], get_bitmap(wx.ART_TICK_MARK), "Resume the live execution.")
-        bar.AddButton(Button.ENABLE_LIVE, "", get_bitmap(wx.ART_ADD_BOOKMARK), "")
-        bar.AddButton(Button.DISABLE_LIVE, "", get_bitmap(wx.ART_DEL_BOOKMARK), "")
+        bar.AddButton(Button.PAUSE, BUTTON_TEXT[Button.PAUSE], get_bitmap_from_text('⏸️'), "Pause the live execution.")
+        bar.AddButton(Button.RESUME, BUTTON_TEXT[Button.RESUME], get_bitmap_from_text('▶️'), "Resume the live execution.")
+        bar.AddButton(Button.ENABLE_LIVE, "", get_bitmap_from_text('⚡', color = (191, 137, 0)), "")
+        bar.AddButton(Button.DISABLE_LIVE, "", get_bitmap_from_text('💤', color = (15, 143, 179)), "")
 
 
         files = RB.RibbonPanel(main_page, wx.ID_ANY, "Files", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
@@ -1190,7 +1223,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         bar = RB.RibbonButtonBar(app_misc)
         bar.AddButton(Button.TERMINATE_ALL_AND_PAUSE, BUTTON_TEXT[Button.TERMINATE_ALL_AND_PAUSE], get_bitmap(wx.ART_ERROR), "Terminate all entries and pause.")
         bar.AddButton(Button.RESTART, BUTTON_TEXT[Button.RESTART], get_bitmap(wx.ART_UNDO), "Restart the GUI.")
-        bar.AddButton(Button.SETTINGS, BUTTON_TEXT[Button.SETTINGS], get_bitmap(wx.ART_EDIT), "Open the GUI settings.")
+        bar.AddButton(Button.SETTINGS, BUTTON_TEXT[Button.SETTINGS], get_bitmap_from_text('🛠️'), "Open the GUI settings.")
 
 
 
@@ -1207,7 +1240,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         compare = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Compare", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(compare)
-        bar.AddButton(Button.COMPARE, "", get_bitmap(wx.ART_FULL_SCREEN), "")
+        bar.AddButton(Button.COMPARE, "", get_bitmap_from_text('🧐'), "")
 
         difference = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Difference", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(difference)
@@ -1217,9 +1250,11 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         status = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Status", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(status)
-        bar.AddButton(Button.SET_AS_UPDATED, "", get_bitmap(wx.ART_TICK_MARK), "")
-        bar.AddButton(Button.SET_AS_NEEDS_UPDATE, "", get_bitmap(wx.ART_CLOSE), "")
-        bar.AddButton(Button.POKE, "", get_bitmap(wx.ART_QUESTION), "")
+        bar.AddButton(Button.SET_AS_UPDATED, "", get_bitmap_from_text('👍', color = (25, 117, 10)), "")
+        bar.AddButton(Button.SET_AS_NEEDS_UPDATE, "", get_bitmap_from_text('🦕', color = (184, 176, 24)), "")
+        bar.AddButton(Button.POKE, "", get_bitmap_from_text('👇'), "")
+
+
 
         copy = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Copy", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(copy)
@@ -1230,14 +1265,14 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         layout = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Layout", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(layout)
-        bar.AddButton(Button.LAYOUT_PRINT, BUTTON_TEXT[Button.LAYOUT_PRINT], get_bitmap(wx.ART_PASTE), "")
+        bar.AddButton(Button.LAYOUT_PRINT, BUTTON_TEXT[Button.LAYOUT_PRINT], get_bitmap(wx.ART_PRINT), "")
         bar.AddButton(Button.LAYOUT_RESTORE, BUTTON_TEXT[Button.LAYOUT_RESTORE], get_bitmap(wx.ART_GO_HOME), "")
 
         console = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Console", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(console)
-        bar.AddButton(Button.CONSOLE_SHOW_ON_TOP, BUTTON_TEXT[Button.CONSOLE_SHOW_ON_TOP], get_bitmap(wx.ART_GO_TO_PARENT), "")
+        bar.AddButton(Button.CONSOLE_SHOW_ON_TOP, BUTTON_TEXT[Button.CONSOLE_SHOW_ON_TOP], get_bitmap_from_text('🔝'), "")
         if not utils.Console_Shown.get_is_using_terminal():
-            bar.AddButton(Button.CONSOLE_TOGGLE, BUTTON_TEXT[Button.CONSOLE_TOGGLE], get_bitmap(wx.ART_HELP_SETTINGS), "")
+            bar.AddButton(Button.CONSOLE_TOGGLE, BUTTON_TEXT[Button.CONSOLE_TOGGLE], get_bitmap_from_text('🖥️'), "")
 
 
     def map_button_to_id(self):
