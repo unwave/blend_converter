@@ -379,9 +379,11 @@ class Updater:
                 self.observer.schedule(self.event_handler, os.path.dirname(program.blend_path))
             self.despatch()
 
+        tasks = []
+
         for entry in self.entries:
 
-            self.program_getting_pool.apply_async(
+            tasks.append(self.program_getting_pool.apply_async(
                 program_getter_process.get_program,
                 kwds = dict(
                     module_file_path = entry.module_file_path,
@@ -389,7 +391,15 @@ class Updater:
                     keyword_arguments = entry.keyword_arguments,
                 ),
                 callback = lambda program, entry=entry: callback(entry, program),
-            )
+            ))
+
+
+        def final_callback():
+            [t.get() for t in tasks]
+            update_ui()
+
+        threading.Thread(target=final_callback).start()
+
 
 
     def init_observer(self):
