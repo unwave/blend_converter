@@ -112,17 +112,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def set_data(self, data):
-
-        self.Freeze()
-
         self.data: list[updater.Program_Entry] = data
         self.SetItemCount(len(data))
-        self.Refresh()
+        self.refresh_visible()
 
-        if not self.data:
-            self.main_frame.Refresh()
-
-        self.Thaw()
 
 
     def OnGetItemText(self, row: int, col: int) -> str:
@@ -302,7 +295,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         for entry in self.get_selected_items():
             entry.is_live_update = value
         wx.CallAfter(self.main_frame.update_ribbon_state)
-        self.Refresh()
+        self.refresh_visible()
 
 
     def on_enable_live_update(self, event):
@@ -330,9 +323,11 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
             self.main_frame.stdout_viewer.data = stdout_lines
             self.main_frame.stdout_viewer.update()
+            self.main_frame.stdout_viewer.refresh_visible()
 
             self.main_frame.stderr_viewer.data = stderr_lines
             self.main_frame.stderr_viewer.update()
+            self.main_frame.stderr_viewer.refresh_visible()
 
         wx.CallAfter(self.main_frame.update_ribbon_state)
 
@@ -452,7 +447,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         for entry in self.get_selected_items():
             entry.status = updater.Status.STALE
         self.main_frame.updater.despatch()
-        self.Refresh()
+        self.refresh_visible()
 
 
     def set_config(self, entry: updater.Program_Entry):
@@ -494,6 +489,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             if entry.status in (updater.Status.STALE, updater.Status.ERROR):
                 entry.is_manual_update = True
         self.main_frame.updater.despatch()
+        self.refresh_visible()
 
 
     def on_terminate_selected(self, event):
@@ -507,7 +503,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.main_frame.updater.despatch()
 
         self.main_frame.update_terminate_button()
-        self.Refresh()
+        self.refresh_visible()
 
 
     def on_force_execute_selected(self, event):
@@ -518,7 +514,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.main_frame.updater.despatch()
 
         self.main_frame.update_terminate_button()
-        self.Refresh()
+        self.refresh_visible()
 
 
     def show_diff_vscode(self, entry: updater.Program_Entry):

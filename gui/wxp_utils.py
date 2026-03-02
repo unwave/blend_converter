@@ -232,6 +232,13 @@ class Item_Viewer_Native(wx.ListCtrl):
             return -1
 
 
+    def refresh_visible(self):
+        start_index = self.GetTopItem()
+        end_index = start_index + self.GetCountPerPage() + 1
+        end_index = min(end_index, self.GetItemCount() - 1)
+        self.RefreshItems(start_index, end_index)
+
+
 def get_click_position(parent: wx.Window, size_x = 400, size_y = 300):
     a, b = wx.Display(wx.Display.GetFromWindow(parent)).GetGeometry().GetSize()
     x, y = wx.GetMouseState().GetPosition()
