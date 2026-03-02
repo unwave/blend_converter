@@ -318,12 +318,20 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         if not self.ignore_select_events:
 
-            entry = self.data[int(event.GetIndex())]
+            index = int(event.GetIndex())
 
-            self.main_frame.stdout_viewer.data = entry.stdout_lines
+            if index >= 0:
+                entry = self.data[index]
+                stdout_lines = entry.stdout_lines
+                stderr_lines = entry.stderr_lines
+            else:
+                stdout_lines = []
+                stderr_lines = []
+
+            self.main_frame.stdout_viewer.data = stdout_lines
             self.main_frame.stdout_viewer.update()
 
-            self.main_frame.stderr_viewer.data = entry.stderr_lines
+            self.main_frame.stderr_viewer.data = stderr_lines
             self.main_frame.stderr_viewer.update()
 
         wx.CallAfter(self.main_frame.update_ribbon_state)
