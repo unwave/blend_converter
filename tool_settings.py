@@ -944,6 +944,8 @@ class S_Bake(Settings):
 
     use_inpaint: bool = True
     """
+    #### TODO: Currently always `True`
+
     Extend image to the image borders.
 
     #### Default: `True`
@@ -1010,11 +1012,6 @@ class S_Bake(Settings):
     _K_MAP_IDENTIFIER = '__bc_map_identifier'
     """
     The property key of a `bpy.types.Image` that contains a texture type of the image.
-    """
-
-    _K_MATERIAL_KEY = '__bc_material_key'
-    """
-    The property key of a new baked material holding the settings' `material_key`.
     """
 
     _images = []
@@ -1197,12 +1194,6 @@ class S_Pack_UVs(Settings):
     The UV layer name to pack.
 
     #### Default: `''`
-    """
-
-    merge: bool = True
-    """
-    Merge the object's UVs into one UV set.
-    #### Default: `True`
     """
 
     material_key: str = ''
@@ -1888,13 +1879,6 @@ class S_Bake_Materials(Settings):
     #### Default: `''`
     """
 
-    uv_layer_reuse: str = ''
-    """
-    The name of a uv layer that will not be re-unwrapped, only packed.
-
-    #### Default: `''`
-    """
-
     faster_ao_bake: bool = True
     """
     Optimizations to make the AO baking faster sacrificing quality.
@@ -1916,32 +1900,6 @@ class S_Bake_Materials(Settings):
     #### Default: `False`
     """
 
-    bake_original_topology: bool = True
-    """
-    The UV data is transferred using the data transfer modifier.
-
-    If `True` the topology changing modifiers will be excluded and the uvs transferred to the model.
-
-    If `False` the topology changing modifiers will be applied and the transfer modifier will be left on the original model as a top most modifier.
-
-    #### Default: `True`
-    """
-
-    unwrap_original_topology: bool = False
-    """
-    If `True` then pre-converter meshes will be UV unwrapped.
-
-    #### Default: `False`
-    """
-
-    non_uniform_average_uv_scale: bool = False
-    """
-    Use non-uniform UVs rescale in `bpy.ops.uv.average_islands_scale`.
-
-    May fix stretched UVs issues or make it worse.
-
-    #### Default: `False`
-    """
 
 @dataclasses.dataclass
 class S_Future_Bake_Materials(Settings):
