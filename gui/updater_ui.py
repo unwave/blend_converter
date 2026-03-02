@@ -294,7 +294,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
     def enable_live_update(self, value):
         for entry in self.get_selected_items():
             entry.is_live_update = value
-        wx.CallAfter(self.main_frame.update_ribbon_state)
+        self.main_frame.update_ribbon_state()
         self.refresh_visible()
 
 
