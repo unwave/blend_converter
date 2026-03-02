@@ -233,7 +233,13 @@ class Program_Entry:
             if self.psutil_process is None:
                 return
 
+            if not self.psutil_process.is_running():
+                return
+
             utils.kill_process(self.psutil_process)
+
+            self.stderr_lines.append(f"The process has been terminated: {time.strftime('%H:%M:%S %Y-%m-%d')}")
+            stderr_line_printed(self)
 
 
     def suspend(self):

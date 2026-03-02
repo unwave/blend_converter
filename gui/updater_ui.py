@@ -486,13 +486,30 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             if entry.status in (updater.Status.STALE, updater.Status.ERROR):
                 entry.is_manual_update = True
         self.main_frame.updater.despatch()
+
+
+    def on_terminate_selected(self, event):
+
+        for entry in self.get_selected_items():
+            entry.is_manual_update = False
+
+        for entry in self.get_selected_items():
+            entry.terminate()
+
+        self.main_frame.updater.despatch()
+
+        self.main_frame.update_terminate_button()
         self.Refresh()
 
 
     def on_force_execute_selected(self, event):
+
         for entry in self.get_selected_items():
             entry.is_manual_update = True
+
         self.main_frame.updater.despatch()
+
+        self.main_frame.update_terminate_button()
         self.Refresh()
 
 
@@ -925,7 +942,7 @@ class BC_App(wx.App):
 
 class Button:
 
-    TERMINATE_ALL = wx.NewIdRef()
+    TERMINATE = wx.NewIdRef()
     EXECUTE = wx.NewIdRef()
     CONFIGURE = wx.NewIdRef()
 
@@ -941,6 +958,7 @@ class Button:
     ENABLE_LIVE = wx.NewIdRef()
     DISABLE_LIVE = wx.NewIdRef()
 
+    TERMINATE_ALL_AND_PAUSE = wx.NewIdRef()
     RESTART = wx.NewIdRef()
     SETTINGS = wx.NewIdRef()
 
@@ -972,7 +990,7 @@ class Button:
 
 
 BUTTON_TEXT = {
-    Button.TERMINATE_ALL: "Terminate All",
+    Button.TERMINATE: "Terminate",
     Button.EXECUTE: "Execute",
     Button.CONFIGURE: "Configure",
 
@@ -988,6 +1006,7 @@ BUTTON_TEXT = {
     Button.ENABLE_LIVE: "Enable",
     Button.DISABLE_LIVE: "Disable",
 
+    Button.TERMINATE_ALL_AND_PAUSE: "Terminate All And Pause",
     Button.RESTART: "Restart",
     Button.SETTINGS: "Settings",
 
@@ -1071,6 +1090,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         def refresh():
             if self.__nonzero__():
                 self.result_panel.refresh()
+                self.update_terminate_button()
 
         updater.update_ui = lambda: wx.CallAfter(refresh)
 
@@ -1148,7 +1168,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         execution = RB.RibbonPanel(main_page, wx.ID_ANY, "Execution", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(execution)
-        bar.AddButton(Button.TERMINATE_ALL, BUTTON_TEXT[Button.TERMINATE_ALL], get_bitmap(wx.ART_DELETE), "Terminate all entries and pause.")
+        bar.AddButton(Button.TERMINATE, "", get_bitmap(wx.ART_DELETE), "Terminate selected entries.")
         bar.AddButton(Button.EXECUTE, "", get_bitmap(wx.ART_REDO), "Execute selected entries.")
         bar.AddButton(Button.CONFIGURE, BUTTON_TEXT[Button.CONFIGURE], get_bitmap(wx.ART_REPORT_VIEW), "Open the entry;s configuration.")
 
@@ -1172,6 +1192,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         app_misc = RB.RibbonPanel(main_page, wx.ID_ANY, "App", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(app_misc)
+        bar.AddButton(Button.TERMINATE_ALL_AND_PAUSE, BUTTON_TEXT[Button.TERMINATE_ALL_AND_PAUSE], get_bitmap(wx.ART_ERROR), "Terminate all entries and pause.")
         bar.AddButton(Button.RESTART, BUTTON_TEXT[Button.RESTART], get_bitmap(wx.ART_UNDO), "Restart the GUI.")
         bar.AddButton(Button.SETTINGS, BUTTON_TEXT[Button.SETTINGS], get_bitmap(wx.ART_EDIT), "Open the GUI settings.")
 
@@ -1271,16 +1292,26 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.set_button_text(Button.ENABLE_LIVE, BUTTON_TEXT[Button.ENABLE_LIVE] + f" ({disabled_live_count}/{len(selected)})")
         self.set_button_text(Button.DISABLE_LIVE, BUTTON_TEXT[Button.DISABLE_LIVE] + f" ({enabled_live_count}/{len(selected)})")
 
+        self.update_terminate_button()
 
         self.ribbon.Realize()
 
         self.ribbon.Thaw()
 
 
+    def update_terminate_button(self):
+
+        selected = self.result_panel.model_list.get_selected_items()
+        running_entries_count = sum(entry.status in (updater.Status.UPDATING, updater.Status.YIELDING) for entry in selected)
+
+        self.enable_button(Button.TERMINATE, bool(running_entries_count))
+        self.set_button_text(Button.TERMINATE, BUTTON_TEXT[Button.TERMINATE] + f" ({running_entries_count}/{len(selected)})")
+
+
     def init_ribbon_events(self):
 
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_terminate_and_pause, Button.TERMINATE_ALL)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_terminate_selected, Button.TERMINATE)
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_force_execute_selected, Button.EXECUTE)
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_set_config, Button.CONFIGURE)
 
@@ -1297,6 +1328,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_disable_live_update, Button.DISABLE_LIVE)
 
 
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_terminate_and_pause, Button.TERMINATE_ALL_AND_PAUSE)
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_restart, Button.RESTART)
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_settings, Button.SETTINGS)
 
