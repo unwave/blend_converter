@@ -1006,7 +1006,7 @@ class Button_Data:
 
 
     def get_data(self):
-        return self.id, self.label, self.get_bitmap(), self.description
+        return self.id, self.label, self.get_bitmap(), ""
 
 
 class Button:
@@ -1284,6 +1284,16 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
     def map_button_to_id(self):
 
+        self.button_id_to_data: typing.Dict[wx.WindowIDRef, Button_Data] = {}
+
+        for key, value in Button.__dict__.items():
+
+            if key.startswith('_'):
+                continue
+
+            self.button_id_to_data[value.id] = value
+
+
         self.button_id_to_bar: typing.Dict[wx.WindowIDRef, RB.RibbonButtonBar] = {}
 
         for page in self.ribbon.GetChildren():
@@ -1415,6 +1425,40 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_show_console_on_top, Button.CONSOLE_SHOW_ON_TOP.id)
         if not utils.Console_Shown.get_is_using_terminal():
             self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_toggle_console, Button.CONSOLE_TOGGLE.id)
+
+
+        page: RB.RibbonPage
+        panel: RB.RibbonPanel
+        bar: RB.RibbonButtonBar
+        for page in self.ribbon.GetChildren():
+            for panel in page.GetChildren():
+
+                for bar in panel.GetChildren():
+                    bar.Bind(wx.EVT_MOTION, self.on_ribbon_bar_motion)
+
+                    bar.Bind(wx.EVT_LEAVE_WINDOW, self.on_ribbon_bar_leave)
+
+
+    def on_ribbon_bar_motion(self, event: wx.MouseEvent):
+
+        event.Skip()
+
+        bar: RB.RibbonButtonBar = event.GetEventObject()
+
+        item = bar.GetHoveredItem()
+        if item:
+            button_id = bar.GetItemId(item)
+            description = self.button_id_to_data[button_id].description
+            self.PushStatusText(description)
+        else:
+            self.PushStatusText('')
+
+
+    def on_ribbon_bar_leave(self, event: wx.MouseEvent):
+
+        event.Skip()
+
+        self.PushStatusText('')
 
 
     def init_ui(self):
