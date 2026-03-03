@@ -944,24 +944,23 @@ def get_bitmap_from_text(text: str, color = (0, 0, 0)):
     dc = wx.MemoryDC()
 
     font = wx.Font()
-    font.SetPointSize(36)
+    font.SetPointSize(42)
     dc.SetFont(font)
 
     dc.SelectObject(bitmap)
     dc.Clear()
 
     x, y = dc.GetTextExtent(text)
-    dc.DrawText(text, (draw_size - x) / 2 ,  (draw_size - y) / 2)
+    dc.DrawText(text, (draw_size - x) // 2 ,  (draw_size - y) // 2)
+
 
     image: wx.Image = bitmap.ConvertToImage()
     image.InitAlpha()
 
-    alpha_buffer = image.GetAlphaBuffer()
-
-    for index, rgb in enumerate(zip(*(iter(image.GetData()),) * 3)):
-        alpha_buffer[index] = max(255 - rgb[0], 255 - rgb[1], 255 - rgb[2])
+    alpha = bytes(255 - min(r, g, b) for r, g, b in zip(*(iter(image.GetData()),) * 3))
 
     image.SetRGB(wx.Rect(0, 0, draw_size, draw_size), *color)
+    image.SetAlpha(bytes(alpha))
 
     bitmap = image.ConvertToBitmap()
 
@@ -1027,11 +1026,11 @@ BUTTON_TEXT = {
     Button.EXECUTE: "Execute",
     Button.CONFIGURE: "Configure",
 
-    Button.SHOW_SOURCE_FILES: "🌱 Source Show",
-    Button.SHOW_RESULT_FILES: "🏆 Result Show",
+    Button.SHOW_SOURCE_FILES: "Show Source",
+    Button.SHOW_RESULT_FILES: "Show Result",
 
-    Button.EDIT_SOURCE_FILES: "🌱 Source Edit",
-    Button.EDIT_RESULT_FILES: "🏆 Result Edit",
+    Button.EDIT_SOURCE_FILES: "Edit Source",
+    Button.EDIT_RESULT_FILES: "Edit Result",
 
     Button.PAUSE: "Pause",
     Button.RESUME: "Resume",
@@ -1055,8 +1054,8 @@ BUTTON_TEXT = {
     Button.DIFF: "Diff",
     Button.DIFF_INLINE: "Diff Inline",
 
-    Button.SET_AS_UPDATED: "Set As Updated",
-    Button.SET_AS_NEEDS_UPDATE: "Set As Needs Update",
+    Button.SET_AS_UPDATED: "Set As Ok",
+    Button.SET_AS_NEEDS_UPDATE: "Set As Stale",
     Button.POKE: "Poke",
 
     Button.COPY_COMMAND: "Command",
@@ -1207,15 +1206,15 @@ class Main_Frame(wxp_utils.Generic_Frame):
         bar.AddButton(Button.PAUSE, BUTTON_TEXT[Button.PAUSE], get_bitmap_from_text('⏸️'), "Pause the live execution.")
         bar.AddButton(Button.RESUME, BUTTON_TEXT[Button.RESUME], get_bitmap_from_text('▶️'), "Resume the live execution.")
         bar.AddButton(Button.ENABLE_LIVE, "", get_bitmap_from_text('⚡', color = (191, 137, 0)), "")
-        bar.AddButton(Button.DISABLE_LIVE, "", get_bitmap_from_text('💤', color = (15, 143, 179)), "")
+        bar.AddButton(Button.DISABLE_LIVE, "", get_bitmap_from_text('🚫', color = (14, 56, 125)), "")
 
 
         files = RB.RibbonPanel(main_page, wx.ID_ANY, "Files", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(files)
         bar.AddButton(Button.SHOW_SOURCE_FILES, "", get_bitmap(wx.ART_FIND), "Show source files in the file explorer.")
-        bar.AddButton(Button.EDIT_SOURCE_FILES, "", get_bitmap(wx.ART_FIND_AND_REPLACE), "Open source files.")
+        bar.AddButton(Button.EDIT_SOURCE_FILES, "", get_bitmap_from_text('🌱'), "Open source files.")
         bar.AddButton(Button.SHOW_RESULT_FILES, "", get_bitmap(wx.ART_FIND), "Show result files in the file explorer.")
-        bar.AddButton(Button.EDIT_RESULT_FILES, "", get_bitmap(wx.ART_CUT), "Open result files.")
+        bar.AddButton(Button.EDIT_RESULT_FILES, "", get_bitmap_from_text('🏆'), "Open result files.")
         # bar.AddButton(Button.SET_AS_UPDATED, "Open Folder", get_bitmap(wx.ART_FOLDER_OPEN), "")
 
 
@@ -1223,7 +1222,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         bar = RB.RibbonButtonBar(app_misc)
         bar.AddButton(Button.TERMINATE_ALL_AND_PAUSE, BUTTON_TEXT[Button.TERMINATE_ALL_AND_PAUSE], get_bitmap(wx.ART_ERROR), "Terminate all entries and pause.")
         bar.AddButton(Button.RESTART, BUTTON_TEXT[Button.RESTART], get_bitmap(wx.ART_UNDO), "Restart the GUI.")
-        bar.AddButton(Button.SETTINGS, BUTTON_TEXT[Button.SETTINGS], get_bitmap_from_text('🛠️'), "Open the GUI settings.")
+        bar.AddButton(Button.SETTINGS, BUTTON_TEXT[Button.SETTINGS], get_bitmap_from_text('⚙️'), "Open the GUI settings.")
 
 
 
@@ -1251,7 +1250,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         status = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Status", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(status)
         bar.AddButton(Button.SET_AS_UPDATED, "", get_bitmap_from_text('👍', color = (25, 117, 10)), "")
-        bar.AddButton(Button.SET_AS_NEEDS_UPDATE, "", get_bitmap_from_text('🦕', color = (184, 176, 24)), "")
+        bar.AddButton(Button.SET_AS_NEEDS_UPDATE, "", get_bitmap_from_text('🦕', color = (166, 171, 0)), "")
         bar.AddButton(Button.POKE, "", get_bitmap_from_text('👇'), "")
 
 
