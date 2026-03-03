@@ -399,17 +399,17 @@ class Model_List(wxp_utils.Item_Viewer_Native):
     def on_key(self, event: wx.KeyEvent):
         event.Skip()
 
-        if not event.ControlDown():
-            return
+        ctrl = event.ControlDown()
+        alt = event.AltDown()
 
         key_code = event.GetKeyCode()
 
-        if key_code == ord('C'):
+        if ctrl and key_code == ord('C'):
             pyperclip.copy(self.get_conversion_command(self.get_selected_items()))
-        elif key_code == ord('A'):
-            self.ignore_select_events = True
-            self.SetItemState(-1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
-            self.ignore_select_events = False
+        elif ctrl and not alt and key_code == ord('A'):
+            self.on_select_all(None)
+        elif not ctrl and alt and key_code == ord('A'):
+            self.on_deselect_all(None)
 
 
     def compare_model(self, entry: updater.Program_Entry):
@@ -716,6 +716,18 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             self.show_diff_vscode(entry)
 
 
+    def on_select_all(self, event):
+        self.ignore_select_events = True
+        self.select_all()
+        self.ignore_select_events = False
+
+
+    def on_deselect_all(self, event):
+        self.ignore_select_events = True
+        self.deselect_all()
+        self.ignore_select_events = False
+
+
 class Output_Lines(wxp_utils.Item_Viewer_Native):
 
 
@@ -974,6 +986,9 @@ class BC_App(wx.App):
 
 class Button:
 
+    SELECT_ALL = wx.NewIdRef()
+    DESELECT_ALL = wx.NewIdRef()
+
     TERMINATE = wx.NewIdRef()
     EXECUTE = wx.NewIdRef()
     CONFIGURE = wx.NewIdRef()
@@ -1022,6 +1037,10 @@ class Button:
 
 
 BUTTON_TEXT = {
+
+    Button.SELECT_ALL: "Select All",
+    Button.DESELECT_ALL: "Deselect All",
+
     Button.TERMINATE: "Terminate",
     Button.EXECUTE: "Execute",
     Button.CONFIGURE: "Configure",
@@ -1193,6 +1212,12 @@ class Main_Frame(wxp_utils.Generic_Frame):
         main_page = RB.RibbonPage(self.ribbon, wx.ID_ANY, "Main")
 
 
+        select = RB.RibbonPanel(main_page, wx.ID_ANY, "Select", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(select)
+        bar.AddButton(Button.SELECT_ALL, BUTTON_TEXT[Button.SELECT_ALL], get_bitmap_from_text('☑️'), "")
+        bar.AddButton(Button.DESELECT_ALL, BUTTON_TEXT[Button.DESELECT_ALL], get_bitmap_from_text('↩️'), "")
+
+
         execution = RB.RibbonPanel(main_page, wx.ID_ANY, "Execution", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(execution)
         bar.AddButton(Button.TERMINATE, "", get_bitmap(wx.ART_DELETE), "Terminate selected entries.")
@@ -1353,6 +1378,9 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     def init_ribbon_events(self):
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_select_all, Button.SELECT_ALL)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_deselect_all, Button.DESELECT_ALL)
 
 
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_terminate_selected, Button.TERMINATE)

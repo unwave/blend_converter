@@ -181,6 +181,10 @@ class Item_Viewer_Native(wx.ListCtrl):
         print('on_left_double_click', index)
 
 
+    def select_all(self):
+        self.SetItemState(-1, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
+
+
     def deselect_all(self):
         self.SetItemState(-1, 0, wx.LIST_STATE_SELECTED)
 
