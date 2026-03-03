@@ -1156,8 +1156,6 @@ class Main_Frame(wxp_utils.Generic_Frame):
     @classmethod
     def get_app(cls, definitions: typing.List[common.Program_Definition], columns = None):
 
-        print(sys.argv)
-
         app = BC_App()
         frame = cls(definitions, columns = columns)
         app.main_frame = frame
