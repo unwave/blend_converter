@@ -1237,7 +1237,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         compare = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Compare", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(compare)
-        bar.AddButton(Button.COMPARE, "", get_bitmap_from_text('🧐'), "")
+        bar.AddButton(Button.COMPARE, "", get_bitmap_from_text('🧐', color = (227, 114, 0)), "")
 
         difference = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Difference", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(difference)
@@ -1308,7 +1308,10 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         is_configurable = bool(active and active.program.config)
         self.enable_button(Button.CONFIGURE, is_configurable)
-        self.set_button_text(Button.CONFIGURE, BUTTON_TEXT[Button.CONFIGURE] + f"{' 🚫' if not is_configurable else ''}")
+        self.set_button_text(Button.CONFIGURE, BUTTON_TEXT[Button.CONFIGURE] + f"{' 🚫' if not is_configurable else ' (Active)'}")
+
+        self.enable_button(Button.COMPARE, bool(active))
+        self.set_button_text(Button.COMPARE, BUTTON_TEXT[Button.COMPARE] + f"{' 🚫' if not active else ' (Active)'}")
 
 
         enabled_live_count = sum(entry.is_live_update for entry in selected)
