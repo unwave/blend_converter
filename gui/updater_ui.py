@@ -984,109 +984,81 @@ class BC_App(wx.App):
     main_frame: Main_Frame
 
 
+class Button_Data:
+
+
+    def __init__(self, label: str, icon = '', icon_color = (0, 0, 0), wx_icon = '', description = ""):
+        self.id = wx.NewIdRef()
+        self.label = label
+        self.icon = icon
+        self.icon_color = icon_color
+        self.wx_icon = wx_icon
+        self.description = description
+
+
+    def get_bitmap(self):
+        if self.wx_icon:
+            return get_bitmap(self.wx_icon)
+        elif self.icon:
+            return get_bitmap_from_text(self.icon, color = self.icon_color)
+        else:
+            return get_bitmap_from_text('🛎️', color = self.icon_color)
+
+
+    def get_data(self):
+        return self.id, self.label, self.get_bitmap(), self.description
+
+
 class Button:
 
-    SELECT_ALL = wx.NewIdRef()
-    DESELECT_ALL = wx.NewIdRef()
+    SELECT_ALL = Button_Data("Select All", icon = '☑️')
+    DESELECT_ALL = Button_Data("Deselect All", icon = '↩️')
 
-    TERMINATE = wx.NewIdRef()
-    EXECUTE = wx.NewIdRef()
-    CONFIGURE = wx.NewIdRef()
+    TERMINATE = Button_Data("Terminate", wx_icon = wx.ART_DELETE, description = "Terminate selected entries.")
+    EXECUTE = Button_Data("Execute", wx_icon = wx.ART_REDO, description = "Execute selected entries.")
+    CONFIGURE = Button_Data("Configure", wx_icon = wx.ART_REPORT_VIEW, description = "Open the entry's configuration.")
 
-    SHOW_SOURCE_FILES = wx.NewIdRef()
-    SHOW_RESULT_FILES = wx.NewIdRef()
+    SHOW_SOURCE_FILES = Button_Data("Show Source", wx_icon = wx.ART_FIND, description = "Show source files in the file explorer.")
+    SHOW_RESULT_FILES = Button_Data("Show Result", wx_icon = wx.ART_FIND, description = "Show result files in the file explorer.")
 
-    EDIT_SOURCE_FILES = wx.NewIdRef()
-    EDIT_RESULT_FILES = wx.NewIdRef()
+    EDIT_SOURCE_FILES = Button_Data("Edit Source", icon = '🌱', description = "Open source files.")
+    EDIT_RESULT_FILES = Button_Data("Edit Result", icon = '🏆', description = "Open result files.")
 
-    PAUSE = wx.NewIdRef()
-    RESUME = wx.NewIdRef()
+    PAUSE = Button_Data("Pause", icon = '⏸️', description = "Pause the live execution.")
+    RESUME = Button_Data("Resume", icon = '▶️', description = "Resume the live execution.")
 
-    ENABLE_LIVE = wx.NewIdRef()
-    DISABLE_LIVE = wx.NewIdRef()
+    ENABLE_LIVE = Button_Data("Enable", icon = '⚡', icon_color=(191, 137, 0))
+    DISABLE_LIVE = Button_Data("Disable", icon = '🚫', icon_color = (14, 56, 125))
 
-    TERMINATE_ALL_AND_PAUSE = wx.NewIdRef()
-    RESTART = wx.NewIdRef()
-    SETTINGS = wx.NewIdRef()
-
-
-    SHOW_STDOUT_FILE = wx.NewIdRef()
-    SHOW_STDERR_FILE = wx.NewIdRef()
-
-    SHOW_PYTHON_SCRIPTS = wx.NewIdRef()
-
-    COMPARE = wx.NewIdRef()
-
-    DIFF_VSCODE = wx.NewIdRef()
-    DIFF = wx.NewIdRef()
-    DIFF_INLINE = wx.NewIdRef()
-
-    SET_AS_UPDATED = wx.NewIdRef()
-    SET_AS_NEEDS_UPDATE = wx.NewIdRef()
-    POKE = wx.NewIdRef()
-
-    COPY_COMMAND = wx.NewIdRef()
-    COPY_FOLDER_BASENAME = wx.NewIdRef()
-    COPY_SOURCE_PATH = wx.NewIdRef()
-
-    LAYOUT_PRINT = wx.NewIdRef()
-    LAYOUT_RESTORE = wx.NewIdRef()
-
-    CONSOLE_SHOW_ON_TOP = wx.NewIdRef()
-    CONSOLE_TOGGLE = wx.NewIdRef()
+    TERMINATE_ALL_AND_PAUSE = Button_Data("Terminate All And Pause", wx_icon = wx.ART_ERROR, description = "Terminate all entries and pause.")
+    RESTART = Button_Data("Restart", wx_icon = wx.ART_UNDO, description = "Restart the GUI.")
+    SETTINGS = Button_Data("Settings", icon = '⚙️', description = "Open the GUI settings.")
 
 
-BUTTON_TEXT = {
+    SHOW_STDOUT_FILE = Button_Data("Stdout", wx_icon = wx.ART_FIND)
+    SHOW_STDERR_FILE = Button_Data("Stderr", wx_icon = wx.ART_FIND)
 
-    Button.SELECT_ALL: "Select All",
-    Button.DESELECT_ALL: "Deselect All",
+    SHOW_PYTHON_SCRIPTS = Button_Data("Show", wx_icon = wx.ART_FIND)
 
-    Button.TERMINATE: "Terminate",
-    Button.EXECUTE: "Execute",
-    Button.CONFIGURE: "Configure",
+    COMPARE = Button_Data("Compare", icon = '🧐', icon_color = (227, 114, 0))
 
-    Button.SHOW_SOURCE_FILES: "Show Source",
-    Button.SHOW_RESULT_FILES: "Show Result",
+    DIFF_VSCODE = Button_Data("Diff VSCode", wx_icon = wx.ART_MISSING_IMAGE)
+    DIFF = Button_Data("Diff", wx_icon = wx.ART_MISSING_IMAGE)
+    DIFF_INLINE = Button_Data("Diff Inline", wx_icon = wx.ART_MISSING_IMAGE)
 
-    Button.EDIT_SOURCE_FILES: "Edit Source",
-    Button.EDIT_RESULT_FILES: "Edit Result",
+    SET_AS_UPDATED = Button_Data("Set As Ok", icon = '👍', icon_color = (25, 117, 10))
+    SET_AS_NEEDS_UPDATE = Button_Data("Set As Stale", icon = '🦕', icon_color = (166, 171, 0))
+    POKE = Button_Data("Poke", icon = '👇')
 
-    Button.PAUSE: "Pause",
-    Button.RESUME: "Resume",
+    COPY_COMMAND = Button_Data("Command", wx_icon = wx.ART_COPY)
+    COPY_FOLDER_BASENAME = Button_Data("Folder Basename", wx_icon = wx.ART_COPY)
+    COPY_SOURCE_PATH = Button_Data("Source Path", wx_icon = wx.ART_COPY)
 
-    Button.ENABLE_LIVE: "Enable",
-    Button.DISABLE_LIVE: "Disable",
+    LAYOUT_PRINT = Button_Data("Print", wx_icon = wx.ART_PRINT)
+    LAYOUT_RESTORE = Button_Data("Restore", wx_icon = wx.ART_GO_HOME)
 
-    Button.TERMINATE_ALL_AND_PAUSE: "Terminate All And Pause",
-    Button.RESTART: "Restart",
-    Button.SETTINGS: "Settings",
-
-
-    Button.SHOW_STDOUT_FILE: "Stdout",
-    Button.SHOW_STDERR_FILE: "Stderr",
-
-    Button.SHOW_PYTHON_SCRIPTS: "Show",
-
-    Button.COMPARE: "Compare",
-
-    Button.DIFF_VSCODE: "Diff VSCode",
-    Button.DIFF: "Diff",
-    Button.DIFF_INLINE: "Diff Inline",
-
-    Button.SET_AS_UPDATED: "Set As Ok",
-    Button.SET_AS_NEEDS_UPDATE: "Set As Stale",
-    Button.POKE: "Poke",
-
-    Button.COPY_COMMAND: "Command",
-    Button.COPY_FOLDER_BASENAME: "Folder Basename",
-    Button.COPY_SOURCE_PATH: "Source Path",
-
-    Button.LAYOUT_PRINT: "Print",
-    Button.LAYOUT_RESTORE: "Restore",
-
-    Button.CONSOLE_SHOW_ON_TOP: "Show On Top",
-    Button.CONSOLE_TOGGLE: "Toggle",
-}
+    CONSOLE_SHOW_ON_TOP = Button_Data("Show On Top", icon = '🔝')
+    CONSOLE_TOGGLE = Button_Data("Toggle", icon = '🖥️')
 
 
 BUTTONS_WITH_COUNT =[
@@ -1214,39 +1186,38 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         select = RB.RibbonPanel(main_page, wx.ID_ANY, "Select", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(select)
-        bar.AddButton(Button.SELECT_ALL, BUTTON_TEXT[Button.SELECT_ALL], get_bitmap_from_text('☑️'), "")
-        bar.AddButton(Button.DESELECT_ALL, BUTTON_TEXT[Button.DESELECT_ALL], get_bitmap_from_text('↩️'), "")
+        bar.AddButton(*Button.SELECT_ALL.get_data())
+        bar.AddButton(*Button.DESELECT_ALL.get_data())
 
 
         execution = RB.RibbonPanel(main_page, wx.ID_ANY, "Execution", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(execution)
-        bar.AddButton(Button.TERMINATE, "", get_bitmap(wx.ART_DELETE), "Terminate selected entries.")
-        bar.AddButton(Button.EXECUTE, "", get_bitmap(wx.ART_REDO), "Execute selected entries.")
-        bar.AddButton(Button.CONFIGURE, BUTTON_TEXT[Button.CONFIGURE], get_bitmap(wx.ART_REPORT_VIEW), "Open the entry;s configuration.")
+        bar.AddButton(*Button.TERMINATE.get_data())
+        bar.AddButton(*Button.EXECUTE.get_data())
+        bar.AddButton(*Button.CONFIGURE.get_data())
 
 
         live = RB.RibbonPanel(main_page, wx.ID_ANY, "Live", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(live)
-        bar.AddButton(Button.PAUSE, BUTTON_TEXT[Button.PAUSE], get_bitmap_from_text('⏸️'), "Pause the live execution.")
-        bar.AddButton(Button.RESUME, BUTTON_TEXT[Button.RESUME], get_bitmap_from_text('▶️'), "Resume the live execution.")
-        bar.AddButton(Button.ENABLE_LIVE, "", get_bitmap_from_text('⚡', color = (191, 137, 0)), "")
-        bar.AddButton(Button.DISABLE_LIVE, "", get_bitmap_from_text('🚫', color = (14, 56, 125)), "")
+        bar.AddButton(*Button.PAUSE.get_data())
+        bar.AddButton(*Button.RESUME.get_data())
+        bar.AddButton(*Button.ENABLE_LIVE.get_data())
+        bar.AddButton(*Button.DISABLE_LIVE.get_data())
 
 
         files = RB.RibbonPanel(main_page, wx.ID_ANY, "Files", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(files)
-        bar.AddButton(Button.SHOW_SOURCE_FILES, "", get_bitmap(wx.ART_FIND), "Show source files in the file explorer.")
-        bar.AddButton(Button.EDIT_SOURCE_FILES, "", get_bitmap_from_text('🌱'), "Open source files.")
-        bar.AddButton(Button.SHOW_RESULT_FILES, "", get_bitmap(wx.ART_FIND), "Show result files in the file explorer.")
-        bar.AddButton(Button.EDIT_RESULT_FILES, "", get_bitmap_from_text('🏆'), "Open result files.")
-        # bar.AddButton(Button.SET_AS_UPDATED, "Open Folder", get_bitmap(wx.ART_FOLDER_OPEN), "")
+        bar.AddButton(*Button.SHOW_SOURCE_FILES.get_data())
+        bar.AddButton(*Button.EDIT_SOURCE_FILES.get_data())
+        bar.AddButton(*Button.SHOW_RESULT_FILES.get_data())
+        bar.AddButton(*Button.EDIT_RESULT_FILES.get_data())
 
 
         app_misc = RB.RibbonPanel(main_page, wx.ID_ANY, "App", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(app_misc)
-        bar.AddButton(Button.TERMINATE_ALL_AND_PAUSE, BUTTON_TEXT[Button.TERMINATE_ALL_AND_PAUSE], get_bitmap(wx.ART_ERROR), "Terminate all entries and pause.")
-        bar.AddButton(Button.RESTART, BUTTON_TEXT[Button.RESTART], get_bitmap(wx.ART_UNDO), "Restart the GUI.")
-        bar.AddButton(Button.SETTINGS, BUTTON_TEXT[Button.SETTINGS], get_bitmap_from_text('⚙️'), "Open the GUI settings.")
+        bar.AddButton(*Button.TERMINATE_ALL_AND_PAUSE.get_data())
+        bar.AddButton(*Button.RESTART.get_data())
+        bar.AddButton(*Button.SETTINGS.get_data())
 
 
 
@@ -1254,48 +1225,48 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         stdout = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Output", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(stdout)
-        bar.AddButton(Button.SHOW_STDOUT_FILE, "", get_bitmap(wx.ART_FIND), "")
-        bar.AddButton(Button.SHOW_STDERR_FILE, "", get_bitmap(wx.ART_FIND), "")
+        bar.AddButton(*Button.SHOW_STDOUT_FILE.get_data())
+        bar.AddButton(*Button.SHOW_STDERR_FILE.get_data())
 
         script = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Script", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(script)
-        bar.AddButton(Button.SHOW_PYTHON_SCRIPTS, BUTTON_TEXT[Button.SHOW_PYTHON_SCRIPTS], get_bitmap(wx.ART_FIND), "")
+        bar.AddButton(*Button.SHOW_PYTHON_SCRIPTS.get_data())
 
         compare = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Compare", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(compare)
-        bar.AddButton(Button.COMPARE, "", get_bitmap_from_text('🧐', color = (227, 114, 0)), "")
+        bar.AddButton(*Button.COMPARE.get_data())
 
         difference = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Difference", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(difference)
-        bar.AddButton(Button.DIFF_VSCODE, "", get_bitmap(wx.ART_MISSING_IMAGE), "")
-        bar.AddButton(Button.DIFF, "", get_bitmap(wx.ART_MISSING_IMAGE), "")
-        bar.AddButton(Button.DIFF_INLINE, "", get_bitmap(wx.ART_MISSING_IMAGE), "")
+        bar.AddButton(*Button.DIFF_VSCODE.get_data())
+        bar.AddButton(*Button.DIFF.get_data())
+        bar.AddButton(*Button.DIFF_INLINE.get_data())
 
         status = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Status", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(status)
-        bar.AddButton(Button.SET_AS_UPDATED, "", get_bitmap_from_text('👍', color = (25, 117, 10)), "")
-        bar.AddButton(Button.SET_AS_NEEDS_UPDATE, "", get_bitmap_from_text('🦕', color = (166, 171, 0)), "")
-        bar.AddButton(Button.POKE, "", get_bitmap_from_text('👇'), "")
+        bar.AddButton(*Button.SET_AS_UPDATED.get_data())
+        bar.AddButton(*Button.SET_AS_NEEDS_UPDATE.get_data())
+        bar.AddButton(*Button.POKE.get_data())
 
 
 
         copy = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Copy", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(copy)
-        bar.AddButton(Button.COPY_COMMAND, "", get_bitmap(wx.ART_COPY), "")
-        bar.AddButton(Button.COPY_FOLDER_BASENAME, "", get_bitmap(wx.ART_COPY), "")
-        bar.AddButton(Button.COPY_SOURCE_PATH, "", get_bitmap(wx.ART_COPY), "")
+        bar.AddButton(*Button.COPY_COMMAND.get_data())
+        bar.AddButton(*Button.COPY_FOLDER_BASENAME.get_data())
+        bar.AddButton(*Button.COPY_SOURCE_PATH.get_data())
 
 
         layout = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Layout", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(layout)
-        bar.AddButton(Button.LAYOUT_PRINT, BUTTON_TEXT[Button.LAYOUT_PRINT], get_bitmap(wx.ART_PRINT), "")
-        bar.AddButton(Button.LAYOUT_RESTORE, BUTTON_TEXT[Button.LAYOUT_RESTORE], get_bitmap(wx.ART_GO_HOME), "")
+        bar.AddButton(*Button.LAYOUT_PRINT.get_data())
+        bar.AddButton(*Button.LAYOUT_RESTORE.get_data())
 
         console = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Console", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(console)
-        bar.AddButton(Button.CONSOLE_SHOW_ON_TOP, BUTTON_TEXT[Button.CONSOLE_SHOW_ON_TOP], get_bitmap_from_text('🔝'), "")
+        bar.AddButton(*Button.CONSOLE_SHOW_ON_TOP.get_data())
         if not utils.Console_Shown.get_is_using_terminal():
-            bar.AddButton(Button.CONSOLE_TOGGLE, BUTTON_TEXT[Button.CONSOLE_TOGGLE], get_bitmap_from_text('🖥️'), "")
+            bar.AddButton(*Button.CONSOLE_TOGGLE.get_data())
 
 
     def map_button_to_id(self):
@@ -1341,22 +1312,22 @@ class Main_Frame(wxp_utils.Generic_Frame):
             disabled_live_count = count - enabled_live_count
 
 
-        for id in BUTTONS_WITH_COUNT:
-            self.set_button_text(id, BUTTON_TEXT[id] + f" ({count})")
-            self.enable_button(id, bool(count))
+        for button in BUTTONS_WITH_COUNT:
+            self.set_button_text(button.id, button.label + f" ({count})")
+            self.enable_button(button.id, bool(count))
 
 
-        self.enable_button(Button.CONFIGURE, is_configurable)
-        self.set_button_text(Button.CONFIGURE, BUTTON_TEXT[Button.CONFIGURE] + f"{' 🚫' if not is_configurable else ' (Active)'}")
+        self.enable_button(Button.CONFIGURE.id, is_configurable)
+        self.set_button_text(Button.CONFIGURE.id, Button.CONFIGURE.label + f"{' 🚫' if not is_configurable else ' (Active)'}")
 
-        self.enable_button(Button.COMPARE, has_active)
-        self.set_button_text(Button.COMPARE, BUTTON_TEXT[Button.COMPARE] + f"{' 🚫' if not has_active else ' (Active)'}")
+        self.enable_button(Button.COMPARE.id, has_active)
+        self.set_button_text(Button.COMPARE.id, Button.COMPARE.label + f"{' 🚫' if not has_active else ' (Active)'}")
 
 
-        self.enable_button(Button.ENABLE_LIVE, bool(disabled_live_count))
-        self.enable_button(Button.DISABLE_LIVE, bool(enabled_live_count))
-        self.set_button_text(Button.ENABLE_LIVE, BUTTON_TEXT[Button.ENABLE_LIVE] + f" ({disabled_live_count}/{count})")
-        self.set_button_text(Button.DISABLE_LIVE, BUTTON_TEXT[Button.DISABLE_LIVE] + f" ({enabled_live_count}/{count})")
+        self.enable_button(Button.ENABLE_LIVE.id, bool(disabled_live_count))
+        self.enable_button(Button.DISABLE_LIVE.id, bool(enabled_live_count))
+        self.set_button_text(Button.ENABLE_LIVE.id, Button.ENABLE_LIVE.label + f" ({disabled_live_count}/{count})")
+        self.set_button_text(Button.DISABLE_LIVE.id, Button.DISABLE_LIVE.label + f" ({enabled_live_count}/{count})")
 
         self.update_terminate_button(initial = initial)
 
@@ -1373,64 +1344,64 @@ class Main_Frame(wxp_utils.Generic_Frame):
             running_entries_count = sum(entry.status in (updater.Status.UPDATING, updater.Status.YIELDING) for entry in selected)
 
 
-        self.enable_button(Button.TERMINATE, bool(running_entries_count))
-        self.set_button_text(Button.TERMINATE, BUTTON_TEXT[Button.TERMINATE] + f" ({running_entries_count}/{count})")
+        self.enable_button(Button.TERMINATE.id, bool(running_entries_count))
+        self.set_button_text(Button.TERMINATE.id, Button.TERMINATE.label + f" ({running_entries_count}/{count})")
 
 
     def init_ribbon_events(self):
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_select_all, Button.SELECT_ALL)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_deselect_all, Button.DESELECT_ALL)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_select_all, Button.SELECT_ALL.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_deselect_all, Button.DESELECT_ALL.id)
 
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_terminate_selected, Button.TERMINATE)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_force_execute_selected, Button.EXECUTE)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_set_config, Button.CONFIGURE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_terminate_selected, Button.TERMINATE.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_force_execute_selected, Button.EXECUTE.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_set_config, Button.CONFIGURE.id)
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_source_files, Button.SHOW_SOURCE_FILES)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_open_source_files, Button.EDIT_SOURCE_FILES)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_result_files,  Button.SHOW_RESULT_FILES)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_open_result_files,  Button.EDIT_RESULT_FILES)
-
-
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_pause, Button.PAUSE)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_resume, Button.RESUME)
-
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_enable_live_update, Button.ENABLE_LIVE)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_disable_live_update, Button.DISABLE_LIVE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_source_files, Button.SHOW_SOURCE_FILES.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_open_source_files, Button.EDIT_SOURCE_FILES.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_result_files,  Button.SHOW_RESULT_FILES.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_open_result_files,  Button.EDIT_RESULT_FILES.id)
 
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_terminate_and_pause, Button.TERMINATE_ALL_AND_PAUSE)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_restart, Button.RESTART)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_settings, Button.SETTINGS)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_pause, Button.PAUSE.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_resume, Button.RESUME.id)
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_enable_live_update, Button.ENABLE_LIVE.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_disable_live_update, Button.DISABLE_LIVE.id)
 
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_stdout_file_files, Button.SHOW_STDOUT_FILE)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_stderr_file_files, Button.SHOW_STDERR_FILE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_terminate_and_pause, Button.TERMINATE_ALL_AND_PAUSE.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_restart, Button.RESTART.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_settings, Button.SETTINGS.id)
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_show_app_scripts, Button.SHOW_PYTHON_SCRIPTS)
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_stdout_file_files, Button.SHOW_STDOUT_FILE.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_stderr_file_files, Button.SHOW_STDERR_FILE.id)
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_show_app_scripts, Button.SHOW_PYTHON_SCRIPTS.id)
 
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_compare_model, Button.COMPARE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_compare_model, Button.COMPARE.id)
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_diff_vscode, Button.DIFF_VSCODE)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_difference, Button.DIFF)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_inline_difference, Button.DIFF_INLINE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_diff_vscode, Button.DIFF_VSCODE.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_difference, Button.DIFF.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_inline_difference, Button.DIFF_INLINE.id)
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_set_as_updated, Button.SET_AS_UPDATED)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_mark_as_needs_update, Button.SET_AS_NEEDS_UPDATE)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_poke_entries, Button.POKE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_set_as_updated, Button.SET_AS_UPDATED.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_mark_as_needs_update, Button.SET_AS_NEEDS_UPDATE.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_poke_entries, Button.POKE.id)
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_copy_conversion_command, Button.COPY_COMMAND)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_copy_folder_basename, Button.COPY_FOLDER_BASENAME)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_copy_blend_path, Button.COPY_SOURCE_PATH)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_copy_conversion_command, Button.COPY_COMMAND.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_copy_folder_basename, Button.COPY_FOLDER_BASENAME.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_copy_blend_path, Button.COPY_SOURCE_PATH.id)
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_print_layout, Button.LAYOUT_PRINT)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_restore_default_layout, Button.LAYOUT_RESTORE)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_print_layout, Button.LAYOUT_PRINT.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_restore_default_layout, Button.LAYOUT_RESTORE.id)
 
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_show_console_on_top, Button.CONSOLE_SHOW_ON_TOP)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_show_console_on_top, Button.CONSOLE_SHOW_ON_TOP.id)
         if not utils.Console_Shown.get_is_using_terminal():
-            self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_toggle_console, Button.CONSOLE_TOGGLE)
+            self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_toggle_console, Button.CONSOLE_TOGGLE.id)
 
 
     def init_ui(self):
