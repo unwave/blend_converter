@@ -1011,54 +1011,54 @@ class Button_Data:
 
 class Button:
 
-    SELECT_ALL = Button_Data("Select All", icon = '☑️')
-    DESELECT_ALL = Button_Data("Deselect All", icon = '↩️')
+    SELECT_ALL = Button_Data("Select All", icon = '☑️', description = "Select all entries.")
+    DESELECT_ALL = Button_Data("Deselect All", icon = '↩️', description = "Deselect all entries.")
 
     TERMINATE = Button_Data("Terminate", wx_icon = wx.ART_DELETE, description = "Terminate selected entries.")
     EXECUTE = Button_Data("Execute", wx_icon = wx.ART_REDO, description = "Execute selected entries.")
-    CONFIGURE = Button_Data("Configure", wx_icon = wx.ART_REPORT_VIEW, description = "Open the entry's configuration.")
+    CONFIGURE = Button_Data("Configure", wx_icon = wx.ART_REPORT_VIEW, description = "Open the active entry's configuration.")
 
     SHOW_SOURCE_FILES = Button_Data("Show Source", wx_icon = wx.ART_FIND, description = "Show source files in the file explorer.")
     SHOW_RESULT_FILES = Button_Data("Show Result", wx_icon = wx.ART_FIND, description = "Show result files in the file explorer.")
 
-    EDIT_SOURCE_FILES = Button_Data("Edit Source", icon = '🌱', description = "Open source files.")
-    EDIT_RESULT_FILES = Button_Data("Edit Result", icon = '🏆', description = "Open result files.")
+    EDIT_SOURCE_FILES = Button_Data("Edit Source", icon = '🌱', description = "Open the source files.")
+    EDIT_RESULT_FILES = Button_Data("Edit Result", icon = '🏆', description = "Open the result files.")
 
     PAUSE = Button_Data("Pause", icon = '⏸️', description = "Pause the live execution.")
     RESUME = Button_Data("Resume", icon = '▶️', description = "Resume the live execution.")
 
-    ENABLE_LIVE = Button_Data("Enable", icon = '⚡', icon_color=(191, 137, 0))
-    DISABLE_LIVE = Button_Data("Disable", icon = '🚫', icon_color = (14, 56, 125))
+    ENABLE_LIVE = Button_Data("Enable", icon = '⚡', icon_color=(191, 137, 0), description = "Include the selected entries in the live update.")
+    DISABLE_LIVE = Button_Data("Disable", icon = '🚫', icon_color = (14, 56, 125), description = "Exclude the selected entries from the live update.")
 
     TERMINATE_ALL_AND_PAUSE = Button_Data("Terminate All And Pause", wx_icon = wx.ART_ERROR, description = "Terminate all entries and pause.")
     RESTART = Button_Data("Restart", wx_icon = wx.ART_UNDO, description = "Restart the GUI.")
-    SETTINGS = Button_Data("Settings", icon = '⚙️', description = "Open the GUI settings.")
+    SETTINGS = Button_Data("Settings", icon = '⚙️', description = "Open the GUI's settings.")
 
 
-    SHOW_STDOUT_FILE = Button_Data("Stdout", wx_icon = wx.ART_FIND)
-    SHOW_STDERR_FILE = Button_Data("Stderr", wx_icon = wx.ART_FIND)
+    SHOW_STDOUT_FILE = Button_Data("Show Stdout", wx_icon = wx.ART_FIND, description = "Show the Standard Output file in the file explore.")
+    SHOW_STDERR_FILE = Button_Data("Show Stderr", wx_icon = wx.ART_FIND, description = "Show the Standard Error file in the file explore.")
 
-    SHOW_PYTHON_SCRIPTS = Button_Data("Show", wx_icon = wx.ART_FIND)
+    SHOW_PYTHON_SCRIPTS = Button_Data("Show Python Script", wx_icon = wx.ART_FIND, description = "Show the Python scripts the file explore.")
 
-    COMPARE = Button_Data("Compare", icon = '🧐', icon_color = (227, 114, 0))
+    COMPARE = Button_Data("Compare", icon = '🧐', icon_color = (227, 114, 0), description = "Compare the active entry's source and result files in Blender.")
 
-    DIFF_VSCODE = Button_Data("Diff VSCode", wx_icon = wx.ART_MISSING_IMAGE)
-    DIFF = Button_Data("Diff", wx_icon = wx.ART_MISSING_IMAGE)
-    DIFF_INLINE = Button_Data("Diff Inline", wx_icon = wx.ART_MISSING_IMAGE)
+    DIFF_VSCODE = Button_Data("Diff VSCode", wx_icon = wx.ART_MISSING_IMAGE, description = "Show the difference in the program instructions in VSCode.")
+    DIFF = Button_Data("Diff", wx_icon = wx.ART_MISSING_IMAGE, description = "Show the difference in the program instructions.")
+    DIFF_INLINE = Button_Data("Diff Inline", wx_icon = wx.ART_MISSING_IMAGE, description = "Show the inline difference in the program instructions.")
 
-    SET_AS_UPDATED = Button_Data("Set As Ok", icon = '👍', icon_color = (25, 117, 10))
-    SET_AS_NEEDS_UPDATE = Button_Data("Set As Stale", icon = '🦕', icon_color = (166, 171, 0))
-    POKE = Button_Data("Poke", icon = '👇')
+    SET_AS_UPDATED = Button_Data("Set As Ok", icon = '👍', icon_color = (25, 117, 10), description = "Write the report as if the result files are up to date.")
+    SET_AS_NEEDS_UPDATE = Button_Data("Set As Stale", icon = '🦕', icon_color = (166, 171, 0), description = "Change the status of the entries to stale.")
+    POKE = Button_Data("Poke", icon = '👇', description = "Refresh the status.")
 
-    COPY_COMMAND = Button_Data("Command", wx_icon = wx.ART_COPY)
-    COPY_FOLDER_BASENAME = Button_Data("Folder Basename", wx_icon = wx.ART_COPY)
-    COPY_SOURCE_PATH = Button_Data("Source Path", wx_icon = wx.ART_COPY)
+    COPY_COMMAND = Button_Data("Command", wx_icon = wx.ART_COPY, description = "Copy the execution command for a command line interface.")
+    COPY_FOLDER_BASENAME = Button_Data("Folder Basename", wx_icon = wx.ART_COPY, description = "Copy the source folder base name.")
+    COPY_SOURCE_PATH = Button_Data("Source Path", wx_icon = wx.ART_COPY, description = "Copy the source path.")
 
-    LAYOUT_PRINT = Button_Data("Print", wx_icon = wx.ART_PRINT)
-    LAYOUT_RESTORE = Button_Data("Restore", wx_icon = wx.ART_GO_HOME)
+    LAYOUT_PRINT = Button_Data("Print", wx_icon = wx.ART_PRINT, description = "Print the current layout into the console.")
+    LAYOUT_RESTORE = Button_Data("Restore", wx_icon = wx.ART_GO_HOME, description = "Restore the default layout.")
 
-    CONSOLE_SHOW_ON_TOP = Button_Data("Show On Top", icon = '🔝')
-    CONSOLE_TOGGLE = Button_Data("Toggle", icon = '🖥️')
+    CONSOLE_SHOW_ON_TOP = Button_Data("Show On Top", icon = '🔝', description = "Show the console always on top.")
+    CONSOLE_TOGGLE = Button_Data("Toggle", icon = '🖥️', description = "Toggle the console visibility.")
 
 
 BUTTONS_WITH_COUNT =[
