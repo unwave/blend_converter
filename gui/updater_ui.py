@@ -1186,12 +1186,14 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         select = RB.RibbonPanel(main_page, wx.ID_ANY, "Select", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(select)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.SELECT_ALL.get_data())
         bar.AddButton(*Button.DESELECT_ALL.get_data())
 
 
         execution = RB.RibbonPanel(main_page, wx.ID_ANY, "Execution", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(execution)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.TERMINATE.get_data())
         bar.AddButton(*Button.EXECUTE.get_data())
         bar.AddButton(*Button.CONFIGURE.get_data())
@@ -1199,6 +1201,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         live = RB.RibbonPanel(main_page, wx.ID_ANY, "Live", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(live)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.PAUSE.get_data())
         bar.AddButton(*Button.RESUME.get_data())
         bar.AddButton(*Button.ENABLE_LIVE.get_data())
@@ -1207,6 +1210,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         files = RB.RibbonPanel(main_page, wx.ID_ANY, "Files", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(files)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.SHOW_SOURCE_FILES.get_data())
         bar.AddButton(*Button.EDIT_SOURCE_FILES.get_data())
         bar.AddButton(*Button.SHOW_RESULT_FILES.get_data())
@@ -1215,6 +1219,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         app_misc = RB.RibbonPanel(main_page, wx.ID_ANY, "App", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(app_misc)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.TERMINATE_ALL_AND_PAUSE.get_data())
         bar.AddButton(*Button.RESTART.get_data())
         bar.AddButton(*Button.SETTINGS.get_data())
@@ -1225,25 +1230,30 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         stdout = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Output", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(stdout)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.SHOW_STDOUT_FILE.get_data())
         bar.AddButton(*Button.SHOW_STDERR_FILE.get_data())
 
         script = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Script", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(script)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.SHOW_PYTHON_SCRIPTS.get_data())
 
         compare = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Compare", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(compare)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.COMPARE.get_data())
 
         difference = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Difference", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(difference)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.DIFF_VSCODE.get_data())
         bar.AddButton(*Button.DIFF.get_data())
         bar.AddButton(*Button.DIFF_INLINE.get_data())
 
         status = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Status", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(status)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.SET_AS_UPDATED.get_data())
         bar.AddButton(*Button.SET_AS_NEEDS_UPDATE.get_data())
         bar.AddButton(*Button.POKE.get_data())
@@ -1252,6 +1262,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         copy = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Copy", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(copy)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.COPY_COMMAND.get_data())
         bar.AddButton(*Button.COPY_FOLDER_BASENAME.get_data())
         bar.AddButton(*Button.COPY_SOURCE_PATH.get_data())
@@ -1259,11 +1270,13 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         layout = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Layout", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(layout)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.LAYOUT_PRINT.get_data())
         bar.AddButton(*Button.LAYOUT_RESTORE.get_data())
 
         console = RB.RibbonPanel(inspect_page, wx.ID_ANY, "Console", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
         bar = RB.RibbonButtonBar(console)
+        bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.CONSOLE_SHOW_ON_TOP.get_data())
         if not utils.Console_Shown.get_is_using_terminal():
             bar.AddButton(*Button.CONSOLE_TOGGLE.get_data())
