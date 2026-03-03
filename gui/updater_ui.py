@@ -1139,8 +1139,9 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.init_ui()
         self.init_ribbon_events()
         self.map_button_to_id()
-        self.update_ribbon_state()
+        self.update_ribbon_state(True)
         self.ribbon.Realize()
+        self.update_ribbon_state()
 
         self.SetSizer(self.sizer)
 
@@ -1296,42 +1297,59 @@ class Main_Frame(wxp_utils.Generic_Frame):
         bar.SetButtonText(id, text)
 
 
-    def update_ribbon_state(self):
-
+    def update_ribbon_state(self, initial = False):
 
         active = self.result_panel.model_list.get_active_item()
         selected = self.result_panel.model_list.get_selected_items()
 
-        for id in BUTTONS_WITH_COUNT:
-            self.set_button_text(id, BUTTON_TEXT[id] + f" ({len(selected)})")
-            self.enable_button(id, bool(len(selected)))
+        if initial:
+            count = 999
+            has_active = True
+            is_configurable = True
+            enabled_live_count = 999
+            disabled_live_count = 999
+        else:
+            count = len(selected)
+            has_active = bool(active)
+            is_configurable = bool(active and active.program.config)
+            enabled_live_count = sum(entry.is_live_update for entry in selected)
+            disabled_live_count = count - enabled_live_count
 
-        is_configurable = bool(active and active.program.config)
+
+        for id in BUTTONS_WITH_COUNT:
+            self.set_button_text(id, BUTTON_TEXT[id] + f" ({count})")
+            self.enable_button(id, bool(count))
+
+
         self.enable_button(Button.CONFIGURE, is_configurable)
         self.set_button_text(Button.CONFIGURE, BUTTON_TEXT[Button.CONFIGURE] + f"{' 🚫' if not is_configurable else ' (Active)'}")
 
-        self.enable_button(Button.COMPARE, bool(active))
-        self.set_button_text(Button.COMPARE, BUTTON_TEXT[Button.COMPARE] + f"{' 🚫' if not active else ' (Active)'}")
+        self.enable_button(Button.COMPARE, has_active)
+        self.set_button_text(Button.COMPARE, BUTTON_TEXT[Button.COMPARE] + f"{' 🚫' if not has_active else ' (Active)'}")
 
-
-        enabled_live_count = sum(entry.is_live_update for entry in selected)
-        disabled_live_count = len(selected) - enabled_live_count
 
         self.enable_button(Button.ENABLE_LIVE, bool(disabled_live_count))
         self.enable_button(Button.DISABLE_LIVE, bool(enabled_live_count))
-        self.set_button_text(Button.ENABLE_LIVE, BUTTON_TEXT[Button.ENABLE_LIVE] + f" ({disabled_live_count}/{len(selected)})")
-        self.set_button_text(Button.DISABLE_LIVE, BUTTON_TEXT[Button.DISABLE_LIVE] + f" ({enabled_live_count}/{len(selected)})")
+        self.set_button_text(Button.ENABLE_LIVE, BUTTON_TEXT[Button.ENABLE_LIVE] + f" ({disabled_live_count}/{count})")
+        self.set_button_text(Button.DISABLE_LIVE, BUTTON_TEXT[Button.DISABLE_LIVE] + f" ({enabled_live_count}/{count})")
 
-        self.update_terminate_button()
+        self.update_terminate_button(initial = initial)
 
 
-    def update_terminate_button(self):
+    def update_terminate_button(self, initial = False):
 
         selected = self.result_panel.model_list.get_selected_items()
-        running_entries_count = sum(entry.status in (updater.Status.UPDATING, updater.Status.YIELDING) for entry in selected)
+
+        if initial:
+            count = 999
+            running_entries_count = 999
+        else:
+            count = len(selected)
+            running_entries_count = sum(entry.status in (updater.Status.UPDATING, updater.Status.YIELDING) for entry in selected)
+
 
         self.enable_button(Button.TERMINATE, bool(running_entries_count))
-        self.set_button_text(Button.TERMINATE, BUTTON_TEXT[Button.TERMINATE] + f" ({running_entries_count}/{len(selected)})")
+        self.set_button_text(Button.TERMINATE, BUTTON_TEXT[Button.TERMINATE] + f" ({running_entries_count}/{count})")
 
 
     def init_ribbon_events(self):
