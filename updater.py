@@ -225,8 +225,6 @@ class Program_Entry:
 
             threading.Thread(target=self._run, kwargs=dict(callback=callback, thread_identity = self.thread_identity, updater_command_queue = updater_command_queue), daemon = True).start()
 
-            update_ui()
-
 
     def terminate(self):
 
@@ -504,8 +502,6 @@ class Updater:
                 if not entry.program.tags.isdisjoint(failed_tags):
                     entry.status = Status.ERROR
 
-            update_ui()
-
 
         for entry in self.entries:
 
@@ -596,7 +592,6 @@ class Updater:
 
 
         yielding_for: typing.Set[str] = set()
-        suspend_others_queue = []
 
 
         def waiting_for_release(client_socket: socket.socket, entry_id: str):
@@ -635,28 +630,26 @@ class Updater:
             if command == communication.Command.DESPATCH:
                 self._despatch()
 
+
             elif command == communication.Command.SUSPEND_OTHERS:
 
+
+                if not get_active_yield_target():
+
+                    for entry in self.entries:
+
+                        if entry.status != Status.UPDATING:
+                            continue
+
+                        if entry.entry_id == item['entry_id']:
+                            continue
+
+                        entry.suspend()
+                        entry.status = Status.YIELDING
+
+
                 entry_to_yield_for = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
-
-                if len(yielding_for) > 1:
-                    suspend_others_queue.append(item)
-                    continue
-
-                for entry in self.entries:
-
-                    if entry.status != Status.UPDATING:
-                        continue
-
-                    if entry.entry_id == item['entry_id']:
-                        continue
-
-                    entry.suspend()
-                    entry.status = Status.YIELDING
-
                 yielding_for.add(entry_to_yield_for.entry_id)
-                print('Acquired cores:', entry_to_yield_for.program.blend_path)
-                update_ui()
 
 
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listening_socket:
@@ -681,25 +674,20 @@ class Updater:
 
                 entry_to_yield_for = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
 
-                for entry in self.entries:
+                if get_active_yield_target() is entry_to_yield_for:
 
-                    if entry.status != Status.YIELDING:
-                        continue
+                    for entry in self.entries:
 
-                    if entry.entry_id == entry_to_yield_for.entry_id:
-                        continue
+                        if entry.status != Status.YIELDING:
+                            continue
 
-                    entry.resume()
-                    entry.status = Status.UPDATING
+                        if entry.entry_id == entry_to_yield_for.entry_id:
+                            continue
+
+                        entry.resume()
+                        entry.status = Status.UPDATING
 
                 yielding_for.discard(entry_to_yield_for.entry_id)
-
-                for other in suspend_others_queue:
-                    self.updater_command_queue.put(other)
-                suspend_others_queue.clear()
-
-                print('Released cores:', entry_to_yield_for.program.blend_path)
-                update_ui()
 
 
             elif command == communication.Command.SLEEP:
@@ -711,10 +699,6 @@ class Updater:
                     pass
 
                 elif get_active_yield_target() in target_entries:
-
-                    entry_to_yield_for = get_active_yield_target()
-                    entry_to_yield_for.suspend()
-                    entry_to_yield_for.status = Status.SLEEPING
 
                     for entry in target_entries:
                         if entry.status == Status.UPDATING:
@@ -739,8 +723,6 @@ class Updater:
                         if entry.status == Status.UPDATING:
                             entry.suspend()
                         entry.status = Status.SLEEPING
-
-                update_ui()
 
 
             elif command == communication.Command.WAKE:
@@ -771,7 +753,42 @@ class Updater:
                         entry.resume()
                         entry.status = Status.UPDATING
 
-                update_ui()
+
+            elif command == communication.Command.TERMINATE:
+
+                entries_to_terminate = [e for e in self.entries if e.status in (Status.UPDATING, Status.YIELDING, Status.SLEEPING) and e.entry_id in item['entry_ids']]
+
+
+                if not entries_to_terminate:
+                    pass
+
+                elif get_active_yield_target() in entries_to_terminate:
+
+                    for entry in entries_to_terminate:
+                        entry.is_manual_update = False
+                        entry.terminate()
+                        yielding_for.discard(entry.entry_id)
+
+                    other_yielding_entries = [e for e in self.entries if not e in entries_to_terminate and e.status == Status.YIELDING]
+
+                    entry_to_yield_for = next((e for e in other_yielding_entries if e.entry_id in yielding_for), None)
+                    if entry_to_yield_for:
+                        entry_to_yield_for.resume()
+                        entry_to_yield_for.status = Status.UPDATING
+                    else:
+                        for entry in other_yielding_entries:
+                            entry.resume()
+                            entry.status = Status.UPDATING
+
+                else:
+
+                    for entry in entries_to_terminate:
+                        entry.is_manual_update = False
+                        entry.terminate()
+                        yielding_for.discard(entry.entry_id)
+
+
+            update_ui()
 
 
 def update_ui():

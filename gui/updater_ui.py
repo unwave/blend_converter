@@ -490,16 +490,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def on_terminate_selected(self, event):
 
-        for entry in self.get_selected_items():
-            entry.is_manual_update = False
-
-        for entry in self.get_selected_items():
-            entry.terminate()
-
-        self.main_frame.updater.despatch()
-
-        self.main_frame.update_status_dependant_buttons()
-        self.refresh_visible()
+        self.main_frame.updater.updater_command_queue.put({
+            communication.Key.COMMAND: communication.Command.TERMINATE,
+            'entry_ids': [e.entry_id for e in self.get_selected_items()]
+        })
 
 
     def on_force_execute_selected(self, event):
@@ -1637,19 +1631,16 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         self.pause(True)
 
-        for entry in self.updater.entries:
-            entry.is_manual_update = False
-            entry.terminate()
+        self.updater.updater_command_queue.put({
+            communication.Key.COMMAND: communication.Command.TERMINATE,
+            'entry_ids': [e.entry_id for e in self.updater.entries]
+        })
+
 
 
     def on_restart(self, event = None):
 
-        if not self.updater.is_paused:
-            self.on_updater_pause_toggle()
-
-        for entry in self.updater.entries:
-            entry.is_manual_update = False
-            entry.terminate()
+        self.on_terminate_and_pause(event)
 
         # TODO: does not work for argv with spaces
 

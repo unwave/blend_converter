@@ -97,6 +97,7 @@ class Command:
     RESUME_OTHERS = 'resume_others'
     SLEEP = 'sleep'
     WAKE = 'wake'
+    TERMINATE = 'terminate'
 
 
 class Suspend_Others:
