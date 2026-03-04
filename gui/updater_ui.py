@@ -21,7 +21,7 @@ import wx.ribbon as RB
 from .. import utils
 from .. import common
 from .. import updater
-
+from ..blender import communication
 
 from . import wxp_utils
 
@@ -498,7 +498,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         self.main_frame.updater.despatch()
 
-        self.main_frame.update_terminate_button()
+        self.main_frame.update_status_dependant_buttons()
         self.refresh_visible()
 
 
@@ -509,7 +509,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         self.main_frame.updater.despatch()
 
-        self.main_frame.update_terminate_button()
+        self.main_frame.update_status_dependant_buttons()
         self.refresh_visible()
 
 
@@ -726,6 +726,22 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.ignore_select_events = True
         self.deselect_all()
         self.ignore_select_events = False
+
+
+    def on_sleep(self, event):
+
+        self.main_frame.updater.updater_command_queue.put({
+            communication.Key.COMMAND: communication.Command.SLEEP,
+            'entry_ids': [e.entry_id for e in self.get_selected_items()]
+        })
+
+
+    def on_wake(self, event):
+
+        self.main_frame.updater.updater_command_queue.put({
+            communication.Key.COMMAND: communication.Command.WAKE,
+            'entry_ids': [e.entry_id for e in self.get_selected_items()]
+        })
 
 
 class Output_Lines(wxp_utils.Item_Viewer_Native):
@@ -1030,6 +1046,9 @@ class Button:
     ENABLE_LIVE = Button_Data("Enable", icon = '⚡', icon_color=(191, 137, 0), description = "Include the selected entries in the live update.")
     DISABLE_LIVE = Button_Data("Disable", icon = '🚫', icon_color = (14, 56, 125), description = "Exclude the selected entries from the live update.")
 
+    SLEEP = Button_Data("Sleep", icon = '💤', icon_color = (0, 188, 242), description = "Suspend the selected entries' running processes.")
+    WAKE = Button_Data("Wake", icon = '☕', icon_color = (130, 79, 46), description = "Resume the selected entries' running processes.")
+
     TERMINATE_ALL_AND_PAUSE = Button_Data("Terminate All And Pause", wx_icon = wx.ART_ERROR, description = "Terminate all entries and pause.")
     RESTART = Button_Data("Restart", wx_icon = wx.ART_UNDO, description = "Restart the GUI.")
     SETTINGS = Button_Data("Settings", icon = '⚙️', description = "Open the GUI's settings.")
@@ -1109,7 +1128,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         def refresh():
             if self.__nonzero__():
                 self.result_panel.refresh()
-                self.update_terminate_button()
+                self.update_status_dependant_buttons()
 
         updater.update_ui = lambda: wx.CallAfter(refresh)
 
@@ -1206,6 +1225,13 @@ class Main_Frame(wxp_utils.Generic_Frame):
         bar.AddButton(*Button.RESUME.get_data())
         bar.AddButton(*Button.ENABLE_LIVE.get_data())
         bar.AddButton(*Button.DISABLE_LIVE.get_data())
+
+
+        sleep = RB.RibbonPanel(main_page, wx.ID_ANY, "Sleep", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(sleep)
+        bar.SetShowToolTipsForDisabled(True)
+        bar.AddButton(*Button.SLEEP.get_data())
+        bar.AddButton(*Button.WAKE.get_data())
 
 
         files = RB.RibbonPanel(main_page, wx.ID_ANY, "Files", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
@@ -1352,23 +1378,33 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.set_button_text(Button.ENABLE_LIVE.id, Button.ENABLE_LIVE.label + f" ({disabled_live_count}/{count})")
         self.set_button_text(Button.DISABLE_LIVE.id, Button.DISABLE_LIVE.label + f" ({enabled_live_count}/{count})")
 
-        self.update_terminate_button(initial = initial)
+        self.update_status_dependant_buttons(initial = initial)
 
 
-    def update_terminate_button(self, initial = False):
+    def update_status_dependant_buttons(self, initial = False):
 
         selected = self.result_panel.model_list.get_selected_items()
 
         if initial:
             count = 999
             running_entries_count = 999
+            sleeping_entries = 999
+            terminatable_entries = 999
         else:
             count = len(selected)
             running_entries_count = sum(entry.status in (updater.Status.UPDATING, updater.Status.YIELDING) for entry in selected)
+            sleeping_entries = sum(entry.status == updater.Status.SLEEPING for entry in selected)
+            terminatable_entries = running_entries_count + sleeping_entries
 
 
-        self.enable_button(Button.TERMINATE.id, bool(running_entries_count))
-        self.set_button_text(Button.TERMINATE.id, Button.TERMINATE.label + f" ({running_entries_count}/{count})")
+        self.enable_button(Button.TERMINATE.id, bool(terminatable_entries))
+        self.set_button_text(Button.TERMINATE.id, Button.TERMINATE.label + f" ({terminatable_entries}/{count})")
+
+        self.enable_button(Button.SLEEP.id, bool(running_entries_count))
+        self.set_button_text(Button.SLEEP.id, Button.SLEEP.label + f" ({running_entries_count}/{count})")
+
+        self.enable_button(Button.WAKE.id, bool(sleeping_entries))
+        self.set_button_text(Button.WAKE.id, Button.WAKE.label + f" ({sleeping_entries}/{count})")
 
 
     def init_ribbon_events(self):
@@ -1392,6 +1428,10 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_enable_live_update, Button.ENABLE_LIVE.id)
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_disable_live_update, Button.DISABLE_LIVE.id)
+
+
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_sleep, Button.SLEEP.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_wake, Button.WAKE.id)
 
 
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.on_terminate_and_pause, Button.TERMINATE_ALL_AND_PAUSE.id)

@@ -39,6 +39,7 @@ class Status:
     DOES_NOT_EXIST = 'does_not_exist'
     WAITING_FOR_DEPENDENCY = 'waiting_for_dependency'
     UNKNOWN = 'unknown'
+    SLEEPING = 'sleeping'
 
 STATUS_ICON = {
     Status.OK: '👍',
@@ -49,6 +50,7 @@ STATUS_ICON = {
     Status.DOES_NOT_EXIST: '👻',
     Status.WAITING_FOR_DEPENDENCY: '🔒',
     Status.UNKNOWN: '❓',
+    Status.SLEEPING: '💤',
 }
 
 class Program_Entry:
@@ -482,10 +484,10 @@ class Updater:
 
 
     def total_max_parallel_executions_exceeded(self):
-        return sum(entry.status in (Status.UPDATING, Status.YIELDING) for entry in self.entries) >= self.total_max_parallel_executions
+        return sum(entry.status in (Status.UPDATING, Status.YIELDING, Status.SLEEPING) for entry in self.entries) >= self.total_max_parallel_executions
 
 
-    def despatch(self):
+    def _despatch(self):
 
         failed_tags = set()
 
@@ -556,6 +558,10 @@ class Updater:
             entry.update(updater_command_queue = self.updater_command_queue, callback = self.callback)
 
 
+    def despatch(self):
+        self.updater_command_queue.put({communication.Key.COMMAND: communication.Command.DESPATCH})
+
+
     def terminate_observer(self):
         self.observer.unschedule_all()
         self.observer.stop()
@@ -568,7 +574,7 @@ class Updater:
 
     def max_executions_per_tag_exceeded(self, tags: typing.Iterable[str]):
 
-        updating_entries = [entry for entry in self.entries if entry.status in (Status.UPDATING, Status.YIELDING)]
+        updating_entries = [entry for entry in self.entries if entry.status in (Status.UPDATING, Status.YIELDING, Status.SLEEPING)]
 
         execution_limiting_tags = [tag for tag in tags if tag in self.max_parallel_execution_per_tag]
         if not execution_limiting_tags:
@@ -589,13 +595,53 @@ class Updater:
     def command_queue_runner(self):
 
 
+        yielding_for: typing.Set[str] = set()
+        suspend_others_queue = []
+
+
+        def waiting_for_release(client_socket: socket.socket, entry_id: str):
+
+            with client_socket:
+
+                try:
+                    client_socket.recv(1)
+                except ConnectionResetError as e:
+                    print(e)
+                finally:
+                    self.updater_command_queue.put({
+                        communication.Key.COMMAND: communication.Command.RESUME_OTHERS,
+                        'entry_id': entry_id,
+                    })
+
+
+        def get_active_yield_target():
+
+            entries = [e for e in self.entries if e.status == Status.UPDATING and e.entry_id in yielding_for]
+
+            if entries:
+                assert len(entries) == 1
+                return entries[0]
+            else:
+                return None
+
+
         for item in iter(self.updater_command_queue.get, SENTINEL):
 
             print("[updater got]:", item)
 
             command = item.get(communication.Key.COMMAND)
 
-            if command == communication.Command.SUSPEND_OTHERS:
+
+            if command == communication.Command.DESPATCH:
+                self._despatch()
+
+            elif command == communication.Command.SUSPEND_OTHERS:
+
+                entry_to_yield_for = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
+
+                if len(yielding_for) > 1:
+                    suspend_others_queue.append(item)
+                    continue
 
                 for entry in self.entries:
 
@@ -608,9 +654,8 @@ class Updater:
                     entry.suspend()
                     entry.status = Status.YIELDING
 
-
-                running_entry = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
-                print('Acquired cores:', running_entry.program.blend_path)
+                yielding_for.add(entry_to_yield_for.entry_id)
+                print('Acquired cores:', entry_to_yield_for.program.blend_path)
                 update_ui()
 
 
@@ -620,31 +665,112 @@ class Updater:
                     listening_socket.bind((host, 0))
                     port = listening_socket.getsockname()[1]
 
-                    running_entry.updater_response_queue.put({communication.Key.RESULT: True, communication.Key.ADDRESS: (host, port)})
+                    entry_to_yield_for.updater_response_queue.put({communication.Key.RESULT: True, communication.Key.ADDRESS: (host, port)})
 
                     listening_socket.listen()
 
                     client_socket, addr = listening_socket.accept()
+                    client_socket.settimeout(None)
+                    client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                     client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
 
-                    try:
-                        client_socket.recv(1)
-                    except ConnectionResetError as e:
-                        print(e)
+                    threading.Thread(target = waiting_for_release, args=(client_socket, entry_to_yield_for.entry_id), daemon = True).start()
 
-                    for entry in self.entries:
 
-                        if entry.status != Status.YIELDING:
-                            continue
+            elif command == communication.Command.RESUME_OTHERS:
 
-                        if entry.entry_id == running_entry.entry_id:
-                            continue
+                entry_to_yield_for = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
 
+                for entry in self.entries:
+
+                    if entry.status != Status.YIELDING:
+                        continue
+
+                    if entry.entry_id == entry_to_yield_for.entry_id:
+                        continue
+
+                    entry.resume()
+                    entry.status = Status.UPDATING
+
+                yielding_for.discard(entry_to_yield_for.entry_id)
+
+                for other in suspend_others_queue:
+                    self.updater_command_queue.put(other)
+                suspend_others_queue.clear()
+
+                print('Released cores:', entry_to_yield_for.program.blend_path)
+                update_ui()
+
+
+            elif command == communication.Command.SLEEP:
+
+                target_entries = [e for e in self.entries if e.status in (Status.UPDATING, Status.YIELDING) and e.entry_id in item['entry_ids']]
+
+
+                if not target_entries:
+                    pass
+
+                elif get_active_yield_target() in target_entries:
+
+                    entry_to_yield_for = get_active_yield_target()
+                    entry_to_yield_for.suspend()
+                    entry_to_yield_for.status = Status.SLEEPING
+
+                    for entry in target_entries:
+                        if entry.status == Status.UPDATING:
+                            entry.suspend()
+                        entry.status = Status.SLEEPING
+
+
+                    other_yielding_entries = [e for e in self.entries if not e in target_entries and e.status == Status.YIELDING]
+
+                    entry_to_yield_for = next((e for e in other_yielding_entries if e.entry_id in yielding_for), None)
+                    if entry_to_yield_for:
+                        entry_to_yield_for.resume()
+                        entry_to_yield_for.status = Status.UPDATING
+                    else:
+                        for entry in other_yielding_entries:
+                            entry.resume()
+                            entry.status = Status.UPDATING
+
+                else:
+
+                    for entry in target_entries:
+                        if entry.status == Status.UPDATING:
+                            entry.suspend()
+                        entry.status = Status.SLEEPING
+
+                update_ui()
+
+
+            elif command == communication.Command.WAKE:
+
+                target_sleeping_entries = [e for e in self.entries if e.status == Status.SLEEPING and e.entry_id in item['entry_ids']]
+
+
+                if not target_sleeping_entries:
+                    pass
+
+                elif get_active_yield_target():
+
+                    for entry in target_sleeping_entries:
+                        entry.status = Status.YIELDING
+
+                elif any(e.entry_id in yielding_for for e in target_sleeping_entries):
+
+                    for entry in target_sleeping_entries:
+                        entry.status = Status.YIELDING
+
+                    entry_to_yield_for = next(e for e in target_sleeping_entries if e.entry_id in yielding_for)
+                    entry_to_yield_for.resume()
+                    entry_to_yield_for.status = Status.UPDATING
+
+                else:
+
+                    for entry in target_sleeping_entries:
                         entry.resume()
                         entry.status = Status.UPDATING
 
-
-                print('Released cores:', running_entry.program.blend_path)
                 update_ui()
 
 

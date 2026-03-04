@@ -91,8 +91,12 @@ class Key:
 
 class Command:
 
+    DESPATCH = 'despatch'
     INSTRUCTIONS = 'instructions'
     SUSPEND_OTHERS = 'suspend_others'
+    RESUME_OTHERS = 'resume_others'
+    SLEEP = 'sleep'
+    WAKE = 'wake'
 
 
 class Suspend_Others:
