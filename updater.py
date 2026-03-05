@@ -365,7 +365,8 @@ class Updater:
 
         self.updater_command_queue: 'multiprocessing.SimpleQueue[dict]' = multiprocessing.SimpleQueue()
 
-        threading.Thread(target = self.command_queue_runner, daemon=True).start()
+        self.command_queue_running = threading.Thread(target = self.command_queue_runner, daemon=True)
+        self.command_queue_running.start()
 
         self.program_getting_pool = multiprocessing.Pool(processes=os.cpu_count()//2)
 
@@ -594,7 +595,22 @@ class Updater:
         yielding_for: typing.Set[str] = set()
 
 
-        def waiting_for_release(client_socket: socket.socket, entry_id: str):
+        def waiting_for_release(entry: Program_Entry):
+
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listening_socket:
+
+                host = 'localhost'
+                listening_socket.bind((host, 0))
+                port = listening_socket.getsockname()[1]
+
+                entry.updater_response_queue.put({communication.Key.RESULT: True, communication.Key.ADDRESS: (host, port)})
+
+                listening_socket.listen()
+
+                client_socket, addr = listening_socket.accept()
+                client_socket.settimeout(None)
+                client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
 
             with client_socket:
 
@@ -605,8 +621,14 @@ class Updater:
                 finally:
                     self.updater_command_queue.put({
                         communication.Key.COMMAND: communication.Command.RESUME_OTHERS,
-                        'entry_id': entry_id,
+                        'entry_id': entry.entry_id,
                     })
+
+
+        def show_error(message: str):
+            utils.show_nt_message("Command Queue Logical Error", message)
+            print('Command:', item)
+            traceback.print_stack()
 
 
         def get_active_yield_target():
@@ -614,10 +636,51 @@ class Updater:
             entries = [e for e in self.entries if e.status == Status.UPDATING and e.entry_id in yielding_for]
 
             if entries:
-                assert len(entries) == 1
+                if len(entries) != 1:
+                    show_error(f"Multiple active yield targets: {[e.program.blend_path for e in entries]}")
                 return entries[0]
             else:
                 return None
+
+
+        def make_others_yield(target_entires: typing.List[Program_Entry]):
+
+            others = [e for e in self.entries if not e in target_entires and e.status == Status.UPDATING]
+
+            for entry in others:
+                entry.suspend()
+                entry.status = Status.YIELDING
+
+
+        def release_yielding_others(target_entires: typing.List[Program_Entry]):
+
+            others = [e for e in self.entries if not e in target_entires and e.status == Status.YIELDING]
+
+            entry_to_yield_for = next((e for e in others if e.entry_id in yielding_for), None)
+            if entry_to_yield_for:
+                entry_to_yield_for.resume()
+                entry_to_yield_for.status = Status.UPDATING
+            else:
+                for entry in others:
+                    entry.resume()
+                    entry.status = Status.UPDATING
+
+
+        def put_into_sleep(target_entries: typing.List[Program_Entry]):
+
+            for entry in target_entries:
+                if entry.status == Status.UPDATING:
+                    entry.suspend()
+                entry.status = Status.SLEEPING
+
+
+        def terminate(target_entries: typing.List[Program_Entry]):
+
+            for entry in target_entries:
+                entry.is_manual_update = False
+                entry.terminate()
+                yielding_for.discard(entry.entry_id)
+                entry.status = Status.ERROR
 
 
         for item in iter(self.updater_command_queue.get, SENTINEL):
@@ -627,47 +690,24 @@ class Updater:
             command = item.get(communication.Key.COMMAND)
 
 
-            if command == communication.Command.DESPATCH:
+            if command == communication.Command.SHUTDOWN:
+                return
+
+
+            elif command == communication.Command.DESPATCH:
                 self._despatch()
 
 
             elif command == communication.Command.SUSPEND_OTHERS:
 
-
-                if not get_active_yield_target():
-
-                    for entry in self.entries:
-
-                        if entry.status != Status.UPDATING:
-                            continue
-
-                        if entry.entry_id == item['entry_id']:
-                            continue
-
-                        entry.suspend()
-                        entry.status = Status.YIELDING
-
-
                 entry_to_yield_for = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
+
+                if not get_active_yield_target() or get_active_yield_target() is entry_to_yield_for:
+                    make_others_yield([entry_to_yield_for])
+
                 yielding_for.add(entry_to_yield_for.entry_id)
 
-
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listening_socket:
-
-                    host = 'localhost'
-                    listening_socket.bind((host, 0))
-                    port = listening_socket.getsockname()[1]
-
-                    entry_to_yield_for.updater_response_queue.put({communication.Key.RESULT: True, communication.Key.ADDRESS: (host, port)})
-
-                    listening_socket.listen()
-
-                    client_socket, addr = listening_socket.accept()
-                    client_socket.settimeout(None)
-                    client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-                    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
-
-                    threading.Thread(target = waiting_for_release, args=(client_socket, entry_to_yield_for.entry_id), daemon = True).start()
+                threading.Thread(target = waiting_for_release, args=[entry_to_yield_for], daemon = True).start()
 
 
             elif command == communication.Command.RESUME_OTHERS:
@@ -675,17 +715,9 @@ class Updater:
                 entry_to_yield_for = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
 
                 if get_active_yield_target() is entry_to_yield_for:
-
-                    for entry in self.entries:
-
-                        if entry.status != Status.YIELDING:
-                            continue
-
-                        if entry.entry_id == entry_to_yield_for.entry_id:
-                            continue
-
-                        entry.resume()
-                        entry.status = Status.UPDATING
+                    release_yielding_others([entry_to_yield_for])
+                else:
+                    show_error(f"Unexpected race condition for {entry_to_yield_for.entry_id}: {entry_to_yield_for.program.blend_path}")
 
                 yielding_for.discard(entry_to_yield_for.entry_id)
 
@@ -700,29 +732,12 @@ class Updater:
 
                 elif get_active_yield_target() in target_entries:
 
-                    for entry in target_entries:
-                        if entry.status == Status.UPDATING:
-                            entry.suspend()
-                        entry.status = Status.SLEEPING
-
-
-                    other_yielding_entries = [e for e in self.entries if not e in target_entries and e.status == Status.YIELDING]
-
-                    entry_to_yield_for = next((e for e in other_yielding_entries if e.entry_id in yielding_for), None)
-                    if entry_to_yield_for:
-                        entry_to_yield_for.resume()
-                        entry_to_yield_for.status = Status.UPDATING
-                    else:
-                        for entry in other_yielding_entries:
-                            entry.resume()
-                            entry.status = Status.UPDATING
+                    put_into_sleep(target_entries)
+                    release_yielding_others(target_entries)
 
                 else:
 
-                    for entry in target_entries:
-                        if entry.status == Status.UPDATING:
-                            entry.suspend()
-                        entry.status = Status.SLEEPING
+                    put_into_sleep(target_entries)
 
 
             elif command == communication.Command.WAKE:
@@ -742,6 +757,8 @@ class Updater:
 
                     for entry in target_sleeping_entries:
                         entry.status = Status.YIELDING
+
+                    make_others_yield([])
 
                     entry_to_yield_for = next(e for e in target_sleeping_entries if e.entry_id in yielding_for)
                     entry_to_yield_for.resume()
@@ -764,30 +781,15 @@ class Updater:
 
                 elif get_active_yield_target() in entries_to_terminate:
 
-                    for entry in entries_to_terminate:
-                        entry.is_manual_update = False
-                        entry.terminate()
-                        yielding_for.discard(entry.entry_id)
-
-                    other_yielding_entries = [e for e in self.entries if not e in entries_to_terminate and e.status == Status.YIELDING]
-
-                    entry_to_yield_for = next((e for e in other_yielding_entries if e.entry_id in yielding_for), None)
-                    if entry_to_yield_for:
-                        entry_to_yield_for.resume()
-                        entry_to_yield_for.status = Status.UPDATING
-                    else:
-                        for entry in other_yielding_entries:
-                            entry.resume()
-                            entry.status = Status.UPDATING
+                    terminate(entries_to_terminate)
+                    release_yielding_others(entries_to_terminate)
 
                 else:
 
-                    for entry in entries_to_terminate:
-                        entry.is_manual_update = False
-                        entry.terminate()
-                        yielding_for.discard(entry.entry_id)
+                    terminate(entries_to_terminate)
 
 
+            get_active_yield_target()  # for validation
             update_ui()
 
 

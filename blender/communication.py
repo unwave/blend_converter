@@ -98,6 +98,7 @@ class Command:
     SLEEP = 'sleep'
     WAKE = 'wake'
     TERMINATE = 'terminate'
+    SHUTDOWN = 'shutdown'
 
 
 class Suspend_Others:

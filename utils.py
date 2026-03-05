@@ -1256,3 +1256,17 @@ class Dummy:
 
     def __ge__(self, other):
         return False
+
+
+def show_nt_message(title, message):
+
+    print(title, message)
+
+    if os.name != 'nt':
+        return
+
+    import subprocess
+
+    code = f"import ctypes, sys; ctypes.windll.user32.MessageBoxW(0, sys.argv[1], sys.argv[2], 0x10 | 0x40000)"
+
+    subprocess.Popen([sys.executable, '-c', code, str(message), str(title)], creationflags = subprocess.CREATE_NO_WINDOW)
