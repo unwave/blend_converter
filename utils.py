@@ -1154,6 +1154,49 @@ if typing.TYPE_CHECKING:
     import psutil
 
 
+def suspend_process_tree(parent: 'psutil.Process'):
+
+    import psutil
+
+    seen: typing.Set[psutil.Process] = set()
+    descendants: typing.List[psutil.Process] = []
+
+    try:
+        parent.suspend()
+    except psutil.Error:
+        print(e)
+        return descendants
+
+    while True:
+
+        child_found = False
+
+        try:
+            children = parent.children(recursive=True)
+        except psutil.Error as e:
+            print(e)
+            break
+
+        for child in children:
+
+            if child in seen:
+                continue
+
+            try:
+                child.suspend()
+            except psutil.Error as e:
+                print(e)
+            else:
+                seen.add(child)
+                descendants.append(child)
+                child_found = True
+
+        if not child_found:
+            break
+
+    return descendants
+
+
 def kill_process(parent: 'psutil.Process'):
 
     import psutil
@@ -1163,11 +1206,11 @@ def kill_process(parent: 'psutil.Process'):
         if not parent.is_running():
             return
 
-        children = parent.children(recursive=True)
+        descendants = suspend_process_tree(parent)
 
-        for child in children:
+        for process in reversed(descendants):
             try:
-                child.terminate()
+                process.terminate()
             except psutil.Error as e:
                 print(e)
 
@@ -1176,7 +1219,7 @@ def kill_process(parent: 'psutil.Process'):
         except psutil.Error as e:
             print(e)
 
-        gone, alive = psutil.wait_procs(children + [parent], timeout=3)
+        gone, alive = psutil.wait_procs(descendants + [parent], timeout=3)
         for process in alive:
             try:
                 process.kill()
