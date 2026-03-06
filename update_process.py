@@ -39,6 +39,7 @@ def run(*,
             entry_id: str,
             updater_command_queue: multiprocessing.SimpleQueue,
             updater_response_queue: multiprocessing.SimpleQueue,
+            no_pending_children: multiprocessing.Event,
             module_file_path: str,
             programs_getter_name: str,
             keyword_arguments: str,
@@ -105,7 +106,11 @@ def run(*,
         )
 
         try:
-            program.execute(entry_command_queue = entry_command_queue, updater_response_queue = updater_response_queue)
+            program.execute(
+                entry_command_queue = entry_command_queue,
+                updater_response_queue = updater_response_queue,
+                no_pending_children = no_pending_children
+            )
         except BaseException as e:
             error = e
             if str(e) != 'BLENDER':

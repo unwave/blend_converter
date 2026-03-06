@@ -43,6 +43,9 @@ class Unreal:
             profile: bool,
         ):
 
+        if self.no_pending_children is not None:
+            self.no_pending_children.set()
+
         with remote_execution_handler.UE_Remote_Execution_Handler() as handler:
 
             utils.print_in_color(utils.get_color_code(96, 154, 247, 0,0,0), "UNREAL ENGINE EXECUTION", flush = True)
@@ -64,6 +67,9 @@ class Unreal:
 
             if result != 'None':
                 raise RuntimeError(result)
+
+        if self.no_pending_children is not None:
+            self.no_pending_children.clear()
 
 
     def _to_dict(self):

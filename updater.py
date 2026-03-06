@@ -109,6 +109,8 @@ class Program_Entry:
 
             self.updater_response_queue: 'multiprocessing.SimpleQueue[dict]' = multiprocessing.SimpleQueue()
 
+            self.no_pending_children = multiprocessing.Event()
+
             self.post_initialized = True
 
 
@@ -160,6 +162,7 @@ class Program_Entry:
                     entry_id = self.entry_id,
                     updater_command_queue = updater_command_queue,
                     updater_response_queue = self.updater_response_queue,
+                    no_pending_children = self.no_pending_children,
                     module_file_path = self.module_file_path,
                     programs_getter_name = self.programs_getter_name,
                     keyword_arguments = self.keyword_arguments,
@@ -174,6 +177,7 @@ class Program_Entry:
         exit_func = atexit.register(self.terminate)
 
         process.join()
+        self.no_pending_children.set()
 
         if process.exitcode == None:
             self.terminate()
@@ -217,6 +221,8 @@ class Program_Entry:
 
             print(f"Processing [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
 
+            self.no_pending_children.clear()
+
             self.status = Status.UPDATING
 
             self.thread_identity = uuid.uuid4()
@@ -241,6 +247,8 @@ class Program_Entry:
             self.stderr_lines.append(f"The process has been terminated: {time.strftime('%H:%M:%S %Y-%m-%d')}")
             stderr_line_printed(self)
 
+            print(f"Entry terminated: {self}")
+
 
     def suspend(self):
 
@@ -251,6 +259,8 @@ class Program_Entry:
 
             if not self.psutil_process.is_running():
                 return
+
+            self.no_pending_children.wait()
 
             try:
 
@@ -263,6 +273,8 @@ class Program_Entry:
             except psutil.Error as e:
                 print(e)
 
+            print(f"Entry suspended: {self}")
+
 
     def resume(self):
 
@@ -274,6 +286,8 @@ class Program_Entry:
             if not self.psutil_process.is_running():
                 return
 
+            self.no_pending_children.wait()
+
             try:
 
                 for child in self.psutil_process.children(recursive=True):
@@ -284,6 +298,12 @@ class Program_Entry:
 
             except psutil.Error as e:
                 print(e)
+
+            print(f"Entry resumed: {self}")
+
+
+    def __repr__(self):
+        return f"<Entry {self.entry_id}: {self.module_file_path}::{self.programs_getter_name}({self.keyword_arguments})>"
 
 
 class Blend_Event_Handler(watchdog_events.PatternMatchingEventHandler):
@@ -490,6 +510,9 @@ class Updater:
 
         failed_tags = set()
 
+        result: typing.List[Program_Entry] = []
+
+
         for entry in self.entries:
 
             if entry.status != Status.ERROR:
@@ -524,6 +547,7 @@ class Updater:
 
             entry.is_manual_update = False
             entry.update(updater_command_queue = self.updater_command_queue, callback = self.callback)
+            result.append(entry)
 
 
         if self.is_paused:
@@ -553,6 +577,9 @@ class Updater:
 
 
             entry.update(updater_command_queue = self.updater_command_queue, callback = self.callback)
+            result.append(entry)
+
+        return result
 
 
     def despatch(self):
@@ -695,7 +722,13 @@ class Updater:
 
 
             elif command == communication.Command.DESPATCH:
-                self._despatch()
+
+                new_entries = self._despatch()
+
+                if get_active_yield_target():
+                    for entry in new_entries:
+                        entry.suspend()
+                        entry.status = Status.YIELDING
 
 
             elif command == communication.Command.SUSPEND_OTHERS:
@@ -716,7 +749,7 @@ class Updater:
 
                 if get_active_yield_target() is entry_to_yield_for:
                     release_yielding_others([entry_to_yield_for])
-                else:
+                elif entry_to_yield_for.status != Status.ERROR:
                     show_error(f"Unexpected race condition for {entry_to_yield_for.entry_id}: {entry_to_yield_for.program.blend_path}")
 
                 yielding_for.discard(entry_to_yield_for.entry_id)
