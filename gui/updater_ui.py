@@ -1643,10 +1643,10 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.updater.is_paused = True
 
         self.updater.updater_command_queue.put({communication.Key.COMMAND: communication.Command.SHUTDOWN})
-        # self.updater.command_queue_running.join()  # can freeze
 
         for entry in self.updater.entries:
-            entry.terminate()
+            if entry.psutil_process:
+                utils.kill_process(entry.psutil_process)
 
         # TODO: does not work for argv with spaces
 
