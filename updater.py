@@ -174,7 +174,7 @@ class Program_Entry:
             self.psutil_process = psutil.Process(process.pid)
 
 
-        exit_func = atexit.register(self.terminate)
+        exit_func = atexit.register(utils.kill_process, self.psutil_process)
 
         process.join()
         self.no_pending_children.set()
