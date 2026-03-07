@@ -109,8 +109,7 @@ class Program_Entry:
 
             self.updater_response_queue: 'multiprocessing.SimpleQueue[dict]' = multiprocessing.SimpleQueue()
 
-            self.no_pending_children = multiprocessing.Event()
-            self.is_process_running = multiprocessing.Event()
+            self.execution_context = common.Execution_Context()
 
             self.post_initialized = True
 
@@ -163,8 +162,7 @@ class Program_Entry:
                     entry_id = self.entry_id,
                     updater_command_queue = updater_command_queue,
                     updater_response_queue = self.updater_response_queue,
-                    no_pending_children = self.no_pending_children,
-                    is_process_running = self.is_process_running,
+                    execution_context = self.execution_context,
                     module_file_path = self.module_file_path,
                     programs_getter_name = self.programs_getter_name,
                     keyword_arguments = self.keyword_arguments,
@@ -179,7 +177,11 @@ class Program_Entry:
         exit_func = atexit.register(utils.kill_process, self.psutil_process)
 
         process.join()
-        self.no_pending_children.set()
+
+        with self.execution_context.lock:
+            self.execution_context.no_pending_children.value = True
+            self.execution_context.is_process_running.value = False
+            self.execution_context.lock.notify_all()
 
         if process.exitcode == None:
             self.terminate()
@@ -223,15 +225,17 @@ class Program_Entry:
 
             self.post_init()
 
-            self.no_pending_children.clear()
-
             self.status = Status.UPDATING
 
             self.thread_identity = uuid.uuid4()
 
-            self.terminate()
+            with self.execution_context.lock:
 
-            self.is_process_running.set()
+                self.terminate()
+
+                self.execution_context.no_pending_children.value = False
+                self.execution_context.is_process_running.value = True
+                self.execution_context.lock.notify_all()
 
             threading.Thread(target=self._run, kwargs=dict(callback=callback, thread_identity = self.thread_identity, updater_command_queue = updater_command_queue), daemon = True).start()
 
@@ -248,7 +252,7 @@ class Program_Entry:
             if not self.psutil_process.is_running():
                 return
 
-            self.is_process_running.clear()
+            self.execution_context.is_process_running.value = False
 
             utils.kill_process(self.psutil_process)
 
@@ -270,11 +274,14 @@ class Program_Entry:
             if not self.psutil_process.is_running():
                 return
 
-            self.is_process_running.clear()
+            with self.execution_context.lock:
 
-            if not self.no_pending_children.is_set():
-                print(f"Waiting for pending children: {self.entry_id}")
-                self.no_pending_children.wait()
+                self.execution_context.is_process_running.value = False
+                self.execution_context.lock.notify_all()
+
+                self.execution_context.lock.wait_for(
+                    lambda: self.execution_context.are_executors_stopped.value or self.execution_context.no_pending_children.value
+                )
 
             try:
 
@@ -313,7 +320,9 @@ class Program_Entry:
             except psutil.Error as e:
                 print(e)
 
-            self.is_process_running.set()
+            with self.execution_context.lock:
+                self.execution_context.is_process_running.value = True
+                self.execution_context.lock.notify_all()
 
             print(f"Resumed: {self.entry_id}")
 

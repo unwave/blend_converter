@@ -7,6 +7,7 @@ import multiprocessing
 from datetime import datetime, timezone
 
 from . import utils
+from . import common
 from . import program_getter_process
 
 
@@ -39,8 +40,7 @@ def run(*,
             entry_id: str,
             updater_command_queue: multiprocessing.SimpleQueue,
             updater_response_queue: multiprocessing.SimpleQueue,
-            no_pending_children: multiprocessing.Event,
-            is_process_running: multiprocessing.Event,
+            execution_context: common.Execution_Context,
             module_file_path: str,
             programs_getter_name: str,
             keyword_arguments: str,
@@ -110,8 +110,7 @@ def run(*,
             program.execute(
                 entry_command_queue = entry_command_queue,
                 updater_response_queue = updater_response_queue,
-                no_pending_children = no_pending_children,
-                is_process_running = is_process_running,
+                execution_context = execution_context,
             )
         except BaseException as e:
             error = e

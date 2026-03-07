@@ -45,7 +45,7 @@ class Blender:
 
     entry_command_queue: 'queue.SimpleQueue[dict]' = None
     updater_response_queue: 'multiprocessing.SimpleQueue[dict]' = None
-    no_pending_children: 'multiprocessing.Event' = None
+    execution_context: common.Execution_Context
 
 
     def __init__(self, binary_path: str, memory_limit = 8, timeout = 0):
@@ -162,8 +162,9 @@ class Blender:
 
             with subprocess.Popen(command, text = True, env = env) as blender:
 
-                if self.no_pending_children is not None:
-                    self.no_pending_children.set()
+                with self.execution_context.lock:
+                    self.execution_context.no_pending_children.value = True
+                    self.execution_context.lock.notify_all()
 
                 listening_socket.listen()
 
@@ -232,8 +233,9 @@ class Blender:
                 process_checking.start()
 
                 blender.wait()
-                if self.no_pending_children is not None:
-                    self.no_pending_children.clear()
+                with self.execution_context.lock:
+                    self.execution_context.no_pending_children.value = False
+                    self.execution_context.lock.notify_all()
                 waiting.set()
 
                 process_checking.join()

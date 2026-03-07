@@ -33,6 +33,8 @@ def runner_bootstrap(script_runner_path: str, data: dict):
 class Unreal:
     """ Needs an open Unreal Engine instance. """
 
+    execution_context: common.Execution_Context
+
 
     def run(self, *,
             instructions: typing.List[common.Instruction],
@@ -43,8 +45,9 @@ class Unreal:
             profile: bool,
         ):
 
-        if self.no_pending_children is not None:
-            self.no_pending_children.set()
+        with self.execution_context.lock:
+            self.execution_context.no_pending_children.value = True
+            self.execution_context.lock.notify_all()
 
         with remote_execution_handler.UE_Remote_Execution_Handler() as handler:
 
@@ -68,8 +71,9 @@ class Unreal:
             if result != 'None':
                 raise RuntimeError(result)
 
-        if self.no_pending_children is not None:
-            self.no_pending_children.clear()
+        with self.execution_context.lock:
+            self.execution_context.no_pending_children.value = False
+            self.execution_context.lock.notify_all()
 
 
     def _to_dict(self):

@@ -10,6 +10,7 @@ import configparser
 import textwrap
 import inspect
 import time
+import multiprocessing
 
 
 from . import utils
@@ -307,14 +308,17 @@ class Program:
 
 
     def execute(self,
+                *,
                 entry_command_queue = None,
                 updater_response_queue = None,
-                no_pending_children = None,
-                is_process_running = None,
+                execution_context: Execution_Context = None,
             ):
 
         start_time = time.perf_counter()
         print("EXECUTION START:", time.strftime('%H:%M:%S %Y-%m-%d'), flush=True)
+
+        if execution_context is None:
+            execution_context = utils.Dummy()
 
         with tempfile.TemporaryDirectory() as temp_dir:
 
@@ -324,16 +328,22 @@ class Program:
 
             for executor, instructions in instructions_sorted.items():
 
-                if is_process_running is not None:
-                    if not is_process_running.is_set():
-                        print("Waiting for the process to run.")
-                        no_pending_children.set()
-                        is_process_running.wait()
-                        no_pending_children.clear()
+                with execution_context.lock:
+
+                    if not execution_context.is_process_running.value:
+
+                        execution_context.are_executors_stopped.value = True
+                        execution_context.lock.notify_all()
+
+                        execution_context.lock.wait_for(lambda: execution_context.is_process_running.value)
+
+                        execution_context.are_executors_stopped.value = False
+                        execution_context.lock.notify_all()
+
 
                 executor.entry_command_queue = entry_command_queue
                 executor.updater_response_queue = updater_response_queue
-                executor.no_pending_children = no_pending_children
+                executor.execution_context = execution_context
 
                 substituted_instructions = []
                 for instruction in instructions:
@@ -514,3 +524,14 @@ class Program_Definition:
 
     def __repr__(self):
         return str(self.__dict__)
+
+
+class Execution_Context:
+
+    def __init__(self):
+
+        self.lock = multiprocessing.Condition()
+
+        self.no_pending_children = multiprocessing.Value('b', False, lock = self.lock)
+        self.is_process_running = multiprocessing.Value('b', False, lock = self.lock)
+        self.are_executors_stopped = multiprocessing.Value('b', False, lock = self.lock)

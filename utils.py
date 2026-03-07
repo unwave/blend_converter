@@ -1300,6 +1300,12 @@ class Dummy:
     def __ge__(self, other):
         return False
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
 
 def show_nt_message(title, message):
 
