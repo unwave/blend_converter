@@ -306,7 +306,12 @@ class Program:
             raise Exception(f"Unexpected value {repr(value)} or type {type(value)}")
 
 
-    def execute(self, entry_command_queue = None, updater_response_queue = None, no_pending_children = None):
+    def execute(self,
+                entry_command_queue = None,
+                updater_response_queue = None,
+                no_pending_children = None,
+                is_process_running = None,
+            ):
 
         start_time = time.perf_counter()
         print("EXECUTION START:", time.strftime('%H:%M:%S %Y-%m-%d'), flush=True)
@@ -319,8 +324,12 @@ class Program:
 
             for executor, instructions in instructions_sorted.items():
 
-                if no_pending_children is not None:
-                    no_pending_children.clear()
+                if is_process_running is not None:
+                    if not is_process_running.is_set():
+                        print("Waiting for the process to run.")
+                        no_pending_children.set()
+                        is_process_running.wait()
+                        no_pending_children.clear()
 
                 executor.entry_command_queue = entry_command_queue
                 executor.updater_response_queue = updater_response_queue

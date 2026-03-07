@@ -110,6 +110,7 @@ class Program_Entry:
             self.updater_response_queue: 'multiprocessing.SimpleQueue[dict]' = multiprocessing.SimpleQueue()
 
             self.no_pending_children = multiprocessing.Event()
+            self.is_process_running = multiprocessing.Event()
 
             self.post_initialized = True
 
@@ -163,6 +164,7 @@ class Program_Entry:
                     updater_command_queue = updater_command_queue,
                     updater_response_queue = self.updater_response_queue,
                     no_pending_children = self.no_pending_children,
+                    is_process_running = self.is_process_running,
                     module_file_path = self.module_file_path,
                     programs_getter_name = self.programs_getter_name,
                     keyword_arguments = self.keyword_arguments,
@@ -215,11 +217,11 @@ class Program_Entry:
 
     def update(self, *, updater_command_queue: 'multiprocessing.SimpleQueue[dict]' = None, callback: typing.Optional[typing.Callable] = None):
 
+        print(f"Processing [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self)
+
         with self.lock:
 
             self.post_init()
-
-            print(f"Processing [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
 
             self.no_pending_children.clear()
 
@@ -229,10 +231,14 @@ class Program_Entry:
 
             self.terminate()
 
+            self.is_process_running.set()
+
             threading.Thread(target=self._run, kwargs=dict(callback=callback, thread_identity = self.thread_identity, updater_command_queue = updater_command_queue), daemon = True).start()
 
 
     def terminate(self):
+
+        print(f"Terminating: {self.entry_id}")
 
         with self.lock:
 
@@ -241,16 +247,20 @@ class Program_Entry:
 
             if not self.psutil_process.is_running():
                 return
+
+            self.is_process_running.clear()
 
             utils.kill_process(self.psutil_process)
 
             self.stderr_lines.append(f"The process has been terminated: {time.strftime('%H:%M:%S %Y-%m-%d')}")
             stderr_line_printed(self)
 
-            print(f"Entry terminated: {self}")
+            print(f"Terminated: {self.entry_id}")
 
 
     def suspend(self):
+
+        print(f"Suspending: {self.entry_id}")
 
         with self.lock:
 
@@ -260,7 +270,11 @@ class Program_Entry:
             if not self.psutil_process.is_running():
                 return
 
-            self.no_pending_children.wait()
+            self.is_process_running.clear()
+
+            if not self.no_pending_children.is_set():
+                print(f"Waiting for pending children: {self.entry_id}")
+                self.no_pending_children.wait()
 
             try:
 
@@ -273,10 +287,12 @@ class Program_Entry:
             except psutil.Error as e:
                 print(e)
 
-            print(f"Entry suspended: {self}")
+            print(f"Suspended: {self.entry_id}")
 
 
     def resume(self):
+
+        print(f"Resuming: {self.entry_id}")
 
         with self.lock:
 
@@ -285,8 +301,6 @@ class Program_Entry:
 
             if not self.psutil_process.is_running():
                 return
-
-            self.no_pending_children.wait()
 
             try:
 
@@ -299,7 +313,9 @@ class Program_Entry:
             except psutil.Error as e:
                 print(e)
 
-            print(f"Entry resumed: {self}")
+            self.is_process_running.set()
+
+            print(f"Resumed: {self.entry_id}")
 
 
     def __repr__(self):
