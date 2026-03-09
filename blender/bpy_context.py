@@ -1683,6 +1683,8 @@ def call_in_uv_editor(func, *args, can_be_canceled = False, **kwargs):
 
         space_data = area.spaces.active
 
+        state.set(space_data, 'image', None)
+
         window_region = next(region for region in area.regions if region.type == 'WINDOW')
 
         override = dict(
