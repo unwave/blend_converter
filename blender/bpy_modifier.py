@@ -208,7 +208,7 @@ POSITION_SENSITIVE_TOPOLOGY_MODIFIERS = {
     'SKIN',
     # 'SOLIDIFY',
     # 'SUBSURF',
-    'TRIANGULATE',
+    # 'TRIANGULATE',  # not really, but works
     'VOLUME_TO_MESH',
     'WELD',
     # 'WIREFRAME',
