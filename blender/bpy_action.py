@@ -767,7 +767,13 @@ def get_bone_walk_parent_map(object: bpy.types.Object, deform_root: str):
             return None
 
         parent_name = _get_parent(bone_path, name)
-        assert parent_name != name
+
+        if parent_name == name:
+            print(
+                f"Cannot be parent of itself: {parent_name}"
+                '\n\t' f"Path: {path}"
+            )
+            return None
 
         return parent_name
 
