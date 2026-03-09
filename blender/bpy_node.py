@@ -1244,6 +1244,18 @@ class _Shader_Node_Wrapper(_Node_Wrapper['Shader_Tree_Wrapper', _Shader_Socket_W
                 # ...
             }
 
+        elif bl_idname == 'ShaderNodeBsdfSheen':
+            return {
+                'Base Color': (0, 0, 0, 1),
+                # 'Roughness': 1,
+                Socket_Identifier.SPECULAR_IOR: 0,
+
+                Socket_Identifier.SHEEN: 1,
+                'Sheen Tint': self.get_input('Color'),
+                'Sheen Roughness': self.get_input('Roughness'),
+                'Normal': self.get_input('Normal', True),
+            }
+
 
         if bl_idname in SHADER_OUTPUTTING_NODES:
             raise NotImplementedError(f"The node type is not yet supported: {bl_idname}")
