@@ -23,6 +23,7 @@ import uuid
 from . import bpy_context
 from . import bpy_utils
 from . import blend_inspector
+from . import bpy_modifier
 
 from .. import utils
 from .. import tool_settings
@@ -533,13 +534,6 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
 
             imported_object.data.uv_layers[0].name = uv_layer_name
 
-
-            def apply_modifier(modifier: bpy.types.Modifier):
-                object = modifier.id_data
-                print(modifier.name + "...")
-                bpy_context.call_for_object(object, bpy.ops.object.modifier_apply, modifier = modifier.name, single_user = True)
-
-
             def apply_uv_data_transfer_modifier(from_object: bpy.types.Object, to_object: bpy.types.Object, uv_layer_name: str):
 
                 modifier: bpy.types.DataTransferModifier = to_object.modifiers.new('', type='DATA_TRANSFER')
@@ -551,7 +545,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
                 modifier.layers_uv_select_src = uv_layer_name
                 modifier.show_expanded = False
 
-                apply_modifier(modifier)
+                bpy_modifier.apply_modifier(modifier)
 
             try:
                 copy_uv(imported_object, object, uv_layer_name)
