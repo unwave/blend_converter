@@ -1351,14 +1351,20 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
 
     all_bound_box_ratios: typing.List[float] = []
 
+
+    objects = bpy_utils.get_unique_data_objects(objects)
+
+    with bpy_context.Focus(objects):
+        objects = [o for o in objects if o.data.polygons]
+
     with bpy_context.Focus(objects, mode='EDIT'):
 
-        for object in objects:
+        bpy.ops.mesh.reveal()
+        bpy.ops.uv.reveal()
+        bpy.ops.uv.select_all(action='SELECT')
+        bpy.ops.uv.align_rotation()
 
-            bpy.ops.mesh.reveal()
-            bpy.ops.uv.reveal()
-            bpy.ops.uv.select_all(action='SELECT')
-            bpy.ops.uv.align_rotation()
+        for object in objects:
 
             bm = bmesh.from_edit_mesh(object.data)
 
@@ -1383,8 +1389,6 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
         with bpy_context.Focus(object, mode='EDIT'):
 
             bm = bmesh.from_edit_mesh(object.data)
-            if not bm.faces:
-                continue
 
             # collect islands data
             mesh_areas: typing.List[float] = []
