@@ -482,6 +482,13 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
             bpy.data.batch_remove((temp, temp.data))
 
 
+        ## ensure the Basis key
+        # in case there was only one key
+        if object.data.shape_keys is None:
+            assert not names
+            object.shape_key_add(name = basis_key_name, from_mix=False)
+
+
         ## transferring shape keys drivers to the original object
         if copy.data.shape_keys.animation_data:
 
@@ -489,13 +496,6 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
 
             for driver in copy.data.shape_keys.animation_data.drivers:
                 object.data.shape_keys.animation_data.drivers.from_existing(src_driver=driver)
-
-
-        ## ensure the Basis key
-        # in case there was only one key
-        if object.data.shape_keys is None:
-            assert not names
-            object.shape_key_add(name = basis_key_name, from_mix=False)
 
 
         # HACK: since we create a new bpy.types.Key block
