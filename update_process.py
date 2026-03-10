@@ -15,8 +15,6 @@ def capturing(*, file_path: str, capture_queue: queue.SimpleQueue, output_queue:
 
     with open(file_path, 'w', encoding='utf-8') as f:
 
-        f.reconfigure(line_buffering = True)
-
         for line in iter(capture_queue.get, None):
 
             output_queue.put(line)
