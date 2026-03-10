@@ -229,9 +229,9 @@ class Program_Entry:
 
             self.thread_identity = uuid.uuid4()
 
-            with self.execution_context.lock:
+            self.terminate()
 
-                self.terminate()
+            with self.execution_context.lock:
 
                 self.execution_context.no_pending_children.value = False
                 self.execution_context.is_process_running.value = True
@@ -252,7 +252,9 @@ class Program_Entry:
             if not self.psutil_process.is_running():
                 return
 
-            self.execution_context.is_process_running.value = False
+            with self.execution_context.lock:
+                self.execution_context.is_process_running.value = False
+                self.execution_context.lock.notify_all()
 
             utils.kill_process(self.psutil_process)
 
