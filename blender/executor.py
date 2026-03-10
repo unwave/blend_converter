@@ -48,7 +48,7 @@ class Blender:
     execution_context: common.Execution_Context
 
 
-    def __init__(self, binary_path: str, memory_limit = 8, timeout = 0):
+    def __init__(self, binary_path: str, memory_limit = 8, timeout = 0, use_system_env = True):
 
         self.binary_path = binary_path
 
@@ -66,6 +66,8 @@ class Blender:
         This does not include the suspension time.
         If `0` — no timeout.
         """
+
+        self.use_system_env = use_system_env
 
 
     def run(self, *,
@@ -114,7 +116,6 @@ class Blender:
     def run_blender(self, *,
             executable: typing.Union[str, typing.List[str]],
             arguments: dict,
-            use_system_env = False,
             memory_limit = 8,
         ):
 
@@ -132,7 +133,7 @@ class Blender:
 
             '-b',
             '-noaudio',
-            *(['--python-use-system-env'] if use_system_env else []),
+            *(['--python-use-system-env'] if self.use_system_env else []),
             '--factory-startup',
             '--python-exit-code',
             '1',
