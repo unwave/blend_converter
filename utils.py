@@ -663,7 +663,7 @@ class Capture_Output:
         self.pipe_read_fileno, self.pipe_write_fileno = os.pipe()
 
         self.pipe_reading = threading.Thread(target=self.read_pipe)
-        self.read_pipe_textwrapper = os.fdopen(self.pipe_read_fileno, encoding='utf-8')
+        self.read_pipe_textwrapper = os.fdopen(self.pipe_read_fileno, encoding='utf-8', errors='backslashreplace')
         self.pipe_reading.start()
 
         self.write_pipe_textwrapper = os.fdopen(self.pipe_write_fileno, 'w', encoding='utf-8')
