@@ -555,6 +555,11 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
                 with bpy_context.Focus(imported_object):
                     bpy.ops.object.transform_apply()
 
+                with bpy_context.Focus(imported_object, 'EDIT'):
+                    bpy.ops.mesh.select_all(action='SELECT')
+                    bpy.ops.uv.select_all(action='SELECT')
+                    aabb_pack()
+
                 with bpy_context.Focus([imported_object, object_copy, object]):
                     apply_uv_data_transfer_modifier(imported_object, object_copy, uv_layer_name)
 
