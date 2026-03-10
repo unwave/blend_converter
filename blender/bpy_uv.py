@@ -482,49 +482,7 @@ def unwrap_ministry_of_flat(object: bpy.types.Object, temp_dir: os.PathLike, set
             imported_object.name = imported_object.name + "(import)"
 
             print('validate')
-            with utils.Capture_Stdout() as capture_stdout:
-                is_invalid_geometry = imported_object.data.validate(verbose=True)
-
-            validation_lines: typing.List[str] = capture_stdout.exhaust()
-
-            if is_invalid_geometry:
-                raise utils.Fallback('\n'.join(validation_lines))
-
-            was_re_unwrapped = False
-
-            for line in validation_lines:
-
-                # CustomDataLayer type 49 has some invalid data
-                if 'CustomDataLayer' in line and 'invalid data' in line:
-                    if was_re_unwrapped:
-                        continue
-
-                    # TODO: it is better to find all verts that have (0,0) coords after the validation correction
-                    # pin all the rest and unwrap so the invalid uvs will take a better place
-
-                    # this really solves only bad overlapping, which ministry_of_flat does not produce
-
-                    utils.print_in_color(magenta_color, 'Failed validation. Re-unwrapping overlaps.')
-                    bpy.ops.object.editmode_toggle()
-                    bpy.ops.mesh.reveal()
-                    bpy.ops.uv.reveal()
-                    bpy.ops.mesh.select_all(action='SELECT')
-                    bpy.ops.uv.select_all(action='SELECT')
-                    aabb_pack(margin=0.1, merge_overlap=False)
-                    bpy.ops.uv.select_all(action='DESELECT')
-                    bpy.ops.uv.select_overlap()
-
-                    bpy_context.call_in_uv_editor(bpy.ops.uv.select_linked)
-                    bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, can_be_canceled = True)
-
-                    bpy.ops.uv.reveal()
-                    bpy.ops.object.editmode_toggle()
-
-                    was_re_unwrapped = True
-                elif line.strip():
-                    raise utils.Fallback(line)
-
-            bpy_utils.focus(object)
+            imported_object.data.validate(verbose=True)
 
             if not object.data.uv_layers:
                 object.data.uv_layers.new(do_init=False)
