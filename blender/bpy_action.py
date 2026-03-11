@@ -475,7 +475,10 @@ def unassign_deform_bones_with_missing_weights(armature: bpy.types.Object, meshe
     vertex_group_names = set()
 
     for object in bpy_utils.get_unique_mesh_objects(meshes):
-        vertex_group_names.update(get_assigned_weights_groups(object))
+        if object.vertex_groups:
+            vertex_group_names.update(get_assigned_weights_groups(object))
+        else:
+            print(f"Object has not vertex groups: {object.name_full}")
 
     with bpy_context.Focus(armature, 'EDIT'):
 
