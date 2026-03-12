@@ -1278,8 +1278,6 @@ def unwrap(
         with bpy_context.Empty_Scene():
             unwrap_with_fallback(objects, settings, ministry_of_flat_settings)
 
-        scale_uv_to_world_per_uv_layout(objects)
-
 
     return uv_layer_name
 
