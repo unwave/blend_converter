@@ -1614,29 +1614,6 @@ def unwrap_ministry_of_flat_with_fallback(
                     correct_aspect=False,
                 )
 
-            do_reunwrap = settings.reunwrap_bad_uvs_with_minimal_stretch or settings.reunwrap_all_with_minimal_stretch
-
-            if do_reunwrap and 'iterations' in repr(bpy.ops.uv.unwrap):
-
-                mark_seams_from_islands(object_copy, settings.uv_layer_name)
-
-                if settings.reunwrap_all_with_minimal_stretch:
-                    bpy.ops.mesh.select_all(action='SELECT')
-                    bpy.ops.uv.select_all(action='SELECT')
-                    bpy_context.call_in_uv_editor(
-                        bpy.ops.uv.unwrap,
-                        method='MINIMUM_STRETCH',
-                        fill_holes=True,
-                        no_flip=True,
-                        use_weights = bool(settings.uv_importance_weight_group),
-                        weight_group = settings.uv_importance_weight_group,
-                        weight_factor = settings.uv_importance_weight_factor,
-                        can_be_canceled=True,
-                        correct_aspect=False,
-                    )
-
-                reunwrap_bad_uvs([object_copy])
-
 
         copy_uv(object_copy, object, settings.uv_layer_name)
 

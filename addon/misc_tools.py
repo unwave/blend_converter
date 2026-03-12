@@ -548,7 +548,6 @@ def unwrap_and_pack(operator: bpy.types.Operator, context: bpy.types.Context):
             uvs_unwrap_settings = tool_settings.S_Unwrap_UVs(
                 uv_layer_name = object.data.uv_layers.active.name,
                 mark_seams_from_islands = operator.mark_seams_from_islands,
-                reunwrap_all_with_minimal_stretch = operator.reunwrap_with_minimal_stretch,
             )
 
             ministry_of_flat_settings = tool_settings.S_Ministry_Of_Flat(

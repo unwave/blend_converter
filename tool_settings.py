@@ -1096,20 +1096,6 @@ class S_Unwrap_UVs(Settings):
     #### Default: `False`
     """
 
-    reunwrap_bad_uvs_with_minimal_stretch: bool = True
-    """
-    Reunwrap bad uvs using the Blender's MINIMUM_STRETCH method.
-
-    #### Default: `True`
-    """
-
-    reunwrap_all_with_minimal_stretch: bool = False
-    """
-    Reunwrap all uvs using the Blender's MINIMUM_STRETCH method.
-
-    #### Default: `False`
-    """
-
     uv_importance_weight_group: str = ''
     """
     Used for the MINIMUM_STRETCH method.
