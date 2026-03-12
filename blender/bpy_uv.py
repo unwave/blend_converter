@@ -311,6 +311,8 @@ def get_object_copy_for_uv_unwrap(object: bpy.types.Object):
         object_copy = object.copy()
         object_copy.data = object.data.copy()
 
+        bpy_context.call_for_object(object_copy, bpy.ops.object.parent_clear, type = 'CLEAR_KEEP_TRANSFORM')
+
         object_copy.rotation_mode = 'XYZ'
         object_copy.location = (0,0,0)
 
