@@ -1310,6 +1310,19 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
         return ( abs(max(xs) - min(xs)) ) / ( abs(max(ys) - min(ys)) )
 
 
+    def get_uv_aria(island):
+        """
+        #79775 - Something in Blender can generate invalid (Nan) values in UVMaps
+        https://projects.blender.org/blender/blender/issues/79775
+        """
+
+        area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face])
+        if math.isnan(area):
+            area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face] if all(not map(math.isnan, vert) for vert in loop))
+
+        return area
+
+
     all_bound_box_ratios: typing.List[float] = []
 
 
@@ -1373,13 +1386,7 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
             for island in islands:
 
                 island_mesh_area = sum(bm_copy.faces[face.index].calc_area() for face in island)
-
-                island_uv_area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face])
-
-                # #79775 - Something in Blender can generate invalid (Nan) values in UVMaps
-                # https://projects.blender.org/blender/blender/issues/79775
-                if math.isnan(island_uv_area):
-                    island_uv_area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face] if all(not map(math.isnan, vert) for vert in loop))
+                island_uv_area = get_uv_aria(island)
 
                 try:
                     world_to_uv_ratio = island_mesh_area / island_uv_area
@@ -1403,33 +1410,46 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
 
             # mean_scale_multiplier = statistics.harmonic_mean([math.sqrt(world_to_uv_ratio) for is_bad, world_to_uv_ratio in zip(is_bad_islands, world_to_uv_ratios) if not is_bad])
 
-            bpy.ops.mesh.select_all(action='SELECT')
-            bpy.ops.uv.select_all(action='DESELECT')
 
-            for index, (island, mesh_area, uv_area, world_to_uv_ratio, bound_box_ratio, is_bad) in enumerate(zip(islands, mesh_areas, uv_areas, world_to_uv_ratios, bound_box_ratios, is_bad_islands)):
+            ## reunwrap bad
+            outliers_count = sum(is_bad_islands)
+            if outliers_count:
 
-                if is_bad:
+                # make seams from islands
+                bpy.ops.mesh.reveal()
+                bpy.ops.uv.reveal()
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.uv.select_all(action='SELECT')
+                bpy.ops.uv.mark_seam(clear=True)
+                bpy.ops.uv.seams_from_islands()
 
-                    utils.print_in_color(utils.get_color_code(255,255,255, 148,0,211), f"Outlier island: {index}/{len(islands)}")
+                # re-unwrap
+                bpy.ops.uv.select_all(action='DESELECT')
 
-                    if not only_select:
-                        bpy.ops.mesh.select_all(action='SELECT')
-                        bpy.ops.uv.select_all(action='DESELECT')
+                utils.print_in_color(utils.get_color_code(255,255,255, 148,0,211), f"Outlier islands: {outliers_count}/{len(islands)}")
 
-                    select_island(island, uv_layer)
-
-                    if only_select:
-                        continue
-
-                    bpy_context.call_in_uv_editor(bpy.ops.uv.unwrap, method='MINIMUM_STRETCH', fill_holes=True, no_flip=True, can_be_canceled=True, iterations=30)
-
-                    uv_area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face])
-                    if math.isnan(uv_area):
-                        uv_area = sum(area_tri(*loop) for face in island for loop in face_to_uv_triangles[face] if all(not map(math.isnan, vert) for vert in loop))
-
+                for island, is_bad in zip(islands, is_bad_islands):
+                    if is_bad:
+                        select_island(island, uv_layer)
 
                 if only_select:
-                    continue
+                    return
+
+                bpy_context.call_in_uv_editor(
+                    bpy.ops.uv.unwrap,
+                    method='MINIMUM_STRETCH',
+                    fill_holes=True,
+                    no_flip=True,
+                    can_be_canceled=True,
+                    correct_aspect=False,
+                )
+
+
+            ## rescale
+            for index, (island, mesh_area, uv_area, world_to_uv_ratio, bound_box_ratio, is_bad) in enumerate(zip(islands, mesh_areas, uv_areas, world_to_uv_ratios, bound_box_ratios, is_bad_islands)):
+
+                # if is_bad:
+                #     uv_area = get_uv_aria(island)
 
                 # if uv_area == 0:
                 #     scale_multiplier = mean_scale_multiplier
@@ -1475,7 +1495,6 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
                             uv_loop.uv += island_center
 
 
-            bpy.ops.ed.flush_edits()
             bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
 
             bm_copy.free()
