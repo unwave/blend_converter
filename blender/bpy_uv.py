@@ -1551,10 +1551,10 @@ def unwrap_ministry_of_flat_with_fallback(
 
     ministry_of_flat_settings = tool_settings.S_Ministry_Of_Flat(
         stretch = False,
-        scale_uv_space_to_worldspace = True,
         vertex_weld= False,
-        rasterization_resolution = 1,
-        packing_iterations = 1
+        packing = False,
+        rasterization_resolution = 0,
+        packing_iterations = 0
     )._update(ministry_of_flat_settings)
 
     for object in objects:
