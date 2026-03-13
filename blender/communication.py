@@ -99,6 +99,10 @@ class Command:
     WAKE = 'wake'
     TERMINATE = 'terminate'
     SHUTDOWN = 'shutdown'
+    SET_AS_STALE = 'set_as_stale'
+    SET_AS_OK = 'set_as_ok'
+    POKE = 'poke'
+    JOIN = 'join'
 
 
 class Suspend_Others:

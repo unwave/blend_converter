@@ -91,6 +91,8 @@ class Program_Entry:
 
         self.post_initialized = False
 
+        self.running: threading.Thread = None
+
 
     def post_init(self):
 
@@ -128,7 +130,6 @@ class Program_Entry:
         else:
             self.status = Status.DOES_NOT_EXIST
 
-        update_item(self)
 
 
     def _run(self, *, callback: typing.Callable, thread_identity: uuid.UUID, updater_command_queue: 'multiprocessing.SimpleQueue[dict]' = None):
@@ -178,11 +179,6 @@ class Program_Entry:
 
         process.join()
 
-        with self.execution_context.lock:
-            self.execution_context.no_pending_children.value = True
-            self.execution_context.is_process_running.value = False
-            self.execution_context.lock.notify_all()
-
         if process.exitcode == None:
             self.terminate()
 
@@ -199,22 +195,22 @@ class Program_Entry:
         self.stderr_queue.put(None)
         read_stderr_thread.join()
 
+        with self.execution_context.lock:
+            self.execution_context.no_pending_children.value = True
+            self.execution_context.is_process_running.value = False
+            self.execution_context.lock.notify_all()
+
         if is_superseded:
-            update_ui()
             return
 
-        if process.exitcode == 0:
-            self.status = Status.OK
+        is_ok = process.exitcode == 0
+
+        if is_ok:
             print(f"Done [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
         else:
-            self.status = Status.ERROR
             print(f"Error [{time.strftime('%H:%M:%S %Y-%m-%d')}]:", self.program)
 
-
-        if callback:
-            callback()
-
-        update_ui()
+        callback(self, is_ok, thread_identity)
 
 
     def update(self, *, updater_command_queue: 'multiprocessing.SimpleQueue[dict]' = None, callback: typing.Optional[typing.Callable] = None):
@@ -225,11 +221,12 @@ class Program_Entry:
 
             self.post_init()
 
-            self.status = Status.UPDATING
-
             self.thread_identity = uuid.uuid4()
 
             self.terminate()
+
+            if self.running is not None:
+                self.running.join()
 
             with self.execution_context.lock:
 
@@ -237,7 +234,19 @@ class Program_Entry:
                 self.execution_context.is_process_running.value = True
                 self.execution_context.lock.notify_all()
 
-            threading.Thread(target=self._run, kwargs=dict(callback=callback, thread_identity = self.thread_identity, updater_command_queue = updater_command_queue), daemon = True).start()
+            self.running = threading.Thread(
+                target=self._run,
+                kwargs=dict(
+                    callback=callback,
+                    thread_identity = self.thread_identity,
+                    updater_command_queue = updater_command_queue
+                ),
+                daemon = True
+            )
+
+            self.running.start()
+
+            self.status = Status.UPDATING
 
 
     def terminate(self):
@@ -421,11 +430,17 @@ class Updater:
     def update_entries(self):
 
         def callback(entry: Program_Entry, program: common.Program):
+
             entry.program = program
-            entry.poke(self.has_non_updated_dependency(entry))
+
+            self.updater_command_queue.put({
+                communication.Key.COMMAND: communication.Command.POKE,
+                'entry_ids': [entry.entry_id]
+            })
+
             if program.blend_path and os.path.exists(program.blend_path):
                 self.observer.schedule(self.event_handler, os.path.dirname(program.blend_path))
-            self.despatch()
+
 
         tasks = []
 
@@ -444,6 +459,7 @@ class Updater:
 
         def final_callback():
             [t.get() for t in tasks]
+            self.despatch()
             update_ui()
 
         threading.Thread(target=final_callback).start()
@@ -457,9 +473,6 @@ class Updater:
 
         self.observer = watchdog_observers.Observer()
         self.observer.start()
-
-        self.poker = threading.Thread(target=self.poking, daemon=True)
-        self.poker.start()
 
 
     @classmethod
@@ -488,45 +501,22 @@ class Updater:
             if not _entry is entry and _entry.status != Status.OK
         )
 
+
     def poke_entry(self, entry: Program_Entry):
-        entry.poke(self.has_non_updated_dependency(entry))
+        self.updater_command_queue.put({
+            communication.Key.COMMAND: communication.Command.POKE,
+            'entry_ids': [entry.entry_id]
+        })
 
 
-    def callback(self):
+    def callback(self, entry: Program_Entry, status: str, thread_identity: uuid.UUID):
 
-        for entry in self.entries:
-            if entry.status == Status.WAITING_FOR_DEPENDENCY:
-                self.poke_entry(entry)
-
-        self.despatch()
-
-
-    def poke_all(self):
-
-        entries = list(self.entries)
-
-        # at the start entries has unknown status
-        # TODO: dependency map
-        entries.sort(key = self.has_non_updated_dependency)
-
-        for entry in entries:
-            self.poke_entry(entry)
-
-        self.despatch()
-
-
-    def poking(self):
-        for path in iter(self.queue.get, None):
-
-            has_poked = False
-
-            for entry in self.entries:
-                if entry.program.blend_path == path:
-                    self.poke_entry(entry)
-                    has_poked = True
-
-            if has_poked:
-                self.despatch()
+        self.updater_command_queue.put({
+            communication.Key.COMMAND: communication.Command.JOIN,
+            'entry_id': entry.entry_id,
+            'is_ok': status,
+            'thread_identity': thread_identity,
+        })
 
 
     def total_max_parallel_executions_exceeded(self):
@@ -847,6 +837,40 @@ class Updater:
                 else:
 
                     terminate(entries_to_terminate)
+
+            elif command == communication.Command.SET_AS_STALE:
+
+                target_entries = [e for e in self.entries if e.status in (Status.OK, Status.ERROR) and e.entry_id in item['entry_ids']]
+
+                for entry in target_entries:
+                    entry.status = Status.STALE
+
+            elif command == communication.Command.SET_AS_OK:
+
+                target_entries = [e for e in self.entries if e.status in (Status.STALE, Status.ERROR) and e.entry_id in item['entry_ids']]
+
+                for entry in target_entries:
+                    entry.program.write_report()
+
+            elif command == communication.Command.POKE:
+
+                target_entries = [e for e in self.entries if e.status not in (Status.UPDATING, Status.YIELDING, Status.SLEEPING) and e.entry_id in item['entry_ids']]
+
+                for entry in target_entries:
+                    entry.poke(self.has_non_updated_dependency(entry))
+
+            elif command == communication.Command.JOIN:
+
+                entry = next(e for e in self.entries if e.entry_id == item['entry_id'])
+
+                if entry.thread_identity == item['thread_identity']:
+
+                    if item['is_ok']:
+                        entry.status = Status.OK
+                    else:
+                        entry.status = Status.ERROR
+
+                    self.despatch()
 
 
             get_active_yield_target()  # for validation

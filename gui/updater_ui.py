@@ -334,9 +334,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def on_poke_entries(self, event):
-        for entry in self.get_selected_items():
-            self.main_frame.updater.poke_entry(entry)
-        self.main_frame.updater.despatch()
+        self.main_frame.updater.updater_command_queue.put({
+            communication.Key.COMMAND: communication.Command.POKE,
+            'entry_ids': [e.entry_id for e in self.get_selected_items()]
+        })
 
 
     def get_conversion_command(self, entries: typing.Iterable[updater.Program_Entry]):
@@ -440,10 +441,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def on_mark_as_needs_update(self, event):
-        for entry in self.get_selected_items():
-            entry.status = updater.Status.STALE
-        self.main_frame.updater.despatch()
-        self.refresh_visible()
+        self.main_frame.updater.updater_command_queue.put({
+            communication.Key.COMMAND: communication.Command.SET_AS_STALE,
+            'entry_ids': [e.entry_id for e in self.get_selected_items()]
+        })
 
 
     def set_config(self, entry: updater.Program_Entry):
@@ -616,10 +617,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             if result != wx.ID_YES:
                 return
 
-        for entry in selected_entries:
-            entry.program.write_report()
-
-        self.main_frame.updater.poke_all()
+        self.main_frame.updater.updater_command_queue.put({
+            communication.Key.COMMAND: communication.Command.SET_AS_OK,
+            'entry_ids': [e.entry_id for e in self.get_selected_items()]
+        })
 
 
     def on_show_source_files(self, event):
@@ -1556,8 +1557,6 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         menu.AppendSeparator()
 
-        self.Bind(wx.EVT_MENU, self.on_mark_update_all, menu.Append(wx.ID_ANY, "Mark All As Needing Update"))
-
         self.Bind(wx.EVT_MENU, self.on_terminate_and_pause, menu.Append(wx.ID_ANY, "Terminate All and Pause"))
 
         menu = wx.Menu()
@@ -1616,15 +1615,6 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
     def on_resume(self, event):
         self.pause(False)
-
-
-    def on_mark_update_all(self, event):
-
-        for entry in self.updater.entries:
-            entry.status = updater.Status.STALE
-
-        self.updater.despatch()
-        updater.update_ui()
 
 
     def on_terminate_and_pause(self, event):
