@@ -146,7 +146,14 @@ class Blender:
         bytes_in_gb = 1024 ** 3
         memory_limit_in_bytes = memory_limit * bytes_in_gb
 
-        import psutil
+
+        try:
+            import psutil
+        except ModuleNotFoundError as e:
+            print(e)
+            if not typing.TYPE_CHECKING:
+                psutil = None
+
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listening_socket:
 
@@ -181,8 +188,9 @@ class Blender:
                 message_receiving = threading.Thread(target=self.message_receiving, daemon=True)
                 message_receiving.start()
 
-                process = psutil.Process(blender.pid)
-                process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+                if psutil:
+                    process = psutil.Process(blender.pid)
+                    process.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
 
 
                 start_time = time.monotonic()
@@ -193,6 +201,9 @@ class Blender:
 
 
                 def checking():
+
+                    if not psutil:
+                        return
 
                     nonlocal suspension_time
                     nonlocal elapsed
