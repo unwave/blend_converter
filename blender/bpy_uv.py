@@ -1553,6 +1553,7 @@ def unwrap_ministry_of_flat_with_fallback(
 
     ministry_of_flat_settings = tool_settings.S_Ministry_Of_Flat(
         stretch = False,
+        cut = False,
         vertex_weld= False,
         packing = False,
         rasterization_resolution = 0,
