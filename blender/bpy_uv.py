@@ -1198,11 +1198,10 @@ def ensure_pixel_per_island(objects: typing.List[bpy.types.Object], settings: to
 
     with bpy_context.Focus(objects, mode='EDIT'), bpy_context.State() as state:
 
-        for object in objects:
-
-            mesh: bpy.types.Mesh = object.data
-
-            state.set(mesh.uv_layers, 'active', mesh.uv_layers[settings.uv_layer_name])
+        if settings.uv_layer_name:
+            for object in objects:
+                mesh: bpy.types.Mesh = object.data
+                state.set(mesh.uv_layers, 'active', mesh.uv_layers[settings.uv_layer_name])
 
         _ensure_pixel_per_island(objects, settings._actual_width, settings._actual_height, material_key = settings.material_key)
 
