@@ -674,7 +674,7 @@ def the_bake(active_object: bpy.types.Object, selected_objects: typing.List[bpy.
     )
 
 
-def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings: tool_settings.S_Bake):
+def bake_images(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Bake):
 
     materials_to_bake: typing.List[bpy.types.Material] = []
     objects_by_material = bpy_utils.group_objects_by_material(objects)
@@ -821,12 +821,10 @@ def bake_images(objects: typing.List[bpy.types.Object], uv_layer: str, settings:
 
 def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Bake):
 
-    uv_layer_name = settings.uv_layer_name
-
     if settings.merge_materials and not settings.material_key:
 
         with communication.Suspend_Others():
-            images = bake_images(objects, uv_layer_name, settings)
+            images = bake_images(objects, settings)
         settings._images.extend(images)
 
     elif settings.merge_materials and settings.material_key:
@@ -861,7 +859,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
         )
 
         with communication.Suspend_Others():
-            images = bake_images(objects_in_group, uv_layer_name, settings)
+            images = bake_images(objects_in_group, settings)
         settings._images.extend(images)
 
     else:
@@ -875,7 +873,7 @@ def bake_materials(objects: typing.List[bpy.types.Object], settings: tool_settin
             )
 
             with communication.Suspend_Others():
-                images = bake_images(_objects, uv_layer_name, settings)
+                images = bake_images(_objects, settings)
             settings._images.extend(images)
 
 
@@ -1050,6 +1048,10 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Bake)
 
         # set active uv layer
         for object in objects:
+
+            if not settings.uv_layer_name:
+                print(f"The UV layer name is empty. Baking using the current active UV layouts.")
+                break
 
             if settings.use_selected_to_active and bpy.context.view_layer.objects.active != object:
                 continue
