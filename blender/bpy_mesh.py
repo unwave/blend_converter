@@ -33,19 +33,17 @@ def create_object_from_selected_edit_mode_geometry():
 
     objects_in_edit_mode = [o.copy() for o in objects_in_edit_mode]
 
-    with bpy_context.Focus(objects_in_edit_mode):
+    new_object = bpy.data.objects.new('collision_shape', bpy.data.meshes.new(name='collision_shape'))
 
-        new_object = bpy.data.objects.new('collision_shape', bpy.data.meshes.new(name='collision_shape'))
+    object = bpy_utils.join_objects(bpy_utils.convert_to_mesh(objects_in_edit_mode), join_into=new_object)
 
-        object = bpy_utils.join_objects(bpy_utils.convert_to_mesh(objects_in_edit_mode), join_into=new_object)
+    with bpy_context.Focus(object, 'EDIT'):
 
-        with bpy_context.Focus(object, 'EDIT'):
+        bm = bmesh.from_edit_mesh(object.data)
 
-            bm = bmesh.from_edit_mesh(object.data)
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.select], context='VERTS')
 
-            bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.select], context='VERTS')
-
-            bmesh.update_edit_mesh(object.data)
+        bmesh.update_edit_mesh(object.data)
 
     return object
 
