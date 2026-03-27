@@ -384,6 +384,8 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
 
         for shape_key in copy.data.shape_keys.key_blocks:
             shape_key.value = 0
+            shape_key.slider_min = 0
+            shape_key.slider_max = 1
 
 
         ## apply the modifier and clear the shape keys on the object
