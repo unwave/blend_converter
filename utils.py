@@ -637,12 +637,12 @@ class Capture_Output:
     _std_output_name: str
 
 
-    def __init__(self, is_dummy = False, use_set_other = True, line_buffering: typing.Optional[bool] = None):
+    def __init__(self, is_dummy = False, line_buffering: typing.Optional[bool] = None):
         self.lines = queue.SimpleQueue()
         self.is_dummy = is_dummy
-        self.use_set_other = use_set_other
 
         self.line_buffering = line_buffering
+
 
     def __enter__(self):
 
@@ -675,8 +675,6 @@ class Capture_Output:
 
         os.dup2(self.pipe_write_fileno, self.file_descriptor)
 
-        if self.use_set_other:
-            self.set_other(self.prev_std_output, self.write_pipe_textwrapper)
 
         return self
 
@@ -697,8 +695,6 @@ class Capture_Output:
             prev_std_output = self.prev_std_output
 
         setattr(sys, self._std_output_name, prev_std_output)
-        if self.use_set_other:
-            self.set_other(self.write_pipe_textwrapper, prev_std_output)
 
 
         self.write_pipe_textwrapper.close()
@@ -792,18 +788,6 @@ class Capture_Output:
             return False
 
         return True
-
-
-    def set_other(self, prev_output, output):
-        """ Replace other output targets. Patch this function if needed. """
-
-        import logging
-
-        for logger in logging.root.manager.loggerDict.values():
-            for handler in getattr(logger, 'handlers', ()):
-                if hasattr(handler, 'stream'):
-                    if handler.stream is prev_output:
-                        handler.stream = output
 
 
     def exhaust(self):
