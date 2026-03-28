@@ -1231,7 +1231,7 @@ def disable_buffering():
 
     _IONBF = 4
 
-    for index in (sys.stdout.fileno(), sys.stderr.fileno()):
+    for index in (1, 2):
 
         pointer = lib.__acrt_iob_func(index)
 
