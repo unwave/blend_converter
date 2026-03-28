@@ -14,13 +14,13 @@ def get_result_dir(blend_dir):
 
 def get_bake_program(blend_dir: str, blender_executable: str):
 
-    from blend_converter.blender.formats.blend import open_mainfile, save_as_mainfile
     from blend_converter.blender.executor import Blender
     from blend_converter import common
     from blend_converter import utils
     from blend_converter import tool_settings
 
     from blend_converter.blender import bpy_utils
+    from blend_converter.blender import bpy_data
     from blend_converter.blender import bpy_uv
 
 
@@ -36,7 +36,7 @@ def get_bake_program(blend_dir: str, blender_executable: str):
         blender_executable = blender.binary_path
     )
 
-    program.run(blender, open_mainfile, blend_path, load_ui = False)
+    program.run(blender, bpy_data.open_mainfile, blend_path, load_ui = False)
 
     objects = program.run(blender, bpy_utils.get_meshable_objects, program.run(blender, bpy_utils.get_view_layer_objects))
 
@@ -71,7 +71,7 @@ def get_bake_program(blend_dir: str, blender_executable: str):
 
     program.run(blender, bpy_utils.remove_all_node_groups_from_materials)
 
-    program.run(blender, save_as_mainfile, result_path)
+    program.run(blender, bpy_data.save_as_mainfile, result_path)
 
 
     return program

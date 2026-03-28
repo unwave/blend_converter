@@ -46,7 +46,7 @@ class COMMON:
     """ inspect after each script """
 
     INSPECT_BLEND_OPEN = 'inspect:blend:open'
-    """ inspect on blend_converter.blender.formats.blend.open_mainfile """
+    """ inspect on blend_converter.blender.bpy_data.open_mainfile """
 
     INSPECT_BLEND_FINAL = 'inspect:final'
     """ inspect the final blend """

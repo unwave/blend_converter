@@ -72,13 +72,13 @@ if __name__ == '__main__':
     from blend_converter import common
     from blend_converter.blender.executor import Blender
     from blend_converter.blender import bpy_utils
-    from blend_converter.blender.formats.blend import open_mainfile
+    from blend_converter.blender import bpy_data
 
     blender = Blender(blender_executable)
 
     program = common.Program(blend_path='', result_path='', blender_executable='', report_path = os.path.join(temp_dir, 'report.json'))
 
-    program.run(blender, open_mainfile, blend_path)
+    program.run(blender, bpy_data.open_mainfile, blend_path)
 
     program.run(blender, make_everything_local)
 
