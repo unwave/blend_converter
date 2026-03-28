@@ -90,19 +90,8 @@ if __name__ == '__main__':
 
         program.run(blender, delete_other, object_names)
 
-    if False and model_type == 'Bam':
 
-        from blend_converter.blender.formats.bam import Bam
-
-        from blend_converter.blender.formats.bam import post_conversion, pre_conversion
-
-        program.run(pre_conversion.assign_curve_placeholders)
-        program.run(pre_conversion.assign_collision_placeholders)
-
-        program.run_bam_function(post_conversion.convert_curve_placeholders)
-        program.run_bam_function(post_conversion.convert_collision_placeholders)
-
-    elif model_type == 'Gltf':
+    if model_type == 'Gltf':
         from blend_converter.blender.formats.gltf import export_gltf, S_GLTF
 
         result_path = os.path.join(temp_dir, 'converted.gltf')
