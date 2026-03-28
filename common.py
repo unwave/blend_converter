@@ -535,3 +535,79 @@ class Execution_Context:
         self.no_pending_children = multiprocessing.Value('b', False, lock = self.lock)
         self.is_process_running = multiprocessing.Value('b', False, lock = self.lock)
         self.are_executors_stopped = multiprocessing.Value('b', False, lock = self.lock)
+
+
+def replace_return_value(value, return_values: dict, instructions: list):
+    """ Substitute previous function return values. """
+
+    if isinstance(value, list):
+
+        new_value = []
+
+        for sub_value in value:
+            if sub_value in instructions:
+                new_value.append(return_values[instructions.index(sub_value)])
+            elif type(sub_value) is list:
+                new_value.append(replace_return_value(sub_value, return_values, instructions))
+            elif type(sub_value) is dict:
+                _bc_settings_name = sub_value.get('_bc_settings_name')
+                if _bc_settings_name:
+                    new_value.append(replace_return_value(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value), return_values, instructions))
+                else:
+                    new_value.append(replace_return_value(sub_value, return_values, instructions))
+            else:
+                new_value.append(sub_value)
+
+        return new_value
+
+    elif isinstance(value, dict):
+
+        new_value = {}
+
+        for key, sub_value in value.items():
+            if sub_value in instructions:
+                new_value[key] = return_values[instructions.index(sub_value)]
+            elif type(sub_value) is list:
+                new_value[key] = replace_return_value(sub_value, return_values, instructions)
+            elif type(sub_value) is dict:
+                _bc_settings_name = sub_value.get('_bc_settings_name')
+                if _bc_settings_name:
+                    new_value[key] = replace_return_value(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value), return_values, instructions)
+                else:
+                    new_value[key] = replace_return_value(sub_value, return_values, instructions)
+            else:
+                new_value[key] = sub_value
+
+        return new_value
+
+    elif isinstance(value, tool_settings.Settings):
+
+        for key in value.__dict__:
+
+            if key.startswith('_'):
+                continue
+
+            if not key in value._has_been_set:
+                continue
+
+            sub_value = getattr(value, key)
+
+            if sub_value in instructions:
+                new_value = return_values[instructions.index(sub_value)]
+            elif type(sub_value) is list:
+                new_value = replace_return_value(sub_value, return_values, instructions)
+            elif type(sub_value) is dict:
+                _bc_settings_name = sub_value.get('_bc_settings_name')
+                if _bc_settings_name:
+                   new_value = replace_return_value(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value), return_values, instructions)
+                else:
+                    new_value = replace_return_value(sub_value, return_values, instructions)
+            else:
+                new_value = sub_value
+
+            setattr(value, key, new_value)
+
+        return value
+
+    else:
+        raise Exception(f"Unexpected args type: {value}")

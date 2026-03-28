@@ -122,82 +122,6 @@ def append_sys_path(path: str):
         sys.path.append(path)
 
 
-def replace_return_values(value):
-    """ Substitute previous function return values. """
-
-    if isinstance(value, list):
-
-        new_value = []
-
-        for sub_value in value:
-            if sub_value in INSTRUCTIONS:
-                new_value.append(return_values[INSTRUCTIONS.index(sub_value)])
-            elif type(sub_value) is list:
-                new_value.append(replace_return_values(sub_value))
-            elif type(sub_value) is dict:
-                _bc_settings_name = sub_value.get('_bc_settings_name')
-                if _bc_settings_name:
-                    new_value.append(replace_return_values(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value)))
-                else:
-                    new_value.append(replace_return_values(sub_value))
-            else:
-                new_value.append(sub_value)
-
-        return new_value
-
-    elif isinstance(value, dict):
-
-        new_value = {}
-
-        for key, sub_value in value.items():
-            if sub_value in INSTRUCTIONS:
-                new_value[key] = return_values[INSTRUCTIONS.index(sub_value)]
-            elif type(sub_value) is list:
-                new_value[key] = replace_return_values(sub_value)
-            elif type(sub_value) is dict:
-                _bc_settings_name = sub_value.get('_bc_settings_name')
-                if _bc_settings_name:
-                    new_value[key] = replace_return_values(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value))
-                else:
-                    new_value[key] = replace_return_values(sub_value)
-            else:
-                new_value[key] = sub_value
-
-        return new_value
-
-    elif isinstance(value, tool_settings.Settings):
-
-        for key in value.__dict__:
-
-            if key.startswith('_'):
-                continue
-
-            if not key in value._has_been_set:
-                continue
-
-            sub_value = getattr(value, key)
-
-            if sub_value in INSTRUCTIONS:
-                new_value = return_values[INSTRUCTIONS.index(sub_value)]
-            elif type(sub_value) is list:
-                new_value = replace_return_values(sub_value)
-            elif type(sub_value) is dict:
-                _bc_settings_name = sub_value.get('_bc_settings_name')
-                if _bc_settings_name:
-                   new_value = replace_return_values(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value))
-                else:
-                    new_value = replace_return_values(sub_value)
-            else:
-                new_value = sub_value
-
-            setattr(value, key, new_value)
-
-        return value
-
-    else:
-        raise Exception(f"Unexpected args type: {value}")
-
-
 CANONICAL_NAME = 'blend_converter'
 
 if typing.TYPE_CHECKING:
@@ -207,7 +131,7 @@ else:
 
 
 from blend_converter import utils
-from blend_converter import tool_settings
+from blend_converter import common
 from blend_converter.blender import blend_inspector
 
 from blend_converter.blender import communication
@@ -248,7 +172,7 @@ def process():
                 append_sys_path(os.path.dirname(instruction['filepath']))
                 module = import_module_from_file(instruction['filepath'])
 
-            result = getattr(module, instruction['name'])(*replace_return_values(instruction['args']), **replace_return_values(instruction['kwargs']))
+            result = getattr(module, instruction['name'])(*common.replace_return_value(instruction['args'], return_values, INSTRUCTIONS), **common.replace_return_value(instruction['kwargs'], return_values, INSTRUCTIONS))
             return_values[index] = result
 
             utils.print_in_color(utils.get_color_code(56, 199, 134, 0, 0, 0), f"Processed in {round(time.perf_counter() - script_start_time, 2)} seconds.", flush=True)
