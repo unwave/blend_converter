@@ -92,11 +92,11 @@ if __name__ == '__main__':
 
 
     if model_type == 'Gltf':
-        from blend_converter.blender.formats.gltf import export_gltf, S_GLTF
+        from blend_converter.blender import bpy_export
 
         result_path = os.path.join(temp_dir, 'converted.gltf')
 
-        program.run(blender, export_gltf, result_path, S_GLTF(export_format = 'GLTF_SEPARATE'))
+        program.run(blender, bpy_export.export_gltf, result_path, bpy_export.S_GLTF(export_format = 'GLTF_SEPARATE'))
 
     else:
         raise Exception(f"Unknown file type: {model_type}")

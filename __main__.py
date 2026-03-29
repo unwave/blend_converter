@@ -63,6 +63,12 @@ def test_gui():
     subprocess.Popen([sys.executable, os.path.join(common.ROOT_DIR, 'test', 'gui.py')])
 
 
+def generate_settings(blender_executable):
+
+    from .blender.generate_settings import main
+
+    main(blender_executable)
+
 
 def main():
 
@@ -108,6 +114,10 @@ def main():
                 test_gui()
             else:
                 print_orange(f"Argument not recognized: {argument}")
+
+    elif command == 'generate_settings':
+
+        generate_settings(arguments[0])
 
 
     else:

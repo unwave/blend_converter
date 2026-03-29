@@ -58,6 +58,9 @@ PROPERTY_INTERNAL = {
     'enum_items_static_ui',
     'is_path_output',
     'is_skip_preset',
+    'enum_items_static',
+    'is_path_supports_blend_relative',
+    'is_path_supports_templates',
     }
 """ The internal Blender property keywords. Ignored in the docs parsing. """
 
@@ -105,7 +108,7 @@ def get_docs_string(keywords: dict, is_property = False):
         docs_string.append('\n\n')
 
     items = keywords.get('items', SENTINEL)
-    if items is not SENTINEL:
+    if items is not SENTINEL and not is_property:
         docs_string.append(f"Options:")
         docs_string.append('\n')
 
@@ -113,7 +116,7 @@ def get_docs_string(keywords: dict, is_property = False):
             items = items(bpy.context.scene, bpy.context)
 
         for item in items:
-            docs_string.append(f"* `{item[0]}`: {item[1]}{', ' + item[2] if item[2] else ''}\n")
+            docs_string.append(f"* `{item[0]}`: {item[1]}{' — ' + item[2] if item[2] else ''}\n")
         docs_string.append('\n')
 
 
@@ -164,12 +167,15 @@ def get_docs_string(keywords: dict, is_property = False):
         if value:
             keywords['default'] = value
 
-        value = keywords.pop('enum_items_static', None)
+        value = keywords.pop('enum_items', None)
         if value:
             docs_string.append(f"Options:")
             docs_string.append('\n')
             for item in value:
-                docs_string.append(f"* `{item.identifier}`: {item.name}{', ' + item.description if item.description else ''}\n")
+                docs_string.append(f"* `{item.identifier}`: {item.name}{' — ' + item.description if item.description else ''}\n")
+            docs_string.append('\n')
+        if value is not None and not value:
+            docs_string.append(f"Options: [UNKNOWN]")
             docs_string.append('\n')
 
         value = keywords.pop('is_enum_flag', None)
@@ -205,7 +211,7 @@ def get_docs_string(keywords: dict, is_property = False):
     return docs_string
 
 
-def get_docs_from_annotations(annotations, argument_names = None) -> str:
+def get_docs_from_annotations(annotations):
     """
     From `__annotations__`
 
@@ -216,15 +222,11 @@ def get_docs_from_annotations(annotations, argument_names = None) -> str:
     ```
     """
 
-    if argument_names:
-        argument_names = set(argument_names)
-
-    docs = []
+    items = {}
 
     for key, value in annotations.items():
 
-        if argument_names is not None and key not in argument_names:
-            continue
+        docs = []
 
         keywords = value.keywords
 
@@ -238,10 +240,12 @@ def get_docs_from_annotations(annotations, argument_names = None) -> str:
         docs.append(''.join(docs_string))
         docs.append('\n\n')
 
-    return ''.join(docs)
+        items[key] = docs
+
+    return items
 
 
-def get_docs_from_properties(properties, argument_names = None) -> str:
+def get_docs_from_properties(properties):
     """
     From `properties`
 
@@ -253,15 +257,11 @@ def get_docs_from_properties(properties, argument_names = None) -> str:
 
     import inspect
 
-    if argument_names:
-        argument_names = set(argument_names)
-
-    docs = []
+    items = {}
 
     for key, value in properties.items():
 
-        if argument_names is not None and key not in argument_names:
-            continue
+        docs = []
 
         keywords = dict(inspect.getmembers(value))
 
@@ -283,7 +283,9 @@ def get_docs_from_properties(properties, argument_names = None) -> str:
         docs.append(''.join(docs_string))
         docs.append('\n\n')
 
-    return ''.join(docs)
+        items[key] = docs
+
+    return items
 
 
 def to_json(object):
