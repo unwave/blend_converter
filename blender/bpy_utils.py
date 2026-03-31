@@ -549,7 +549,13 @@ def get_closest_power_of_two(resolution: float, min_res = 64, max_res = 4096) ->
     return closest_resolution[1]
 
 
-def get_texture_resolution(objects: typing.List[bpy.types.Object], *, uv_layer_name: str, materials: typing.Optional[typing.List[bpy.types.Material]] = None, px_per_meter = 1024, min_res = 64, max_res = 4096):
+def get_texture_resolution(
+        objects: typing.List[bpy.types.Object],
+        *,
+        uv_layer_name = '',
+        materials: typing.Optional[typing.List[bpy.types.Material]] = None,
+        px_per_meter = 1024,
+    ):
     """ Get a texture resolution needed to achieve the given texel density. """
 
     from mathutils.geometry import area_tri
@@ -557,8 +563,9 @@ def get_texture_resolution(objects: typing.List[bpy.types.Object], *, uv_layer_n
 
     with bpy_context.Focus(objects), bpy_context.State() as state:
 
-        for object in objects:
-            state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
+        if uv_layer_name:
+            for object in objects:
+                state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
 
         face_areas = []
         face_uv_areas = []
@@ -588,7 +595,7 @@ def get_texture_resolution(objects: typing.List[bpy.types.Object], *, uv_layer_n
             bm.free()
 
 
-        # total_face_area = sum(itertools.filterfalse(math.isnan, face_areas))
+        total_face_area = sum(itertools.filterfalse(math.isnan, face_areas))
         total_uv_area = sum(itertools.filterfalse(math.isnan, face_uv_areas))
 
         texel_densities = []
@@ -605,14 +612,74 @@ def get_texture_resolution(objects: typing.List[bpy.types.Object], *, uv_layer_n
             texel_densities.append(texel_density)
             weights.append(weight)
 
-        perfect_resolution = bpy_uv.get_weighted_percentile(texel_densities, 0.5, weights)
 
-        print(f"Perfect resolution for {[o.name_full for o in objects]}:", round(perfect_resolution), 'px')
+        uv_resolution = bpy_uv.get_weighted_percentile(texel_densities, 0.5, weights)
+        surface_resolution = math.sqrt(total_face_area) * px_per_meter
 
-        final_resolution = get_closest_power_of_two(perfect_resolution, min_res, max_res)
+        return uv_resolution, surface_resolution, total_uv_area
 
 
-    return final_resolution
+def suggest_udim_layout(
+        target_resolution: int,
+        uv_coverage: float,
+        *,
+        min_resolution = 64,
+        max_resolution = 4096,
+        min_udim_count = 1,
+        max_udim_count = 4,
+        undershoot_tolerance = 0.05,
+        udim_cost = 0.25,
+        min_resolution_for_udim = 2048,
+    ):
+
+
+    def get_power_of_2(n):
+        return round(math.log(n)/math.log(2))
+
+    target_pixels = target_resolution ** 2
+
+    class Variant(typing.NamedTuple):
+        resolution: int
+        udim_count: int
+
+    variants: typing.List[Variant] = []
+
+
+    for i in range(get_power_of_2(min_resolution), get_power_of_2(max_resolution) + 1):
+
+        resolution = pow(2, i)
+
+        for udim_count in range(min_udim_count, max_udim_count + 1):
+
+            variants.append(Variant(resolution, udim_count))
+
+            if resolution < min_resolution_for_udim:
+                break
+
+    any_match = False
+
+    def score(variant: Variant):
+        resolution, udim_count = variant
+
+        pixels = resolution ** 2 * udim_count
+
+        delta = target_pixels - pixels * uv_coverage
+        is_undershoot = 1 if delta > (target_pixels * undershoot_tolerance) else 0
+
+        nonlocal any_match
+        any_match = any_match or not is_undershoot
+
+        return (is_undershoot, pixels / target_pixels + (udim_count - 1) * udim_cost + abs(delta) / target_pixels)
+
+
+    variants.sort(key = score)
+
+    if not any_match:
+        print(f"An impossible UDIM layout for the resolution specified: {target_resolution}", file = sys.stderr)
+        return max_resolution, max_udim_count
+
+    return variants[0].resolution, variants[0].udim_count
+
 
 
 def get_visible_objects():
@@ -936,14 +1003,23 @@ def pack_and_task(
                 pack_uvs(get_closest_power_of_two((settings.min_resolution + settings.max_resolution)/2), material_key)
 
                 # calculate target resolution
-                _bake_settings.resolution = get_texture_resolution(
+                uv_resolution, surface_resolution, uv_coverage = get_texture_resolution(
                     objects,
                     uv_layer_name = settings.uv_layer_bake,
                     materials = material_group,
                     px_per_meter = settings.texel_density,
-                    min_res = settings.min_resolution,
-                    max_res = settings.max_resolution,
                 )
+
+                resolution, udim_count = suggest_udim_layout(
+                    uv_resolution,
+                    uv_coverage,
+                    min_resolution = settings.min_resolution,
+                    max_resolution = settings.max_resolution,
+                    max_udim_count = 1,
+                )
+
+                _bake_settings.resolution = resolution
+
 
             pack_uvs(_bake_settings.resolution, material_key)
             ensure_pixel_per_island(_bake_settings.resolution, material_key)
