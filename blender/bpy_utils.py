@@ -1362,6 +1362,8 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
 
     affected_materials: typing.Set[bpy.types.Material] = set()
 
+    pre_baked_images  = tuple()  # handled skipped bake
+
     for prebake_label in prebake_labels:
 
         materials = [m for m in get_unique_materials(objects) if m.get(prebake_label) and m.get(original_material_key)]
@@ -1400,6 +1402,10 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
         # replace nodes with baked images
         for material in materials:
 
+            if not pre_baked_images:
+                print("No image baked for the pre-bake stage. Possibly skipped.")
+                break
+
             tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
 
             image_texture = tree.new('ShaderNodeTexImage', image = pre_baked_images[0])
@@ -1419,6 +1425,9 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
         yield None
 
     finally:
+
+        if not pre_baked_images:
+            return
 
         for prebake_label in prebake_labels:
 
