@@ -849,6 +849,14 @@ class _Node_Wrapper(bpy.types.Node if typing.TYPE_CHECKING else _No_Type, typing
             return None
 
 
+    def get_output_by_name(self, name: str):
+        for socket in self.outputs:
+            if socket.name == name:
+                return socket
+        else:
+            return None
+
+
 class _Tree_Wrapper(bpy.types.NodeTree if typing.TYPE_CHECKING else _No_Type, typing.Generic[_T_NODE, _T_SOCKET, _BL_TREE, _BL_NODE], typing.Dict[_BL_NODE, _T_NODE]):
 
     __slots__ = ['bl_tree', 'input_bl_socket_to_link_map', '_new_nodes']
@@ -953,6 +961,72 @@ class _Tree_Wrapper(bpy.types.NodeTree if typing.TYPE_CHECKING else _No_Type, ty
             return self[socket.node].outputs[socket.identifier]
         else:
             return self[socket.node].inputs[socket.identifier]
+
+
+    if hasattr(bpy.types, 'NodeTreeInterfaceSocket'):
+
+
+        def get_input_sockets(self) -> typing.List[bpy.types.NodeTreeInterfaceSocket]:
+            return [item for item in self.bl_tree.interface.items_tree if item.item_type == 'SOCKET' and item.in_out == 'INPUT']
+
+
+        def get_output_sockets(self)-> typing.List[bpy.types.NodeTreeInterfaceSocket]:
+            return [item for item in self.bl_tree.interface.items_tree if item.item_type == 'SOCKET' and item.in_out == 'OUTPUT']
+
+
+        def add_input_socket(self, type: str, name: str):
+            """ #### This does not update any wrappers. """
+
+            return self.bl_tree.interface.new_socket(name = name, in_out = 'INPUT', socket_type = type)
+
+
+        def add_output_socket(self, type: str, name: str):
+            """ #### This does not update any wrappers. """
+
+            return self.bl_tree.interface.new_socket(name = name, in_out = 'OUTPUT', socket_type = type)
+
+
+        def delete_input_socket(self, identifier: str):
+            """ #### This does not update any wrappers. """
+
+            bl_socket = next(item for item in self.bl_tree.interface.items_tree if item.item_type == 'SOCKET' and item.identifier == identifier and item.in_out == 'INPUT')
+            self.bl_tree.interface.remove(bl_socket)
+
+
+        def delete_output_socket(self, identifier: str):
+            """ #### This does not update any wrappers. """
+
+            bl_socket = next(item for item in self.bl_tree.interface.items_tree if item.item_type == 'SOCKET' and item.identifier == identifier and item.in_out == 'OUTPUT')
+            self.bl_tree.interface.remove(bl_socket)
+
+
+    elif not typing.TYPE_CHECKING:
+
+
+        def get_input_sockets(self):
+            return list(self.bl_tree.inputs)
+
+
+        def get_output_sockets(self):
+            return list(self.bl_tree.outputs)
+
+
+        def add_input_socket(self, type: str, name: str):
+            return self.bl_tree.inputs.new(type, name)
+
+
+        def add_output_socket(self, type: str, name: str):
+            return self.bl_tree.outputs.new(type, name)
+
+
+        def delete_input_socket(self, identifier: str):
+            bl_socket = next(socket for socket in self.bl_tree.inputs if socket.identifier == identifier)
+            self.bl_tree.inputs.remove(bl_socket)
+
+
+        def delete_output_socket(self, identifier: str):
+            bl_socket = next(socket for socket in self.bl_tree.outputs if socket.identifier == identifier)
+            self.bl_tree.outputs.remove(bl_socket)
 
 
 

@@ -9,6 +9,7 @@ import json
 import re
 import math
 import collections
+import sys
 
 
 from . import bpy_node
@@ -774,35 +775,107 @@ class No_Active_Image:
         self.nodes.active = self.initial_active_node
 
 
+class Tree_Path_Fragment(typing.NamedTuple):
+
+    tree: bpy.types.ShaderNodeTree
+    node_group: bpy.types.ShaderNode
+
+
+
+def get_tree_paths(from_tree: bpy.types.ShaderNodeTree, to_tree: bpy.types.ShaderNodeTree, *, path: typing.List[Tree_Path_Fragment] = None):
+
+    if path is None:
+        path = []
+
+    if from_tree == to_tree:
+        return [path + [Tree_Path_Fragment(to_tree, None)]]
+
+    paths: typing.List[typing.List[Tree_Path_Fragment]] = []
+
+    for node in from_tree.nodes:
+
+        if node.bl_idname != 'ShaderNodeGroup':
+            continue
+
+        if not node.node_tree:
+            continue
+
+        paths.extend(get_tree_paths(node.node_tree, to_tree, path = path + [Tree_Path_Fragment(from_tree, node)]))
+
+    return paths
+
+
 class Output_Override:
 
 
-    def __init__(self, material: bpy.types.Material, target_socket_output: bpy.types.NodeSocketStandard):
+    def __init__(self, material: bpy.types.Material, socket: bpy.types.NodeSocketStandard):
 
-        self.tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+        if not socket.is_output:
+            raise ValueError(f"The socket should be an output socket.")
 
-        assert target_socket_output.is_output if target_socket_output else True, f"R cannel {target_socket_output} should be an output socket."
-        self.target_socket_output = self.tree.get_socket_wrapper(target_socket_output)
+        self.bl_socket = socket
+        self.material = material
+        self.id = bpy_utils.get_uuid1_hex()
 
 
     def __enter__(self):
+
+
+        paths = get_tree_paths(self.material.node_tree, self.bl_socket.id_data)
+        self.path = paths[0]
+
+        if len(paths) > 1:
+            print(f"Multiple paths to the socket found. Picking the first one: {self.path}", file = sys.stderr)
+
+
+        for fragment in reversed(self.path[1:]):
+
+            tree = bpy_node.Shader_Tree_Wrapper(fragment.tree)
+
+            tree.add_output_socket(self.bl_socket.bl_idname, self.id)
+            for node in tree.get_by_bl_idname('NodeGroupOutput'):
+                node.update_sockets()
+
+            if self.bl_socket.id_data == fragment.tree.id_data:
+                socket = tree.get_socket_wrapper(self.bl_socket)
+            else:
+                socket = tree[fragment.node_group].get_output_by_name(self.id)
+
+            socket.join(tree.root.get_input_by_name(self.id))
+
+
+        self.tree = bpy_node.Shader_Tree_Wrapper(self.material.node_tree)
+
+        if self.path:
+            socket = self.tree[self.path[0].node_group].get_output_by_name(self.id)
+        else:
+            socket = self.tree.get_socket_wrapper(self.bl_socket)
 
         if self.tree.surface_input.connections:
             self.initial_output = self.tree.surface_input.connections[0]
         else:
             self.initial_output = None
 
-        if self.target_socket_output.be('NodeSocketShader'):
-            self.tree.surface_input.join(self.target_socket_output, move=False)
+        if socket.be('NodeSocketShader'):
+            self.tree.surface_input.join(socket, move=False)
         else:
-            self.tree.surface_input.new('ShaderNodeEmission').inputs[0].join(self.target_socket_output, move=False)
+            self.tree.surface_input.new('ShaderNodeEmission').inputs[0].join(socket, move=False)
 
 
     def __exit__(self, type, value, traceback):
+
         self.tree.delete_new_nodes()
 
         if self.initial_output:
             self.initial_output.join(self.tree.surface_input, move = False)
+
+        for fragment in reversed(self.path[1:]):
+
+            tree = bpy_node.Shader_Tree_Wrapper(fragment.tree)
+
+            for socket in tree.get_output_sockets():
+                if socket.name == self.id:
+                    tree.delete_output_socket(socket.identifier)
 
 
 class Output_Override_Combine_RGB:
