@@ -281,9 +281,7 @@ class Baked_Image:
     def image_file_settings(self):
         if self.bake_types[0]._identifier in NORMAL_SOCKETS:
             return self.normal_file_settings
-        elif any(isinstance(type, bake_settings.S_Buffer_Factor) for type in self.bake_types):
-            return self.buffer_file_settings
-        elif any(isinstance(type, bake_settings.S_View_Space_Normal) for type in self.bake_types):
+        elif any(getattr(t, '_is_float_buffer', False) for t in self.bake_types):
             return self.buffer_file_settings
         else:
             return self.default_file_settings

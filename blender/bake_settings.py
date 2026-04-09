@@ -656,6 +656,8 @@ class S_View_Space_Normal(_S_Bake_Type, tool_settings.Settings):
     use_denoise: bool = False
     use_remove_inward_normals: bool = False
 
+    _is_float_buffer = True
+
 
     def _get_setup_context(self):
 
@@ -752,6 +754,8 @@ class S_Buffer_Factor(_S_Bake_Type, tool_settings.Settings):
         use_denoise: bool = True
 
         node_label: str = ''
+
+        _is_float_buffer = True
 
 
         def _get_setup_context(self):
