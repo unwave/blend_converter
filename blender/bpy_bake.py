@@ -732,6 +732,10 @@ def bake_images(objects: typing.List[bpy.types.Object], settings: tool_settings.
                     if len(bake_task) == 1:
                         output_socket = context_stack.enter_context(bake_task[0]._get_material_context(material))
 
+                        if not output_socket:
+                            context_stack.enter_context(bpy_context.No_Active_Image(material))
+                            return
+
                         if type(output_socket) is tuple:
                             output_socket, path = output_socket
                         else:
