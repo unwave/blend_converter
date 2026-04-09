@@ -728,9 +728,17 @@ def bake_images(objects: typing.List[bpy.types.Object], settings: tool_settings.
                     context_stack.enter_context(sub_task._get_setup_context())
 
                 def enter_output_context(material: bpy.types.Material, bake_task: typing.List[bake_settings._S_Bake_Type]):
+
                     if len(bake_task) == 1:
                         output_socket = context_stack.enter_context(bake_task[0]._get_material_context(material))
-                        context_stack.enter_context(bpy_context.Output_Override(material, output_socket))
+
+                        if type(output_socket) is tuple:
+                            output_socket, path = output_socket
+                        else:
+                            path = None
+
+                        context_stack.enter_context(bpy_context.Output_Override(material, output_socket, path))
+
                     else:
                         r_g_b = [context_stack.enter_context(bake_task[i]._get_material_context(material)) for i in range(3)]
                         context_stack.enter_context(bpy_context.Output_Override_Combine_RGB(material, *r_g_b))

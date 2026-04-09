@@ -788,7 +788,7 @@ def get_tree_paths(from_tree: bpy.types.ShaderNodeTree, to_tree: bpy.types.Shade
         path = []
 
     if from_tree == to_tree:
-        return [path + [Tree_Path_Fragment(to_tree, None)]]
+        return [path]
 
     paths: typing.List[typing.List[Tree_Path_Fragment]] = []
 
@@ -805,10 +805,25 @@ def get_tree_paths(from_tree: bpy.types.ShaderNodeTree, to_tree: bpy.types.Shade
     return paths
 
 
+def walk_tree(node_tree: bpy.types.ShaderNodeTree, *, path: typing.List[Tree_Path_Fragment] = None):
+
+    if path is None:
+        path = []
+
+    tree = bpy_node.Shader_Tree_Wrapper(node_tree)
+
+    for node in tree.root.descendants:
+
+        yield node, path
+
+        if node.be('ShaderNodeGroup') and node.node_tree:
+            yield from walk_tree(node.node_tree, path = path + [Tree_Path_Fragment(node_tree, node.bl_node)])
+
+
 class Output_Override:
 
 
-    def __init__(self, material: bpy.types.Material, socket: bpy.types.NodeSocketStandard):
+    def __init__(self, material: bpy.types.Material, socket: bpy.types.NodeSocketStandard, path: typing.List[Tree_Path_Fragment] = None):
 
         if not socket.is_output:
             raise ValueError(f"The socket should be an output socket.")
@@ -817,18 +832,24 @@ class Output_Override:
         self.material = material
         self.id = bpy_utils.get_uuid1_hex()
 
+        if path is None:
+            self.path = []
+        else:
+            self.path = path
+
+
+    def get_sub_tree_path(self):
+        if self.path:
+            return list(self.path[1:]) + [Tree_Path_Fragment(self.bl_socket.id_data, None)]
+        else:
+            return []
+
 
     def __enter__(self):
 
 
-        paths = get_tree_paths(self.material.node_tree, self.bl_socket.id_data)
-        self.path = paths[0]
 
-        if len(paths) > 1:
-            print(f"Multiple paths to the socket found. Picking the first one: {self.path}", file = sys.stderr)
-
-
-        for fragment in reversed(self.path[1:]):
+        for fragment in reversed(self.get_sub_tree_path()):
 
             tree = bpy_node.Shader_Tree_Wrapper(fragment.tree)
 
@@ -869,7 +890,7 @@ class Output_Override:
         if self.initial_output:
             self.initial_output.join(self.tree.surface_input, move = False)
 
-        for fragment in reversed(self.path[1:]):
+        for fragment in reversed(self.get_sub_tree_path()):
 
             tree = bpy_node.Shader_Tree_Wrapper(fragment.tree)
 
