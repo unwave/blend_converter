@@ -21,7 +21,7 @@ import wx.lib.scrolledpanel as scrolled
 
 
 from .. import utils
-from .. import common
+from .. import root
 from .. import updater
 
 
@@ -30,7 +30,7 @@ from . import wxp_utils
 
 
 def get_root_path(*name: str):
-    return os.path.join(common.ROOT_DIR, *name)
+    return os.path.join(root.PATH, *name)
 
 
 SENTINEL = object()

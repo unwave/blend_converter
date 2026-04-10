@@ -13,6 +13,7 @@ import multiprocessing
 
 from .. import utils
 from .. import common
+from .. import root
 from . import communication
 
 
@@ -20,7 +21,7 @@ from . import communication
 SENTINEL = object()
 
 
-BLENDER_SCRIPT_RUNNER = os.path.join(common.ROOT_DIR, 'blender', 'scripts', 'process_scripts.py')
+BLENDER_SCRIPT_RUNNER = os.path.join(root.PATH, 'blender', 'scripts', 'process_scripts.py')
 
 
 def remove_code(value):

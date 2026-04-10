@@ -27,7 +27,7 @@ from . import bpy_modifier
 
 from .. import utils
 from .. import tool_settings
-from .. import common
+from .. import root
 
 
 if utils.is_in_blender():
@@ -218,7 +218,7 @@ def execute_uv_packer_addon(self: 'uv_packer.UVPackerPackButtonOperator', contex
 
 def import_uv_packer_addon():
 
-    uv_packer_path = os.path.join(common.ROOT_DIR, 'external', 'uv_packer', '__init__.py')
+    uv_packer_path = os.path.join(root.PATH, 'external', 'uv_packer', '__init__.py')
     if os.path.exists(uv_packer_path):
         return utils.import_module_from_file(uv_packer_path)
 

@@ -5,10 +5,10 @@ import sys
 from .. import common
 from . import remote_execution_handler
 from .. import utils
+from .. import root
 
 
-
-SCRIPT_RUNNER_PATH = os.path.join(common.ROOT_DIR, 'unreal', 'script_runner.py')
+SCRIPT_RUNNER_PATH = os.path.join(root.PATH, 'unreal', 'script_runner.py')
 
 
 def runner_bootstrap(script_runner_path: str, data: dict):

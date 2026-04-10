@@ -10,9 +10,9 @@ def show_external():
 
     import os
     from . import utils
-    from . import common
+    from . import root
 
-    utils.os_open(os.path.join(common.ROOT_DIR, 'external'))
+    utils.os_open(os.path.join(root.PATH, 'external'))
 
 
 def show_blender():
@@ -38,18 +38,18 @@ def show_logs():
 def show_blend_converter():
 
     from . import utils
-    from . import common
+    from . import root
 
-    utils.os_open(common.ROOT_DIR)
+    utils.os_open(root.PATH)
 
 
 def show_test_blends():
 
     import os
     from . import utils
-    from . import common
+    from . import root
 
-    utils.os_open(os.path.join(common.ROOT_DIR, 'test', 'blend'))
+    utils.os_open(os.path.join(root.PATH, 'test', 'blend'))
 
 
 def test_gui():
@@ -58,9 +58,9 @@ def test_gui():
     import os
     import subprocess
 
-    from . import common
+    from . import root
 
-    subprocess.Popen([sys.executable, os.path.join(common.ROOT_DIR, 'test', 'gui.py')])
+    subprocess.Popen([sys.executable, os.path.join(root.PATH, 'test', 'gui.py')])
 
 
 def generate_settings(blender_executable):

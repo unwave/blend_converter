@@ -4,7 +4,7 @@ import os
 import typing
 
 
-from .. import common
+from .. import root
 from .. import utils
 
 
@@ -39,7 +39,7 @@ def load_block(filepath: str, type: str, name: str):
 
 def load_compositor_node_tree(name: str) -> bpy.types.CompositorNodeTree:
 
-    data_file = os.path.join(common.ROOT_DIR, 'blender', 'blends', 'compositor_node_groups_2_93.blend')
+    data_file = os.path.join(root.PATH, 'blender', 'blends', 'compositor_node_groups_2_93.blend')
 
     return load_block(data_file, 'node_groups', name)
 

@@ -178,9 +178,10 @@ def write_obj_settings(file_path: str):
 def main(blender_executable: str):
 
     from .. import common
+    from .. import root
     from .executor import Blender
 
-    generated_dir = os.path.join(common.ROOT_DIR, 'blender', 'generated')
+    generated_dir = os.path.join(root.PATH, 'blender', 'generated')
 
     blender = Blender(blender_executable)
 

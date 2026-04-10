@@ -8,9 +8,9 @@ import json
 
 
 from .. import common
+from .. import root
 
-
-SCRIPT_RUNNER_PATH = os.path.join(common.ROOT_DIR, 'python', 'script_runner.py')
+SCRIPT_RUNNER_PATH = os.path.join(root.PATH, 'python', 'script_runner.py')
 
 
 class Python:

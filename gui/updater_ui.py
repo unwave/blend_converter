@@ -20,6 +20,7 @@ import wx.ribbon as RB
 
 from .. import utils
 from .. import common
+from .. import root
 from .. import updater
 from ..blender import communication
 
@@ -353,7 +354,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         command = utils.get_command_from_list([
             sys.executable,
-            common.get_script_path('forced_update'),
+            root.get_script_path('forced_update'),
             json.dumps(dict(programs=programs), ensure_ascii=False)
         ])
 
@@ -381,7 +382,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             return
 
         if path.endswith('.bam'):
-            panda_viewer_path = common.get_script_path('panda3d_viewer')
+            panda_viewer_path = root.get_script_path('panda3d_viewer')
             subprocess.Popen([sys.executable, panda_viewer_path, path])
         elif path.endswith('.blend'):
             cmd = [entry.program.blender_executable, path]
@@ -420,7 +421,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             'result_path': entry.program.result_path
         }
 
-        cmd = [entry.program.blender_executable, '--python', common.get_script_path('start_compare'), '--', '-json_args', json.dumps(args)]
+        cmd = [entry.program.blender_executable, '--python', root.get_script_path('start_compare'), '--', '-json_args', json.dumps(args)]
 
         utils.open_blender_detached(*cmd)
 
