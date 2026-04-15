@@ -1123,6 +1123,36 @@ def pack_and_task(
     return bake_tasks, pre_bake_tasks
 
 
+def create_vertex_group_from_material_key(object: bpy.types.Object, material_key: str):
+
+    target_material_indexes = {slot.slot_index for slot in object.material_slots if slot.material and slot.material.get(material_key)}
+
+    vertex_indexes = set()
+
+    for p in object.data.polygons:
+        if p.material_index in target_material_indexes:
+            vertex_indexes.update(p.vertices)
+
+    vertex_group = object.vertex_groups.new(name = material_key)
+    vertex_group.add(list(vertex_indexes), 1, 'REPLACE')
+
+    return vertex_group
+
+
+def add_negative_uv_offset(object: bpy.types.Object, uv_layer: str, vertex_group: str, invert_vertex_group = True):
+    """ This is to prevent overlapping UVs messing up the ADJACENT_FACES margin generation. """
+
+    modifier = object.modifiers.new('__bc_uv_offset', 'UV_WARP')
+
+    modifier.uv_layer = uv_layer
+    modifier.vertex_group = vertex_group
+    modifier.invert_vertex_group = invert_vertex_group
+
+    modifier.offset = (-1, -1)
+
+    return modifier
+
+
 def copy_and_bake(
         objects: typing.List[bpy.types.Object],
         tasks: typing.Tuple[typing.List[tool_settings.S_Bake], typing.List[tool_settings.S_Bake]],
@@ -1199,10 +1229,18 @@ def copy_and_bake(
 
             for bake_settings in bake_tasks:
 
+                if bake_settings.material_key:
+                    vertex_group = create_vertex_group_from_material_key(bake_proxy, bake_settings.material_key)
+                    uv_offset = add_negative_uv_offset(bake_proxy, bake_settings.uv_layer_name, vertex_group.name)
+
                 apply_uv_texture_jitter([bake_proxy], bake_settings)
 
                 with Pre_Baked([bake_proxy], pre_bake_labels, bake_settings):
                     bpy_bake.bake([bake_proxy], bake_settings)
+
+                if bake_settings.material_key:
+                    bake_proxy.modifiers.remove(uv_offset)
+                    bake_proxy.vertex_groups.remove(vertex_group)
 
 
         ## delete temporal objects
