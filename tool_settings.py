@@ -908,11 +908,11 @@ class S_Bake(Settings):
     #### Default: `False`
     """
 
-    use_smart_texture_interpolation: bool = True
+    use_smart_texture_interpolation: bool = False
     """
     Use `Smart` texture interpolation for all image nodes.
 
-    #### Default: `True`
+    #### Default: `False`
     """
 
     margin_type: str = 'ADJACENT_FACES'
