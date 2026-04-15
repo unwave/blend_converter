@@ -1299,8 +1299,16 @@ def get_stdev_mean(values: typing.Union[typing.Sized, typing.Iterable]):
 
 
 @blend_inspector.skipable(blend_inspector.COMMON.SKIP_UV_ALL, blend_inspector.COMMON.SKIP_UV_UNWRAP)
-def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False, divide_by_mean = True):
+def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], *, only_select = False, divide_by_mean = True, uv_layer_name = ''):
     print(f"{reunwrap_bad_uvs.__name__}...")
+
+
+    if uv_layer_name:
+        active_uv_state = bpy_context.State()
+        active_uv_state.__enter__()
+
+        for object in objects:
+            active_uv_state.set(object.data.uv_layers, 'active', object.data.uv_layers[uv_layer_name])
 
 
     from mathutils.geometry import area_tri
@@ -1499,6 +1507,10 @@ def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], only_select = False
             bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
 
             bm_copy.free()
+
+
+    if uv_layer_name:
+        active_uv_state.__exit__(None, None, None)
 
 
 def copy_uv(from_object: bpy.types.Object, to_object: bpy.types.Object, uv_layer_name: str):
