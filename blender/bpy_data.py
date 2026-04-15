@@ -9,6 +9,7 @@ from .. import utils
 
 
 from . import blend_inspector
+from . import bpy_node
 
 
 if utils.is_in_blender():
@@ -87,3 +88,15 @@ def save_as_mainfile(filepath: str, compress = True, relative_remap = True, copy
             raise e
 
     print(f"Blend is saved in path: {filepath}")
+
+
+def get_new_material(name: str):
+
+    material = bpy.data.materials.new(name)
+
+    if bpy.app.version < (5, 0):
+        material.use_nodes = True
+    else:
+        bpy_node.Shader_Tree_Wrapper(material.node_tree).reset_nodes()
+
+    return material

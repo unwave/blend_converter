@@ -22,6 +22,7 @@ from . import bpy_modifier
 from . import bpy_material
 from . import bpy_mesh
 from . import communication
+from . import bpy_data
 
 from .. import tool_settings
 from .. import utils
@@ -41,6 +42,12 @@ elif not typing.TYPE_CHECKING:
     mathutils = utils.Dummy()
     bmesh = utils.Dummy()
 
+
+if typing.TYPE_CHECKING:
+    # need only __init__ hints
+    from dataclasses import dataclass
+else:
+    dataclass = lambda x: x
 
 
 T_Objects = typing.TypeVar('T_Objects', bpy.types.Object, typing.List[bpy.types.Object], typing.Iterable[bpy.types.Object])
@@ -1191,6 +1198,9 @@ def copy_and_bake(
                 bpy_bake.bake([bake_proxy], pre_bake_settings)
 
             for bake_settings in bake_tasks:
+
+                apply_uv_texture_jitter([bake_proxy], bake_settings)
+
                 with Pre_Baked([bake_proxy], pre_bake_labels, bake_settings):
                     bpy_bake.bake([bake_proxy], bake_settings)
 
@@ -1690,3 +1700,285 @@ def select_uv_layer(objects: typing.List[bpy.types.Object], name: str,):
 
 def get_uuid1_hex(prefix = '__bc_'):
     return prefix + uuid.uuid1().hex
+
+
+
+def ensure_image_vector_inputs(material: bpy.types.Material):
+
+    if not material.node_tree:
+        return
+
+    pool = [material.node_tree]
+    seen = set()
+
+    while pool:
+
+        node_tree = pool.pop()
+
+        if node_tree in seen:
+            continue
+        seen.add(node_tree)
+
+        tree = bpy_node.Shader_Tree_Wrapper(node_tree)
+
+
+        image_nodes: typing.List[bpy_node._Shader_Node_Wrapper] = []
+
+        for node in tree.root.descendants:
+
+            if node.be('ShaderNodeGroup') and node.node_tree:
+                pool.append(node.node_tree)
+
+            if node.be('ShaderNodeTexImage'):
+                if not node.inputs['Vector'].connections:
+                    image_nodes.append(node)
+
+
+        # FIXME: handle the image node mapping
+        uv_map = tree.new('ShaderNodeUVMap')
+
+        for node in image_nodes:
+            node.inputs['Vector'].join(uv_map.outputs[0])
+
+
+def get_pixel_world_size_material(uv_map: str, name = '__bc_pixel_world_size'):
+
+    material = bpy.data.materials.get(name)
+    if material:
+        return material
+
+    material = bpy_data.get_new_material(name)
+
+    tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+
+    from .node_groups import pixel_scale
+
+    group = tree.root.inputs['Surface'].new('ShaderNodeGroup', node_tree = pixel_scale.get_main_tree())
+    group.inputs[0].new('ShaderNodeUVMap', uv_map = uv_map)
+
+    return material
+
+
+def apply_uv_texture_jitter(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Bake = None):
+    """ Add a UV jitter for every image texture node to resolve moire. """
+
+
+    original_material_key = settings.material_key
+    material_key = get_uuid1_hex('__bc_uv_scale')
+
+    settings = tool_settings.S_Bake()._update(settings)
+    settings.material_key = material_key
+    settings.do_downscale = False
+    settings.use_anti_aliasing = False
+    settings.compose_and_save = False
+    settings.image_dir = os.path.join(bpy.app.tempdir, '__bc_uv_scale')
+
+
+    # expecting the materials to be unique, otherwise will be incorrect
+    materials = [m for m in get_unique_materials(objects) if m.node_tree]
+
+    if original_material_key:
+        materials = [m for m in materials if m.get(original_material_key)]
+
+
+    for material in materials:
+        ensure_image_vector_inputs(material)
+
+
+    def get_vector_socket(node: bpy_node._Shader_Node_Wrapper):
+
+        socket = node.inputs['Vector'].connections[0]
+
+        while socket.node.be('NodeReroute'):
+            socket = socket.node.inputs[0].connections[0]
+
+        return socket
+
+
+    def get_identifier(index: str):
+        return material_key + f'_{index}'
+
+
+    from .node_groups import uv_derivatives
+    uv_texture_scale_tree = uv_derivatives.get_main_tree()
+
+
+    @dataclass
+    class S_Pixel_Scale(tool_settings_bake._S_Bake_Type, tool_settings.Settings):
+
+        _socket_type = tool_settings_bake._Socket_Type.VALUE
+        _identifier = 'pixel_world_size'
+        _is_float_buffer = True
+
+
+        def _get_setup_context(self):
+            return bpy_context.State([
+                (bpy.context.scene.render.bake, 'margin_type', 'EXTEND'),
+                (bpy.context.scene.render.bake, 'margin', 16),
+                (bpy.context.scene.cycles, 'device', 'CPU'),
+                (bpy.context.scene.cycles, 'shading_system', True),
+                (bpy.context.scene.cycles, 'samples', 1),
+                (bpy.context.view_layer, 'material_override', get_pixel_world_size_material(settings.uv_layer_name)),
+            ])
+
+
+        def _get_material_context(self, material):
+
+
+            try:
+                material_to_socket_path_tuples[material]
+                return contextlib.nullcontext(tool_settings_bake._get_shader_output_socket(material))
+            except IndexError:
+                return contextlib.nullcontext(None)
+
+
+    @dataclass
+    class S_UV_Scale(tool_settings_bake._S_Bake_Type, tool_settings.Settings):
+
+        _socket_type = tool_settings_bake._Socket_Type.VECTOR
+        _is_srgb = False
+
+        _is_float_buffer = True
+
+        index: int = 0
+
+
+        @property
+        def _identifier(self):
+            return get_identifier(self.index)
+
+
+        def _get_setup_context(self):
+            return bpy_context.State([
+                (bpy.context.scene.render.bake, 'margin_type', 'EXTEND'),
+                (bpy.context.scene.render.bake, 'margin', 16),
+            ])
+
+
+        def _get_material_context(self, material):
+
+            try:
+                socket, path = material_to_socket_path_tuples[material][self.index]
+            except IndexError:
+                return contextlib.nullcontext(None)
+
+            @contextlib.contextmanager
+            def context():
+
+                tree = bpy_node.Shader_Tree_Wrapper(socket.id_data)
+
+
+                try:
+                    group = tree.get_socket_wrapper(socket).new('ShaderNodeGroup', node_tree = uv_texture_scale_tree)
+                    scale = group.outputs[0].new('ShaderNodeVectorMath', operation = 'SCALE')
+                    image_node = scale.inputs['Scale'].new('ShaderNodeTexImage', image = pixel_world_size_settings._raw_images[0])
+                    image_node.interpolation = 'Closest'
+                    image_node.inputs['Vector'].new('ShaderNodeUVMap', uv_map = settings.uv_layer_name)
+
+                    yield scale.outputs[0], path
+                finally:
+                    tree.delete_new_nodes()
+
+            return context()
+
+
+    material_to_socket_path_tuples = {}
+
+    for material in materials:
+
+        socket_path_tuples = []
+
+        for node, path in bpy_context.walk_tree(material.node_tree):
+
+            if not (node.be('ShaderNodeTexImage') and node.image):
+                continue
+
+            socket_path_tuples.append((get_vector_socket(node), tuple(path)))
+
+
+        if socket_path_tuples:
+            material_to_socket_path_tuples[material] = utils.deduplicate(socket_path_tuples)
+            material[material_key] = True
+
+
+    bake_types_count = max((len(v) for v in material_to_socket_path_tuples.values()), default = 0)
+    if not bake_types_count:
+        return
+
+
+    pixel_world_size_settings = settings._get_copy()
+    pixel_world_size_settings.bake_types = [S_Pixel_Scale()]
+    bpy_bake.bake(objects, pixel_world_size_settings)
+
+
+    uv_scale_settings = settings._get_copy()
+    uv_scale_settings.bake_types = [S_UV_Scale(index = i) for i in range(bake_types_count)]
+    bpy_bake.bake(objects, uv_scale_settings)
+
+
+    def ensure_tree_input(tree: bpy_node.Shader_Tree_Wrapper, socket_name: str):
+
+        assert not tree.is_material
+
+        for socket in tree.get_input_sockets():
+            if socket.name == socket_name:
+                return
+
+        tree.add_input_socket('NodeSocketVector', socket_name)
+
+        for node in tree.get_by_bl_idname('NodeGroupInput'):
+            node.update_sockets()
+
+
+    def ensure_input_node(tree: bpy_node.Shader_Tree_Wrapper):
+
+        for node in tree.get_by_bl_idname('NodeGroupInput'):
+            return node
+
+        return tree.new('NodeGroupInput')
+
+
+    def add_node_group(socket: bpy_node._Socket_Wrapper, uv_scale: bpy_node._Socket_Wrapper):
+
+        from .node_groups import gaussian_uv_jitter
+
+        group = socket.insert_new('ShaderNodeGroup', node_tree = gaussian_uv_jitter.get_main_tree())
+        group.get_input_by_name('UV Scale').join(uv_scale)
+        group.get_input_by_name('X Resolution').set_default_value(settings._actual_width)
+        group.get_input_by_name('Y Resolution').set_default_value(settings._actual_height)
+
+
+    for material, socket_path_tuples in material_to_socket_path_tuples.items():
+
+        for index, (socket, path) in enumerate(socket_path_tuples):
+
+            image = uv_scale_settings._raw_images[index]
+            socket_name = get_identifier(index)
+
+
+            # connect intermediate path
+            for fragment in reversed(path[1:]):
+
+                tree = bpy_node.Shader_Tree_Wrapper(fragment.tree)
+
+                ensure_tree_input(tree, socket_name)
+                tree[fragment.node_group].get_input_by_name(socket_name).join(ensure_input_node(tree).get_output_by_name(socket_name))
+
+
+            # connect destination
+            if path:
+                tree = bpy_node.Shader_Tree_Wrapper(socket.id_data)
+                ensure_tree_input(tree, socket_name)
+                add_node_group(tree.get_socket_wrapper(socket), ensure_input_node(tree).get_output_by_name(socket_name))
+
+
+            # connect material
+            tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
+
+            image_node = tree.new('ShaderNodeTexImage', image = image)
+            image_node.inputs['Vector'].new('ShaderNodeUVMap', uv_map = settings.uv_layer_name)
+
+            if path:
+                tree[path[0].node_group].get_input_by_name(socket_name).join(image_node.outputs[0])
+            else:
+                add_node_group(tree.get_socket_wrapper(socket), image_node.outputs[0])
