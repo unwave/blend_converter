@@ -174,15 +174,28 @@ def _get_specs(cls):
             raise Exception(f"The attribute does not include a default: {name}")
 
         if attribute_properties['default_repr'] != default_repr:
-            raise Exception(f"The default representation of `{name}` does not mach:\n\t{attribute_properties['default_repr']}\n\t{default_repr}")
+            raise Exception(
+                f"The default representation of `{name}` does not mach:"
+                "\n\t" f"{attribute_properties['default_repr']}"
+                "\n\t" f"{default_repr}"
+            )
 
         if attr_type != type(default).__name__:
-            raise Exception(f"Default value and type of `{name}` do not mach:\n\tdefault={default}\n\tattr_type={attr_type}")
+            raise Exception(
+                f"Default value and type of `{name}` do not mach:"
+                "\n\t" f"default={default}"
+                "\n\t" f"attr_type={attr_type}"
+            )
 
         try:
             ui_spec = get_blender_prop_specs(default, attribute_properties)
         except Exception as e:
-            raise Exception(f"Failed to collect a Blender UI specification:\n\tname = {name}\ndefault = {repr(default)}\n\tattribute_properties = {attribute_properties}") from e
+            raise Exception(
+                "Failed to collect a Blender UI specification:"
+                "\n\t" f"name = {name}"
+                "\n\t" f"default = {repr(default)}"
+                "\n\t" f"attribute_properties = {attribute_properties}"
+            ) from e
 
         specs[name] = dict(
             default = default,
