@@ -15,6 +15,7 @@ import multiprocessing
 
 from . import utils
 from . import tool_settings
+from . import settings_base
 
 
 SENTINEL = object()
@@ -263,7 +264,7 @@ class Program:
                         value[index] = return_value
                 elif type(sub_value) in (list, dict):
                     value[index] = self.replace_return_values(sub_value)
-                elif isinstance(sub_value, tool_settings.Settings):
+                elif isinstance(sub_value, settings_base.Settings):
                     value[index] = self.replace_return_values(sub_value._to_dict())
         elif isinstance(value, dict):
             for key, sub_value in value.items():
@@ -273,7 +274,7 @@ class Program:
                         value[key] = return_value
                 elif type(sub_value) is (list, dict):
                     value[key] = self.replace_return_values(sub_value)
-                elif isinstance(sub_value, tool_settings.Settings):
+                elif isinstance(sub_value, settings_base.Settings):
                     value[key] = self.replace_return_values(sub_value._to_dict())
         else:
             raise Exception(f"Unexpected args type: {value}")
@@ -529,6 +530,14 @@ class Execution_Context:
         self.are_executors_stopped = multiprocessing.Value('b', False, lock = self.lock)
 
 
+def get_settings_class(name: str) -> typing.Union[typing.Type, None]:
+
+    if not name:
+        return None
+
+    return getattr(tool_settings, name, None)
+
+
 def replace_return_value(value, return_values: dict, instructions: list):
     """ Substitute previous function return values. """
 
@@ -542,9 +551,9 @@ def replace_return_value(value, return_values: dict, instructions: list):
             elif type(sub_value) is list:
                 new_value.append(replace_return_value(sub_value, return_values, instructions))
             elif type(sub_value) is dict:
-                _bc_settings_name = sub_value.get('_bc_settings_name')
-                if _bc_settings_name:
-                    new_value.append(replace_return_value(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value), return_values, instructions))
+                settings_class = get_settings_class(sub_value.get(settings_base.K_CLASS_NAME))
+                if settings_class:
+                    new_value.append(replace_return_value(settings_class._from_dict(sub_value), return_values, instructions))
                 else:
                     new_value.append(replace_return_value(sub_value, return_values, instructions))
             else:
@@ -562,9 +571,9 @@ def replace_return_value(value, return_values: dict, instructions: list):
             elif type(sub_value) is list:
                 new_value[key] = replace_return_value(sub_value, return_values, instructions)
             elif type(sub_value) is dict:
-                _bc_settings_name = sub_value.get('_bc_settings_name')
-                if _bc_settings_name:
-                    new_value[key] = replace_return_value(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value), return_values, instructions)
+                settings_class = get_settings_class(sub_value.get(settings_base.K_CLASS_NAME))
+                if settings_class:
+                    new_value[key] = replace_return_value(settings_class._from_dict(sub_value), return_values, instructions)
                 else:
                     new_value[key] = replace_return_value(sub_value, return_values, instructions)
             else:
@@ -572,7 +581,7 @@ def replace_return_value(value, return_values: dict, instructions: list):
 
         return new_value
 
-    elif isinstance(value, tool_settings.Settings):
+    elif isinstance(value, settings_base.Settings):
 
         for key in value.__dict__:
 
@@ -589,9 +598,9 @@ def replace_return_value(value, return_values: dict, instructions: list):
             elif type(sub_value) is list:
                 new_value = replace_return_value(sub_value, return_values, instructions)
             elif type(sub_value) is dict:
-                _bc_settings_name = sub_value.get('_bc_settings_name')
-                if _bc_settings_name:
-                   new_value = replace_return_value(getattr(tool_settings, _bc_settings_name)._from_dict(sub_value), return_values, instructions)
+                settings_class = get_settings_class(sub_value.get(settings_base.K_CLASS_NAME))
+                if settings_class:
+                   new_value = replace_return_value(settings_class._from_dict(sub_value), return_values, instructions)
                 else:
                     new_value = replace_return_value(sub_value, return_values, instructions)
             else:
