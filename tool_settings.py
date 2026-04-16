@@ -410,15 +410,20 @@ class S_Bake(Settings):
     #### Default: `False`
     """
 
-    samples: int = 1
+    samples: int = 8
     """
-    The cycles render samples. Higher values result in a smoother and less aliased image at an increased render time.
-    Usually more than 8 samples would not improve the result. In such a case use `resolution_multiplier`.
+    The Cycles' render samples.
+
+    Higher values result in a smoother and less aliased image at an increased render time.
+
+    Without `bpy_utils.apply_uv_texture_jitter` more than 8 samples usually would not improve the result.
+
+    For the MSAA-like effect use `resolution_multiplier`.
 
     `min`: `1`
-    `soft_max`: `8`
+    `soft_max`: `128`
 
-    #### Default: `1`
+    #### Default: `8`
     """
 
     resolution_multiplier: float = 1.0
