@@ -1370,13 +1370,13 @@ class S_Bake_Materials(Settings):
     #### Default: `os.path.join(tempfile.gettempdir(), 'blend_converter', 'default_image_dir')`
     """
 
-    resolution: int = 0
+    resolution: int = 1024
     """
     Resolution of both X and Y sides of the image.
 
-    If not `0` — used instead of `texel_density`.
+    If `0` — `texel_density` is used.
 
-    #### Default: `0`
+    #### Default: `1024`
     """
 
     texel_density: int = 1024
