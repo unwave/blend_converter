@@ -106,7 +106,11 @@ def get_blender_prop_specs(default_value, attribute_properties: dict):
         return dict(type='StringProperty', is_json=True, kwargs=parameters)
 
     else:
-        raise Exception(f"Unexpected property specification:\n\tdefault_value = {repr(default_value)}\n\tattribute_properties = {attribute_properties}")
+        raise Exception(
+            "Unexpected property specification:"
+            "\n\t" f"default_value = {repr(default_value)}"
+            "\n\t" f"attribute_properties = {attribute_properties}"
+        )
 
 
 
@@ -169,8 +173,8 @@ def _get_specs(cls):
         if attr_type != type(default).__name__:
             raise Exception(
                 f"Default value and type of `{name}` do not mach:"
-                "\n\t" f"default={default}"
-                "\n\t" f"attr_type={attr_type}"
+                "\n\t" f"default = {default}"
+                "\n\t" f"attr_type = {attr_type}"
             )
 
         try:
@@ -246,10 +250,8 @@ class Settings():
         if not self.allow_missing_settings and default is SENTINEL:
             raise Exception(
                 f"Unexpected setting for {type(self).__name__}: {name} = {repr(value)}"
-                "\n"
-                "If it should be valid use allow_missing_settings=True."
-                "\n"
-                "So non-existent settings or settings with no default value will be allowed."
+                "\n\t" "If it should be valid — use allow_missing_settings=True."
+                "\n\t" "To allow non-existent settings or settings with no default value."
             )
 
         self._has_been_set.add(name)
