@@ -601,7 +601,7 @@ class S_Bake(Settings):
     #### Default: `''`
     """
 
-    max_ray_distance = 0
+    max_ray_distance: int = 0
     """
     Used for the selected to active bake.
 
@@ -1449,22 +1449,19 @@ class S_Future_Bake_Materials(Settings):
     """
 
 
-
-
-
-if __name__ == '__main__':
+def _test_specs():
 
 
     for cls in [object for object in globals().values() if type(object) is type and issubclass(object, Settings)]:
 
+        if cls is Settings:
+            continue
+
         print(cls)
 
         for key in [key for key in cls.__dict__.keys() if not key.startswith('_')]:
-            print(key)
 
-            for key_, value_ in cls._get_attribute_spec(key).items():
-                if not key_ == 'docs':
-                    print('\t', key_, ':', value_)
+            print(cls._get_attribute_spec(key))
 
             print()
 

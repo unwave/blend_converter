@@ -25,6 +25,48 @@ RE_ATTR_DEFAULT_ENTRY = re.compile(r'^#### Default: `(.+?)`$')
 RE_ATTR_ENUM_ENTRY = re.compile(r'^\* `(.+?)`\s*:\s*(.+?)\s*—\s*(.+)*$')
 
 
+class Attribute_Spec(typing.NamedTuple):
+
+
+    name: str
+
+    type: typing.Type
+
+    default: typing.Any
+
+
+    description: str = None
+    """ The full docstring of the attribute. """
+
+    default_repr: str = None
+    """ A Python representation of the default value. """
+
+    enum_items: typing.List[typing.Tuple[str, str, str]] = None
+    """ The Blender style enumeration items. """
+
+    ui_spec: dict = None
+    """ A Blender's UI property arguments. """
+
+    cmd: str = None
+    """ The parameter specifies an underlying command line interface tool name if any. E.g.: --attr-name. """
+
+    subtype: str = None
+    """ Blender's string property subtype. """
+
+    min: typing.Union[int, float] = None
+    """ A hard minimum numeric value. """
+
+    max: typing.Union[int, float] = None
+    """ A hard maximum numeric value. """
+
+    soft_min: typing.Union[int, float] = None
+    """ A soft maximum numeric value. """
+
+    soft_max: typing.Union[int, float] = None
+    """ A soft minimum numeric value. """
+
+
+
 def is_json_serializable(object):
     try:
         json.dumps(object)
@@ -115,7 +157,7 @@ def get_blender_prop_specs(default_value, attribute_properties: dict):
 
 
 @functools.lru_cache(None)
-def _get_specs(cls):
+def _get_specs(cls) -> typing.Dict[str, Attribute_Spec]:
 
     source = textwrap.dedent(inspect.getsource(cls))
 
@@ -129,8 +171,8 @@ def _get_specs(cls):
         docs = textwrap.dedent(attr.group(4))
 
         attribute_properties = dict(
-            default=default,
-            description=docs
+            default = default,
+            description = docs.strip()
         )
 
         for line in docs.splitlines():
@@ -148,7 +190,7 @@ def _get_specs(cls):
             elif line.startswith('#### Default:'):
                 match = RE_ATTR_DEFAULT_ENTRY.match(line)
                 if match is None:
-                    raise Exception(f"Failed to parse an default item from string: {line}")
+                    raise Exception(f"Failed to parse a default item from string: {line}")
 
                 attribute_properties['default_repr'] = match.group(1)
 
@@ -187,11 +229,12 @@ def _get_specs(cls):
                 "\n\t" f"attribute_properties = {attribute_properties}"
             ) from e
 
-        specs[name] = dict(
-            default = default,
-            docs = docs,
+
+        specs[name] = Attribute_Spec(
+            name = name,
+            type = type(default),
             ui_spec = ui_spec,
-            properties = attribute_properties,
+            **attribute_properties,
         )
 
     return specs
@@ -259,7 +302,7 @@ class Settings():
 
 
     @classmethod
-    def _get_attribute_spec(cls, name) -> dict:
+    def _get_attribute_spec(cls, name):
         return _get_specs(cls)[name]
 
 
@@ -270,7 +313,7 @@ class Settings():
         properties = dict()
 
         for name, spec in _get_specs(cls).items():
-            properties[name] = getattr(bpy.props, spec['ui_spec']['type'])(**spec['ui_spec']['kwargs'])
+            properties[name] = getattr(bpy.props, spec.ui_spec['type'])(**spec.ui_spec['kwargs'])
 
         return properties
 
@@ -309,11 +352,11 @@ class Settings():
                 else:
                     raise e
 
-            if spec['ui_spec']['type'] == 'EnumProperty':
-                value = spec['ui_spec']['kwargs']['items'][value][0]
-            if spec['ui_spec']['type'] == 'BoolProperty':
+            if spec.ui_spec['type'] == 'EnumProperty':
+                value = spec.ui_spec['kwargs']['items'][value][0]
+            if spec.ui_spec['type'] == 'BoolProperty':
                 value = bool(value)
-            elif spec['ui_spec'].get('is_json', False):
+            elif spec.ui_spec.get('is_json', False):
                 value = json.loads(value)
             elif isinstance(value, bpy.types.bpy_prop_array):
                 value = tuple(value)
@@ -392,11 +435,7 @@ class Settings():
 
             spec = self._get_attribute_spec(key)
 
-            try:
-                cmd = spec['properties']['cmd']
-            except KeyError as e:
-                raise Exception(f"Fail to get command for: {key}") from e
-
+            cmd = spec.cmd
             if cmd is None:
                 continue
 
