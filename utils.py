@@ -615,7 +615,7 @@ def ensure_valid_basename(string: str, limit = 63):
 
 def reload_library():
     for name in list(sys.modules):
-        if name.startswith(__package__ + '.') and not 'addon' in name:
+        if name.startswith(__package__ + '.'):
             importlib.reload(sys.modules[name])
 
 

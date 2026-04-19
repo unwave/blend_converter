@@ -6,12 +6,188 @@ import subprocess
 import threading
 import socket
 import atexit
+import typing
+import math
+import time
+import traceback
 
 import bpy
+import mathutils
 
-from blend_converter.addon import view3d_operator
+
 from blend_converter.blender import bpy_utils
 from blend_converter import utils
+from blend_converter import root
+
+
+
+class Viewer_Commander:
+
+    def __init__(self, ):
+        self.state = {}
+        self.is_dirty = True
+        self.is_terminated = True
+        self.lock = threading.RLock()
+        self.terminate_callback: typing.Optional[typing.Callable] = None
+
+
+    def start(self, blende_socket: socket.socket, depsgraph_update_func: typing.Callable):
+
+        with self.lock:
+
+            self.blende_socket = blende_socket
+            self.depsgraph_update_func = depsgraph_update_func
+
+            self.remove_depsgraph_update()
+
+            self.is_terminated = False
+
+            bpy.app.handlers.depsgraph_update_post.append(depsgraph_update_func)  # pyright: ignore[reportAttributeAccessIssue]
+
+            bpy.app.timers.register(self.tick_send, persistent=True)
+
+            print('START', time.strftime('%H:%M:%S %Y-%m-%d'))
+
+
+    def remove_depsgraph_update(self):
+        for func in list(bpy.app.handlers.depsgraph_update_post):  # pyright: ignore[reportArgumentType]
+            if func is self.depsgraph_update_func:
+                bpy.app.handlers.depsgraph_update_post.remove(func)  # pyright: ignore[reportAttributeAccessIssue]
+
+
+    def terminate(self):
+
+        with self.lock:
+            self.remove_depsgraph_update()
+
+            self.is_terminated = True
+
+            print('EXIT', time.strftime('%H:%M:%S %Y-%m-%d'))
+
+            if self.terminate_callback is not None:
+
+                def do_once():
+                    self.terminate_callback()
+
+                bpy.app.timers.register(do_once, persistent=True)
+
+
+    def set(self, key: str, value):
+        self.state[key] = value
+        self.is_dirty = True
+
+
+    def update(self, date: dict):
+        self.state.update(date)
+        self.is_dirty = True
+
+
+    def send(self, data: dict):
+        try:
+            self.blende_socket.sendall(json.dumps(data).encode() + b'\0')
+        except Exception:
+            traceback.print_exc()
+
+            self.terminate()
+
+    def tick_send(self):
+        if self.is_terminated:
+            return None
+
+        viewport_camera_data = get_viewport_camera_data()
+        if viewport_camera_data:
+            self.state.update(viewport_camera_data)
+
+        if self.is_dirty or viewport_camera_data:
+            self.send(self.state)
+            self.is_dirty = False
+
+        return 1/60
+
+
+    def load_model(self, model_path):
+        self.send({'model': model_path})
+
+
+BLENDER_CAMERA_ROTATION = mathutils.Matrix.Rotation(math.radians(-90), 4, 'X')
+
+
+def get_perspective_view_3d_area():
+    for wm in bpy.data.window_managers:
+        for window in wm.windows:
+            for area in window.screen.areas:
+
+                if area.type != 'VIEW_3D':
+                    continue
+
+                if not area.spaces:
+                    continue
+
+                if not area.spaces[0].region_3d:
+                    continue
+
+                if area.spaces[0].region_3d.view_perspective != 'PERSP':
+                    continue
+
+                return area
+
+def get_viewport_camera_data():
+
+    area = get_perspective_view_3d_area()
+    if not area:
+        return
+
+    space_view: bpy.types.SpaceView3D = area.spaces[0]
+
+    for region in area.regions:
+        if region.type == 'WINDOW':
+            break
+
+    x = region.width
+    y = region.height
+
+    # hardcoded
+    sensor_width = 36
+    zoom = 2
+
+    if x < y:
+        sensor_width = sensor_width * x/y
+
+    return {
+        'width': x,
+        'height': y,
+
+        'matrix': [value for row in (space_view.region_3d.view_matrix.inverted() @ BLENDER_CAMERA_ROTATION).transposed() for value in row],
+
+        'view_matrix': [list(row) for row in space_view.region_3d.view_matrix.transposed()],
+        # 'perspective_matrix': [list(row) for row in space_view.region_3d.perspective_matrix],
+        # 'window_matrix': [list(row) for row in space_view.region_3d.window_matrix],
+
+        'fov': math.degrees(2.0 * math.atan((sensor_width / 2.0) / space_view.lens * zoom)),
+        'near': space_view.clip_start,
+        'far': space_view.clip_end
+    }
+
+
+def update_camera(scene: bpy.types.Scene, depsgraph: bpy.types.Depsgraph, commander: Viewer_Commander):
+
+    for update in depsgraph.updates:
+        if update.id.original != scene.camera:
+            continue
+
+        id_data: bpy.types.Object = update.id
+        camera_data: bpy.types.Camera = id_data.data
+
+        commander.update({
+            'matrix': [value for row in (id_data.matrix_world @ BLENDER_CAMERA_ROTATION).transposed() for value in row],
+            'fov': math.degrees(camera_data.angle),
+            'near': camera_data.clip_start,
+            'far': camera_data.clip_end
+        })
+
+
+PANDA_VIEWER_COMMAND = ['python', root.get_script_path('panda3d_viewer')]
+BLENDER_VIEWER_COMMAND = [bpy.app.binary_path, '--python', root.get_blender_script_path('blender_viewer')]
 
 
 def get_args() -> dict:
@@ -37,12 +213,12 @@ RESULT_TITLE = os.path.splitext(RESULT)[1].lstrip('.').title()
 
 
 if RESULT.lower().endswith('.bam'):
-    VIEWER_STARTER_COMMAND = view3d_operator.PANDA_VIEWER_COMMAND
+    VIEWER_STARTER_COMMAND = PANDA_VIEWER_COMMAND
 else:
-    VIEWER_STARTER_COMMAND = view3d_operator.BLENDER_VIEWER_COMMAND
+    VIEWER_STARTER_COMMAND = BLENDER_VIEWER_COMMAND
 
 
-COMMANDER = view3d_operator.Viewer_Commander.get_viewer_commander()
+COMMANDER = Viewer_Commander()
 
 bpy.context.preferences.view.show_splash = False
 
@@ -58,7 +234,7 @@ def update_ui():
 
 @bpy.app.handlers.persistent
 def blend_conv_depsgraph_update_func(scene: bpy.types.Scene, depsgraph: bpy.types.Depsgraph):
-    view3d_operator.update_camera(scene, depsgraph, COMMANDER)
+    update_camera(scene, depsgraph, COMMANDER)
 
 
 def start_viewer():
