@@ -54,33 +54,27 @@ def __bc_gaussian_uv_jitter():
     vector_math_multiply = vector_math_divide.inputs['Vector'].new('ShaderNodeVectorMath', operation = 'MULTIPLY')
     combine_xyz = vector_math_divide.inputs['Vector_001'].new('ShaderNodeCombineXYZ')
 
-    combine_xyz_2 = vector_math_multiply.inputs['Vector'].new('ShaderNodeCombineXYZ')
+    vector_math_scale = vector_math_multiply.inputs['Vector'].new('ShaderNodeVectorMath', operation = 'SCALE')
     group_input = vector_math_multiply.inputs['Vector_001'].new('NodeGroupInput', 2)
 
     combine_xyz.inputs['X'].join(group_input.get_output_by_name('X Resolution'))
     combine_xyz.inputs['Y'].join(group_input.get_output_by_name('Y Resolution'))
 
-    clamp = combine_xyz_2.inputs['X'].new('ShaderNodeClamp')
-    clamp_2 = combine_xyz_2.inputs['Y'].new('ShaderNodeClamp')
+    vector_math_normalize = vector_math_scale.inputs['Vector'].new('ShaderNodeVectorMath', operation = 'NORMALIZE')
+    clamp = vector_math_scale.inputs['Scale'].new('ShaderNodeClamp')
 
-    separate_xyz = clamp.inputs['Value'].new('ShaderNodeSeparateXYZ')
-    math_multiply = clamp.inputs['Min'].new('ShaderNodeMath', operation = 'MULTIPLY')
-    math_multiply['Value_001'] = -1.0
-    math_multiply_2 = clamp.inputs['Max'].new('ShaderNodeMath', operation = 'MULTIPLY')
-    math_multiply_2['Value_001'] = 1.5
+    vector_math_scale_2 = vector_math_normalize.inputs['Vector'].new('ShaderNodeVectorMath', operation = 'SCALE')
 
-    clamp_2.inputs['Value'].join(separate_xyz.outputs['Y'])
-    clamp_2.inputs['Min'].join(math_multiply.outputs['Value'])
-    clamp_2.inputs['Max'].join(math_multiply_2.outputs['Value'])
+    vector_math_length = clamp.inputs['Value'].new('ShaderNodeVectorMath', 'Value', operation = 'LENGTH')
+    math_multiply = clamp.inputs['Max'].new('ShaderNodeMath', operation = 'MULTIPLY')
+    math_multiply['Value_001'] = 1.5
 
-    vector_math_scale = separate_xyz.inputs['Vector'].new('ShaderNodeVectorMath', operation = 'SCALE')
+    vector_math_length.inputs['Vector'].join(vector_math_scale_2.outputs['Vector'])
 
-    math_multiply.inputs['Value'].join(math_multiply_2.outputs['Value'])
+    math_multiply.inputs['Value'].join(group_input.get_output_by_name('Sigma'))
 
-    math_multiply_2.inputs['Value'].join(group_input.get_output_by_name('Sigma'))
-
-    group = vector_math_scale.inputs['Vector'].new('ShaderNodeGroup', node_tree = __bc_box_muller())
-    vector_math_scale.inputs['Scale'].join(group_input.get_output_by_name('Sigma'))
+    group = vector_math_scale_2.inputs['Vector'].new('ShaderNodeGroup', node_tree = __bc_box_muller())
+    vector_math_scale_2.inputs['Scale'].join(group_input.get_output_by_name('Sigma'))
 
     tex_white_noise = group.get_input_by_name('Vector').new('ShaderNodeTexWhiteNoise', 'Color', noise_dimensions = '2D')
 
@@ -94,19 +88,18 @@ def __bc_gaussian_uv_jitter():
         (3153, 1383),
         (2845, 1378),
         (2031, 1631),
-        (2428, 930),
+        (2236, 1014),
         (342, 1620),
-        (2147, 1029),
-        (2109, 804),
-        (1786, 1477),
+        (1955, 1113),
+        (1917, 888),
+        (1591, 1430),
         (-265, 1188),
-        (1512, 1488),
-        (1514, 1329),
-        (1178, 1468),
-        (1097, 1173),
-        (837, 1246),
+        (1158, 1473),
+        (1392, 1304),
         (838, 1397),
-        (533, 1450),
+        (1158, 1330),
+        (917, 1239),
+        (567, 1444),
         (309, 1470),
     ]
 
