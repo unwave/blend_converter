@@ -14,7 +14,7 @@ from . import bpy_node
 from . import bpy_utils
 from . import bpy_uv
 from . import bpy_modifier
-
+from . import bpy_data
 
 
 if utils.is_in_blender():
@@ -37,15 +37,13 @@ NORMAL_SOCKETS = {
 }
 
 
-def get_default_material() -> bpy.types.Material:
+def get_default_material(name = '__bc_default_material') -> bpy.types.Material:
 
-    material = bpy.data.materials.get('__bc_default_material')
-    if not material:
-        material = bpy.data.materials.new('__bc_default_material')
-        if bpy.app.version < (5, 0):
-            material.use_nodes = True
+    material = bpy.data.materials.get(name)
+    if material:
+        return material
 
-    return material
+    return bpy_data.get_new_material(name)
 
 
 def get_gltf_settings_node_tree():
@@ -69,22 +67,13 @@ def create_material(
             name: str,
             uv_layer: str,
             images: typing.Iterable[bpy.types.Image],
-            material: typing.Optional[bpy.types.Material] = None,
             k_map_identifier = tool_settings.S_Bake._K_MAP_IDENTIFIER
         ):
 
-    do_reset = False
 
-    if not material:
-        material = bpy.data.materials.new(name)
-        if bpy.app.version < (5, 0):
-            material.use_nodes = True
-    else:
-        do_reset = True
-
+    material = bpy_data.get_new_material(name)
     tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
-    if do_reset:
-        tree.reset_nodes()
+
 
     principled = tree.output['Surface']
 
