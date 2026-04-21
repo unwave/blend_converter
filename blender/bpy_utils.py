@@ -1194,6 +1194,15 @@ def copy_and_bake(
         ## join the bake proxy object
         objects_copy = deep_copy_objects(objects)
 
+
+        # adjust bump nodes for better result with the uv jitter
+        if use_uv_texture_jitter:
+            for material in get_unique_materials(objects_copy):
+                for node in bpy_node.Shader_Tree_Wrapper(material.node_tree).root.inputs['Surface'].iter_descendant_nodes_recursive():
+                    if node.be('ShaderNodeBump') and 'Filter Width' in node.inputs.identifiers and node.inputs['Filter Width'].get_default_value() < 1.5:
+                        node.inputs['Filter Width'].set_default_value(1.5)
+
+
         texture_coordinates_collection = bpy_material.make_material_independent_from_object(objects_copy)
 
         convert_to_mesh(objects_copy)
