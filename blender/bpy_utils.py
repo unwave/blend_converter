@@ -1159,6 +1159,7 @@ def copy_and_bake(
         pre_bake_labels: typing.List[str] = tuple(),
         isolate_object_hierarchies = False,
         split_faces_by_materials = True,
+        use_uv_texture_jitter = True,
     ):
     """
     `pre_bake_labels`: Bakes and replaces the nodes with the labels specified. See `label_mix_shader_nodes` and `bake_by_label`.
@@ -1233,7 +1234,8 @@ def copy_and_bake(
                     vertex_group = create_vertex_group_from_material_key(bake_proxy, bake_settings.material_key)
                     uv_offset = add_negative_uv_offset(bake_proxy, bake_settings.uv_layer_name, vertex_group.name)
 
-                apply_uv_texture_jitter([bake_proxy], bake_settings)
+                if use_uv_texture_jitter:
+                    apply_uv_texture_jitter([bake_proxy], bake_settings)
 
                 with Pre_Baked([bake_proxy], pre_bake_labels, bake_settings):
                     bpy_bake.bake([bake_proxy], bake_settings)
