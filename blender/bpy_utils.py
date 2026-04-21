@@ -928,6 +928,17 @@ def move_objects_to_new_collection(objects: typing.List[bpy.types.Object], colle
     return layer_collection
 
 
+def get_texture_prefix(prefix: str, objects: typing.List[bpy.types.Object], is_alpha: bool):
+
+    if not prefix:
+        prefix = get_common_name(objects, 'mesh')
+
+    if is_alpha:
+        return prefix + '_alpha'
+    else:
+        return prefix
+
+
 def pack_and_task(
             objects: typing.List[bpy.types.Object],
             settings: tool_settings.S_Bake_Materials,
@@ -1105,17 +1116,7 @@ def pack_and_task(
             _bake_settings.material_key = material_key
             _bake_settings.bake_types = bake_types
 
-            if _bake_settings.texture_name_prefix:
-                if material_key == alpha_material_key:
-                    _bake_settings.texture_name_prefix = _bake_settings.texture_name_prefix + '_alpha'
-                else:
-                    _bake_settings.texture_name_prefix = _bake_settings.texture_name_prefix
-            else:
-                if material_key == alpha_material_key:
-                    _bake_settings.texture_name_prefix = get_common_name(objects, 'mesh') + '_alpha'
-                else:
-                    _bake_settings.texture_name_prefix = get_common_name(objects, 'mesh')
-
+            _bake_settings.texture_name_prefix = get_texture_prefix(_bake_settings.texture_name_prefix, objects, material_key == alpha_material_key)
 
             bake_tasks.append(_bake_settings)
 
