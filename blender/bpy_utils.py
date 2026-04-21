@@ -939,6 +939,46 @@ def get_texture_prefix(prefix: str, objects: typing.List[bpy.types.Object], is_a
         return prefix
 
 
+def get_pbr_bake_types(
+        *,
+        has_alpha: bool,
+        has_emission: bool,
+        has_normals: bool,
+        settings: tool_settings.S_Bake,
+        environment_has_transparent_materials: bool,
+    ):
+
+    bake_types = []
+
+    orma = [
+        tool_settings_bake.S_AO_Diffuse(
+            faster = settings.faster_ao_bake,
+            environment_has_transparent_materials = environment_has_transparent_materials,
+            use_normals = settings.ao_bake_use_normals,
+        ),
+        tool_settings_bake.S_Roughness(),
+        tool_settings_bake.S_Metallic()
+    ]
+
+    if has_alpha:
+        orma.append(tool_settings_bake.S_Alpha())
+
+    bake_types.append(orma)
+
+
+    if has_emission:
+        bake_types.append(tool_settings_bake.S_Emission())
+
+    if has_normals:
+        bake_types.append(tool_settings_bake.S_Normal(uv_layer = settings.uv_layer_bake))
+
+
+    bake_types.append([tool_settings_bake.S_Base_Color()])
+
+
+    return bake_types
+
+
 def pack_and_task(
             objects: typing.List[bpy.types.Object],
             settings: tool_settings.S_Bake_Materials,
@@ -1043,33 +1083,13 @@ def pack_and_task(
             ensure_pixel_per_island(_bake_settings.resolution, material_key)
 
 
-            bake_types = []
-
-            orma = [
-                tool_settings_bake.S_AO_Diffuse(
-                    faster = settings.faster_ao_bake,
-                    environment_has_transparent_materials = environment_has_transparent_materials,
-                    use_normals = settings.ao_bake_use_normals,
-                ),
-                tool_settings_bake.S_Roughness(),
-                tool_settings_bake.S_Metallic()
-            ]
-
-            if material_key == alpha_material_key:
-                orma.append(tool_settings_bake.S_Alpha())
-
-            bake_types.append(orma)
-
-
-            if any(material[bpy_material.Material_Bake_Type.HAS_EMISSION] for material in material_group):
-                bake_types.append(tool_settings_bake.S_Emission())
-
-            if any(material[bpy_material.Material_Bake_Type.HAS_NORMALS] for material in material_group):
-                bake_types.append(tool_settings_bake.S_Normal(uv_layer=_bake_settings.uv_layer_name))
-
-
-            bake_types.append([tool_settings_bake.S_Base_Color()])
-
+            bake_types = get_pbr_bake_types(
+                has_alpha = material_key == alpha_material_key,
+                has_emission = any(material[bpy_material.Material_Bake_Type.HAS_EMISSION] for material in material_group),
+                has_normals = any(material[bpy_material.Material_Bake_Type.HAS_NORMALS] for material in material_group),
+                settings = settings,
+                environment_has_transparent_materials = environment_has_transparent_materials,
+            )
 
             _bake_settings.material_key = material_key
             _bake_settings.bake_types = bake_types
