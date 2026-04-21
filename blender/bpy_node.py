@@ -1598,7 +1598,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
         # join non shader output to shader input with ShaderNodeEmission
         for node in surface_input.descendants:
             for output_socket in node.outputs:
-                for input_socket in output_socket.connections:
+                for input_socket in output_socket.connections.copy():
                     if input_socket.be('NodeSocketShader') and not output_socket.be('NodeSocketShader'):
                         output_socket.new('ShaderNodeEmission').outputs[0].join(input_socket, move = False)
 
@@ -1615,7 +1615,7 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
             if not node.be('ShaderNodeBsdfPrincipled'):
                  continue
 
-            for socket in node.outputs[0].connections[1:]:
+            for socket in node.outputs[0].connections[1:].copy():
                 node.copy().outputs[0].join(socket)
 
 

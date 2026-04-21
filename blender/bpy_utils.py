@@ -1476,7 +1476,7 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
 
             for node in tree:
                 if node.label == prebake_label:
-                    for other in node.outputs[0].connections:
+                    for other in node.outputs[0].connections.copy():
                         image_texture.outputs[0].join(other)
 
             affected_materials.add(material)
@@ -1503,7 +1503,7 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
 
                 for node in tree:
                     if node.label == prebake_label:
-                        for other in get_baked_image_node().outputs[0].connections:
+                        for other in get_baked_image_node().outputs[0].connections.copy():
                             node.outputs[0].join(other)
 
 

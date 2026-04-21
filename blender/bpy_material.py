@@ -502,7 +502,7 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
                 else:
                     raise Exception(f"Unexpected identifier: {output.identifier}")
 
-                for other_socket in output.connections:
+                for other_socket in output.connections.copy():
                     replacement_node.outputs[0].join(other_socket, move=False)
 
         elif node.be('ShaderNodeObjectInfo'):
@@ -540,7 +540,7 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
                 else:
                     raise Exception(f"Unexpected identifier: {output.identifier}")
 
-                for other_socket in output.connections:
+                for other_socket in output.connections.copy():
                     replacement_node.outputs[0].join(other_socket, move=False)
 
         elif node.be('ShaderNodeUVMap'):
@@ -619,7 +619,7 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
                     if object.data and hasattr(object.data, 'texture_mesh') and object.data.texture_mesh:
                         warn("texture_mesh is not handled.")
 
-                    for other_socket in output.connections:
+                    for other_socket in output.connections.copy():
                         replacement_node.outputs['Object'].join(other_socket, move=False)
 
                 elif output.identifier == 'Object':
@@ -635,7 +635,7 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
                     replacement_node['Rotation'] = rotation.to_euler()
                     replacement_node['Scale'] = scale
 
-                    for other_socket in output.connections:
+                    for other_socket in output.connections.copy():
                         replacement_node.outputs[0].join(other_socket, move=False)
 
                 elif output.identifier == 'UV':
@@ -654,7 +654,7 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
                         replacement_node = tree.new('ShaderNodeUVMap')
                         replacement_node.uv_map = 'UVMap'
 
-                    for other_socket in output.connections:
+                    for other_socket in output.connections.copy():
                         replacement_node.outputs[0].join(other_socket, move=False)
 
 
@@ -691,7 +691,7 @@ def make_node_tree_independent_from_object(object: bpy.types.Object, node_tree: 
                 replacement_node = tree.new('ShaderNodeValue')
 
                 for output in node.outputs:
-                    for other_socket in output.connections:
+                    for other_socket in output.connections.copy():
                         replacement_node.outputs[0].join(other_socket, move=False)
 
 
