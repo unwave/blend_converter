@@ -1219,13 +1219,13 @@ def copy_and_bake(
                 if use_uv_texture_jitter:
                     apply_uv_texture_jitter([bake_proxy], bake_settings)
 
-                with Pre_Baked([bake_proxy], pre_bake_labels, bake_settings):
+                bake_and_replace_by_label([bake_proxy], pre_bake_labels, bake_settings)
 
-                    any_use_denoise = assign_use_denoise([bake_proxy], bake_settings)
-                    if any_use_denoise:
-                        bake_settings.view_space_normals_id = bake_world_space_normal([bake_proxy], bake_settings)
+                any_use_denoise = assign_use_denoise([bake_proxy], bake_settings)
+                if any_use_denoise:
+                    bake_settings.view_space_normals_id = bake_world_space_normal([bake_proxy], bake_settings)
 
-                    bpy_bake.bake([bake_proxy], bake_settings)
+                bpy_bake.bake([bake_proxy], bake_settings)
 
                 if bake_settings.material_key:
                     bake_proxy.modifiers.remove(uv_offset)
@@ -1385,8 +1385,8 @@ def label_mix_shader_nodes(objects: typing.List[bpy.types.Object]):
     return prebake_labels
 
 
-@contextlib.contextmanager
-def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.List[str], settings: tool_settings.S_Bake = None):
+
+def bake_and_replace_by_label(objects: typing.List[bpy.types.Object], prebake_labels: typing.List[str], settings: tool_settings.S_Bake = None):
 
     original_material_key = settings.material_key
 
@@ -1394,8 +1394,6 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
     settings.do_downscale = False
     settings.use_anti_aliasing = False
     settings.image_dir = os.path.join(bpy.app.tempdir, '__bc_pre_baked')
-
-    affected_materials: typing.Set[bpy.types.Material] = set()
 
     pre_baked_images  = tuple()  # handled skipped bake
 
@@ -1453,33 +1451,6 @@ def Pre_Baked(objects: typing.List[bpy.types.Object], prebake_labels: typing.Lis
                 if node.label == prebake_label:
                     for other in node.outputs[0].connections.copy():
                         image_texture.outputs[0].join(other)
-
-            affected_materials.add(material)
-
-    try:
-        yield None
-
-    finally:
-
-        if not pre_baked_images:
-            return
-
-        for prebake_label in prebake_labels:
-
-            # revert the node replacement
-            for material in affected_materials:
-
-                tree = bpy_node.Shader_Tree_Wrapper(material.node_tree)
-
-                def get_baked_image_node():
-                    for node in tree:
-                        if node.label == 'BAKED' + prebake_label:
-                            return node
-
-                for node in tree:
-                    if node.label == prebake_label:
-                        for other in get_baked_image_node().outputs[0].connections.copy():
-                            node.outputs[0].join(other)
 
 
 def apply_scale(objects: typing.List[bpy.types.Object]):
