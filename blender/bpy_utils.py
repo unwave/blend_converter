@@ -1037,7 +1037,6 @@ def pack_and_task(
 
         ## collect bake settings
 
-        pre_bake_tasks: typing.List[tool_settings.S_Bake] = []
         bake_tasks: typing.List[tool_settings.S_Bake] = []
 
         # TODO: this only works for the materials that has been processed, not others in the scene
@@ -1099,7 +1098,7 @@ def pack_and_task(
             bake_tasks.append(_bake_settings)
 
 
-    return bake_tasks, pre_bake_tasks
+    return bake_tasks
 
 
 def create_vertex_group_from_material_key(object: bpy.types.Object, material_key: str):
@@ -1134,7 +1133,7 @@ def add_negative_uv_offset(object: bpy.types.Object, uv_layer: str, vertex_group
 
 def copy_and_bake(
         objects: typing.List[bpy.types.Object],
-        tasks: typing.Tuple[typing.List[tool_settings.S_Bake], typing.List[tool_settings.S_Bake]],
+        bake_tasks: typing.List[tool_settings.S_Bake],
         pre_bake_labels: typing.List[str] = tuple(),
         isolate_object_hierarchies = False,
         split_faces_by_materials = True,
@@ -1209,8 +1208,6 @@ def copy_and_bake(
 
 
         ## bake
-        bake_tasks, pre_bake_tasks = tasks
-
         with communication.Suspend_Others():
 
             for bake_settings in bake_tasks:
@@ -1244,11 +1241,9 @@ def copy_and_bake(
 
 def assign_new_materials(
             objects: typing.List[bpy.types.Object],
-            tasks: typing.Tuple[typing.List[tool_settings.S_Bake], typing.List[tool_settings.S_Bake]],
+            bake_tasks: typing.List[tool_settings.S_Bake],
         ):
 
-
-    bake_tasks, _ = tasks
 
 
     with bpy_context.Focus(objects):
