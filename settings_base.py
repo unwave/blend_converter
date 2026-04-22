@@ -10,7 +10,7 @@ import uuid
 
 SENTINEL = object()
 
-K_CLASS_NAME = '_class_name'
+K_CLASS_NAME = '_bc_settings_name'
 
 
 if typing.TYPE_CHECKING:
@@ -496,6 +496,10 @@ class Settings():
                 continue
 
             yield key
+
+
+    def keys(self):
+        return list(self)
 
 
     def __getitem__(self, key: str):

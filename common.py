@@ -531,11 +531,12 @@ class Execution_Context:
 
 
 def get_settings_class(name: str) -> typing.Union[typing.Type, None]:
+    return getattr(tool_settings, name, Unknown_Settings)
 
-    if not name:
-        return None
 
-    return getattr(tool_settings, name, None)
+class Unknown_Settings(settings_base.Settings):
+
+    allow_missing_settings = True
 
 
 def replace_return_value(value, return_values: dict, instructions: list):
@@ -548,13 +549,13 @@ def replace_return_value(value, return_values: dict, instructions: list):
         elif type(sub_value) is list:
             return replace_return_value(sub_value, return_values, instructions)
         elif type(sub_value) is dict:
-            settings_class = get_settings_class(sub_value.get(settings_base.K_CLASS_NAME))
-            if settings_class:
-                return replace_return_value(settings_class._from_dict(sub_value), return_values, instructions)
-            else:
-                new_value = replace_return_value(sub_value, return_values, instructions)
-                new_value.pop(settings_base.K_CLASS_NAME, None)
-                return new_value
+
+            settings_name = sub_value.get(settings_base.K_CLASS_NAME)
+            if not settings_name:
+                return replace_return_value(sub_value, return_values, instructions)
+
+            return replace_return_value(get_settings_class(settings_name)._from_dict(sub_value), return_values, instructions)
+
         else:
             return sub_value
 
