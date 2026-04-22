@@ -541,45 +541,29 @@ def get_settings_class(name: str) -> typing.Union[typing.Type, None]:
 def replace_return_value(value, return_values: dict, instructions: list):
     """ Substitute previous function return values. """
 
-    if isinstance(value, list):
 
-        new_value = []
-
-        for sub_value in value:
-            if sub_value in instructions:
-                new_value.append(return_values[instructions.index(sub_value)])
-            elif type(sub_value) is list:
-                new_value.append(replace_return_value(sub_value, return_values, instructions))
-            elif type(sub_value) is dict:
-                settings_class = get_settings_class(sub_value.get(settings_base.K_CLASS_NAME))
-                if settings_class:
-                    new_value.append(replace_return_value(settings_class._from_dict(sub_value), return_values, instructions))
-                else:
-                    new_value.append(replace_return_value(sub_value, return_values, instructions))
+    def get_new_value(sub_value):
+        if sub_value in instructions:
+            return return_values[instructions.index(sub_value)]
+        elif type(sub_value) is list:
+            return replace_return_value(sub_value, return_values, instructions)
+        elif type(sub_value) is dict:
+            settings_class = get_settings_class(sub_value.get(settings_base.K_CLASS_NAME))
+            if settings_class:
+                return replace_return_value(settings_class._from_dict(sub_value), return_values, instructions)
             else:
-                new_value.append(sub_value)
+                new_value = replace_return_value(sub_value, return_values, instructions)
+                new_value.pop(settings_base.K_CLASS_NAME, None)
+                return new_value
+        else:
+            return sub_value
 
-        return new_value
+
+    if isinstance(value, list):
+        return [get_new_value(sub_value) for sub_value in value]
 
     elif isinstance(value, dict):
-
-        new_value = {}
-
-        for key, sub_value in value.items():
-            if sub_value in instructions:
-                new_value[key] = return_values[instructions.index(sub_value)]
-            elif type(sub_value) is list:
-                new_value[key] = replace_return_value(sub_value, return_values, instructions)
-            elif type(sub_value) is dict:
-                settings_class = get_settings_class(sub_value.get(settings_base.K_CLASS_NAME))
-                if settings_class:
-                    new_value[key] = replace_return_value(settings_class._from_dict(sub_value), return_values, instructions)
-                else:
-                    new_value[key] = replace_return_value(sub_value, return_values, instructions)
-            else:
-                new_value[key] = sub_value
-
-        return new_value
+        return {key: get_new_value(sub_value) for key, sub_value in value.items()}
 
     elif isinstance(value, settings_base.Settings):
 
@@ -591,22 +575,7 @@ def replace_return_value(value, return_values: dict, instructions: list):
             if not key in value._has_been_set:
                 continue
 
-            sub_value = getattr(value, key)
-
-            if sub_value in instructions:
-                new_value = return_values[instructions.index(sub_value)]
-            elif type(sub_value) is list:
-                new_value = replace_return_value(sub_value, return_values, instructions)
-            elif type(sub_value) is dict:
-                settings_class = get_settings_class(sub_value.get(settings_base.K_CLASS_NAME))
-                if settings_class:
-                   new_value = replace_return_value(settings_class._from_dict(sub_value), return_values, instructions)
-                else:
-                    new_value = replace_return_value(sub_value, return_values, instructions)
-            else:
-                new_value = sub_value
-
-            setattr(value, key, new_value)
+            setattr(value, key, get_new_value(getattr(value, key)))
 
         return value
 
