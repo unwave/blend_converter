@@ -251,35 +251,34 @@ class Program:
         )
 
 
+    def get_return_value(self, value):
+
+
+        if value in self.instructions:
+            return self.return_values.get(self.instructions.index(value), value)
+
+        elif type(value) in (list, dict):
+            return self.replace_return_values(value)
+
+        elif isinstance(value, settings_base.Settings):
+            return self.replace_return_values(value._to_dict())
+
+        else:
+            return value
+
+
     def replace_return_values(self, value: typing.Union[list, dict]):
         """ Provide result of one executor to the next. """
 
-        value = value.copy()
 
         if isinstance(value, list):
-            for index, sub_value in enumerate(value):
-                if sub_value in self.instructions:
-                    return_value = self.return_values.get(self.instructions.index(sub_value), SENTINEL)
-                    if return_value is not SENTINEL:
-                        value[index] = return_value
-                elif type(sub_value) in (list, dict):
-                    value[index] = self.replace_return_values(sub_value)
-                elif isinstance(sub_value, settings_base.Settings):
-                    value[index] = self.replace_return_values(sub_value._to_dict())
+            return [self.get_return_value(v) for v in value]
+
         elif isinstance(value, dict):
-            for key, sub_value in value.items():
-                if sub_value in self.instructions:
-                    return_value = self.return_values.get(self.instructions.index(sub_value), SENTINEL)
-                    if return_value is not SENTINEL:
-                        value[key] = return_value
-                elif type(sub_value) is (list, dict):
-                    value[key] = self.replace_return_values(sub_value)
-                elif isinstance(sub_value, settings_base.Settings):
-                    value[key] = self.replace_return_values(sub_value._to_dict())
+            return {k: self.get_return_value(v) for k, v in value.items()}
+
         else:
             raise Exception(f"Unexpected args type: {value}")
-
-        return value
 
 
     def substitute_filepaths(self, value: typing.Union[list, dict]):
