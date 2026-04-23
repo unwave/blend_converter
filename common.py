@@ -530,7 +530,7 @@ class Execution_Context:
         self.are_executors_stopped = multiprocessing.Value('b', False, lock = self.lock)
 
 
-def get_settings_class(name: str) -> typing.Union[typing.Type, None]:
+def get_settings_class(name: str):
     return getattr(tool_settings, name, Unknown_Settings)
 
 
@@ -539,46 +539,39 @@ class Unknown_Settings(settings_base.Settings):
     allow_missing_settings = True
 
 
+def get_new_return_value(value, return_values: dict, instructions: list):
+
+    if value in instructions:
+        return return_values[instructions.index(value)]
+
+    elif type(value) is list:
+        return replace_return_value(value, return_values, instructions)
+
+    elif type(value) is dict:
+
+        settings_name = value.get(settings_base.K_CLASS_NAME)
+        if settings_name:
+            return replace_return_value(get_settings_class(settings_name)._from_dict(value), return_values, instructions)
+        else:
+            return replace_return_value(value, return_values, instructions)
+
+    else:
+        return value
+
+
 def replace_return_value(value, return_values: dict, instructions: list):
     """ Substitute previous function return values. """
 
-
-    def get_new_value(sub_value):
-        if sub_value in instructions:
-            return return_values[instructions.index(sub_value)]
-        elif type(sub_value) is list:
-            return replace_return_value(sub_value, return_values, instructions)
-        elif type(sub_value) is dict:
-
-            settings_name = sub_value.get(settings_base.K_CLASS_NAME)
-            if not settings_name:
-                return replace_return_value(sub_value, return_values, instructions)
-
-            return replace_return_value(get_settings_class(settings_name)._from_dict(sub_value), return_values, instructions)
-
-        else:
-            return sub_value
-
-
     if isinstance(value, list):
-        return [get_new_value(sub_value) for sub_value in value]
+        return [get_new_return_value(sub_value, return_values, instructions) for sub_value in value]
 
     elif isinstance(value, dict):
-        return {key: get_new_value(sub_value) for key, sub_value in value.items()}
+        return {key: get_new_return_value(sub_value, return_values, instructions) for key, sub_value in value.items()}
 
     elif isinstance(value, settings_base.Settings):
-
-        for key in value.__dict__:
-
-            if key.startswith('_'):
-                continue
-
-            if not key in value._has_been_set:
-                continue
-
-            setattr(value, key, get_new_value(getattr(value, key)))
-
-        return value
+        return type(value)._from_dict(
+            {key: get_new_return_value(getattr(value, key), return_values, instructions) for key in value}
+        )
 
     else:
         raise Exception(f"Unexpected args type: {value}")
