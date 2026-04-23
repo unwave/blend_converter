@@ -20,6 +20,7 @@ from . import settings_base
 
 SENTINEL = object()
 
+K_INSTRUCTION_INDEX = '_bc_instruction_index'
 
 
 T = typing.TypeVar('T')
@@ -253,11 +254,15 @@ class Program:
 
     def get_return_value(self, value):
 
+        if type(value) is list:
+            return self.replace_return_values(value)
 
-        if value in self.instructions:
-            return self.return_values.get(self.instructions.index(value), value)
+        elif type(value) is dict:
 
-        elif type(value) in (list, dict):
+            instruction_index = value.get(K_INSTRUCTION_INDEX)
+            if instruction_index is not None:
+                return self.return_values.get(instruction_index, value)
+
             return self.replace_return_values(value)
 
         elif isinstance(value, settings_base.Settings):
@@ -376,7 +381,7 @@ class Program:
 
         self._instruction_index += 1
 
-        return instruction
+        return {K_INSTRUCTION_INDEX: instruction.index}
 
 
 class Config_Base:
@@ -540,13 +545,14 @@ class Unknown_Settings(settings_base.Settings):
 
 def get_new_return_value(value, return_values: dict, instructions: list):
 
-    if value in instructions:
-        return return_values[instructions.index(value)]
-
-    elif type(value) is list:
+    if type(value) is list:
         return replace_return_value(value, return_values, instructions)
 
     elif type(value) is dict:
+
+        instruction_index = value.get(K_INSTRUCTION_INDEX)
+        if instruction_index is not None:
+            return return_values[instruction_index]
 
         settings_name = value.get(settings_base.K_CLASS_NAME)
         if settings_name:
