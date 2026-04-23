@@ -376,15 +376,17 @@ class Settings():
 
         settings = cls()
 
+        annotations = getattr(cls, '__annotations__', {})
+
         for key, value in data.items():
 
             if key == K_CLASS_NAME:
                 continue
 
-            if only_matching and not key in cls.__annotations__:
+            if only_matching and not key in annotations:
                 continue
 
-            if cls.__annotations__.get(key) is set:
+            if annotations.get(key) is set:
                 setattr(settings, key, set(value))
             else:
                 setattr(settings, key, value)
