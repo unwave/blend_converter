@@ -25,6 +25,7 @@ from .. import updater
 from ..blender import communication
 
 from . import wxp_utils
+from . import program_ui
 
 
 def get_valid_paths(items: typing.List[str]):
@@ -282,6 +283,8 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         menu_item = menu.append_item(f"Set Config", get_func(self.set_config, entry))
         menu_item.Enable(bool(entry.program.config))
 
+        menu_item = menu.append_item(f"Settings", get_func(self.on_settings, entry))
+
         menu.append_separator()
         menu_item = menu.append_item(f"Enable Live Update", get_func(self.enable_live_update, True))
         menu_item = menu.append_item(f"Disable Live Update", get_func(self.enable_live_update, False))
@@ -480,6 +483,20 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             config.save()
 
         self.main_frame.on_restart()
+
+
+    def on_settings(self, entry: updater.Program_Entry):
+
+
+        with program_ui.Program_Dialog(self, entry.program) as dialog:
+
+            dialog.SetSize((1000, 800))
+            dialog.CenterOnScreen()
+
+            result = dialog.ShowModal()
+
+            if result != wx.ID_OK:
+                return
 
 
     def on_update_selected(self, event):
