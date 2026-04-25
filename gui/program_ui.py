@@ -61,6 +61,8 @@ class Program_Dialog(wx.Dialog):
 
     def __init__(self, parent: wx.Window, program: common.Program):
 
+        self.program = program
+
         title = f"Settings - {program.blend_path}"
 
         super().__init__(parent, title = title, style = wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU)
@@ -134,7 +136,7 @@ class Program_Dialog(wx.Dialog):
 
         spec: settings_base.Attribute_Spec = prop.GetClientData()
 
-        path = prop.GetName()
+        path: str = prop.GetName()
         value = event.GetPropertyValue()
 
         if spec.enum_items:
@@ -148,6 +150,20 @@ class Program_Dialog(wx.Dialog):
             prop.SetLabel(spec.name + ' [MODIFIED]')
 
         self.grid.RefreshProperty(prop)
+
+
+        path_list = path.split('.')
+
+        section = path_list[0]
+        option = '.'.join(path_list[1:])
+
+        if not self.program._instructions_config.has_section(section):
+            self.program._instructions_config.add_section(section)
+
+        self.program._instructions_config.set(section, option, str(value))
+
+        with open(self.program.settings_path, 'w') as f:
+            self.program._instructions_config.write(f)
 
 
     if typing.TYPE_CHECKING:

@@ -129,6 +129,35 @@ class Instruction:
         return json.dumps(self._to_dict(), indent = 4, ensure_ascii = False, default = lambda x: x._to_dict())
 
 
+    def iter_arguments(self):
+
+        signature = inspect.signature(self.func)
+
+        arguments = {name: value for name, value in zip(signature.parameters.keys(), self.args)}
+        arguments.update(self.kwargs)
+
+        instruction_path = [self.identifier]
+
+        for argument_name, argument in arguments.items():
+
+            argument_path = instruction_path + [argument_name]
+
+            if isinstance(argument, settings_base.Settings):
+                for key in argument.__class__.__dict__:
+
+                    if key.startswith('_'):
+                        continue
+
+                    spec = argument._get_attribute_spec(key)
+                    value = getattr(argument, key, spec.default)
+
+                    yield argument_path + [key], value, spec
+
+            elif isinstance(argument, (bool, int, float, str)):
+                spec = settings_base.Attribute_Spec(name = argument_name, type = type(argument), default = argument)
+                yield argument_path, argument, spec
+
+
 class Program:
 
 
@@ -138,6 +167,7 @@ class Program:
                 blender_executable: str,
                 report_path: typing.Optional[str] = None,
                 config: typing.Optional[Config_Base] = None,
+                settings_path: str = None,
                 tags: typing.Optional[typing.Set[str]] = None,
             ):
 
@@ -158,6 +188,13 @@ class Program:
 
         self.config: typing.Optional[Config_Base] = config
         """ Pre execution configuration. """
+
+        self.settings_path = settings_path
+        """ Post initialization per instructions argument override. """
+
+        self._instructions_config = configparser.ConfigParser()
+        if self.settings_path:
+            self._instructions_config.read(settings_path)
 
         self.tags: typing.Set[str] = tags if tags else set()
         """ Use for differentiation. See `set_max_workers_by_program_tag`. """
@@ -202,7 +239,7 @@ class Program:
 
         report = self.read_report()
 
-        report['instructions'] = self.instructions
+        report['instructions'] = self.get_next_report_diff()['instructions']
 
         now = datetime.now()
 
@@ -241,8 +278,14 @@ class Program:
 
 
     def get_next_report_diff(self):
+
+        instructions = json.loads(json.dumps(self.instructions, default = lambda x: x._to_dict()))
+
+        for instruction, dictionary in zip(self.instructions, instructions):
+            apply_instruction_settings(instruction, self._instructions_config, dictionary['args'], dictionary['kwargs'])
+
         return dict(
-            instructions = json.loads(json.dumps(self.instructions, default = lambda x: x._to_dict())),
+            instructions = instructions,
         )
 
 
@@ -349,6 +392,8 @@ class Program:
                     kwargs = self.replace_return_values(instruction.kwargs)
                     self.substitute_filepaths(args)
                     self.substitute_filepaths(kwargs)
+
+                    apply_instruction_settings(instruction, self._instructions_config, args, kwargs)
 
                     substituted_instructions.append(Instruction(instruction.identifier, instruction.executor, instruction.func, *args, **kwargs))
 
@@ -591,3 +636,58 @@ def replace_return_value(value, return_values: dict, instructions: list):
 
     else:
         raise Exception(f"Unexpected args type: {value}")
+
+
+def _replace_dictionary_argument_recursive(dictionary: typing.Dict, path: typing.List[str], value: typing.Any):
+
+    current_path = path.copy()
+    current_dictionary = dictionary
+
+    while len(current_path) > 1:
+        current_dictionary = current_dictionary[current_path[0]]
+        current_path = current_path[1:]
+
+    current_dictionary[current_path[0]] = value
+
+
+def _replace_argument(arguments: typing.Union[list, dict], key: typing.Union[int, str], path: typing.List[str], value: typing.Any):
+
+    if not path:
+        arguments[key] = value
+    else:
+        _replace_dictionary_argument_recursive(arguments[key], path, value)
+
+
+def apply_instruction_settings(instruction: Instruction, config: configparser.ConfigParser, args: list, kwargs: dict):
+    """ Replace a dictionary based arguments. """
+
+    positional_arguments = instruction.func.__code__.co_varnames[:len(instruction.args)]
+    key_to_index = {key: index for index, key in enumerate(positional_arguments)}
+
+
+    for path, current_value, spec in instruction.iter_arguments():
+
+        section = path[0]
+        option = '.'.join(path[1:])
+
+        if not config.has_option(section, option):
+            continue
+
+        if spec.type is bool:
+            value = config.getboolean(section, option)
+        elif spec.type is int:
+            value = config.getint(section, option)
+        elif spec.type is float:
+            value = config.getfloat(section, option)
+        else:
+            value = config.get(section, option)
+
+        if value == current_value:
+            continue
+
+        positional_argument_index = key_to_index.get(path[1])
+
+        if positional_argument_index is None:
+            _replace_argument(kwargs, path[1], path[2:], value)
+        else:
+            _replace_argument(args, positional_argument_index, path[2:], value)

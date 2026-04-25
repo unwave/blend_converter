@@ -27,13 +27,15 @@ def get_bake_program(blend_dir: str, blender_executable: str):
     blend_path = common.File(utils.get_last_blend(blend_dir))
     result_dir = get_result_dir(blend_dir)
     result_path = os.path.join(result_dir, blend_path.dir_name + '.blend')
+    settings_path = os.path.join(blend_path.dir, 'bc_instructions_config.ini')
 
     blender = Blender(blender_executable)
 
     program = common.Program(
         blend_path = blend_path,
         result_path = result_path,
-        blender_executable = blender.binary_path
+        blender_executable = blender.binary_path,
+        settings_path = settings_path,
     )
 
     program.run(blender, bpy_data.open_mainfile, blend_path, load_ui = False)
