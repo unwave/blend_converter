@@ -20,7 +20,7 @@ from . import settings_base
 
 SENTINEL = object()
 
-K_INSTRUCTION_INDEX = '_bc_instruction_index'
+K_INSTRUCTION_IDENTIFIER = '_bc_instruction_identifier'
 
 
 T = typing.TypeVar('T')
@@ -97,10 +97,10 @@ class File:
 class Instruction:
 
 
-    def __init__(self, index: int, executor, func: typing.Callable, *args, **kwargs):
+    def __init__(self, identifier: str, executor, func: typing.Callable, *args, **kwargs):
 
         self.func = func
-        self.index = index
+        self.identifier = identifier
         self.executor = executor
         self.filepath: str = os.path.realpath(func.__code__.co_filename)
         self.module_name = func.__module__
@@ -114,7 +114,7 @@ class Instruction:
     def _to_dict(self):
         return dict(
             _type = type(self).__name__,
-            index = self.index,
+            identifier = self.identifier,
             executor = self.executor,
             filepath = self.filepath,
             module_name = self.module_name,
@@ -175,13 +175,13 @@ class Program:
         self._inspect_values = dict()
         """ Values to set when inspecting and get like `blend_inspector.get_value('my_value', 100)` """
 
-        self.return_values = {}
+        self.return_values: typing.Dict[str, typing.Any] = {}
         """ This will be populated after the execution. """
 
         self.return_values_file: typing.Optional[str] = None
         """ A file where the return values will be written. """
 
-        self._instruction_index = 0
+        self._instruction_identifiers: typing.set[str] = set()
 
 
     def read_report(self):
@@ -259,9 +259,9 @@ class Program:
 
         elif type(value) is dict:
 
-            instruction_index = value.get(K_INSTRUCTION_INDEX)
-            if instruction_index is not None:
-                return self.return_values.get(instruction_index, value)
+            identifier = value.get(K_INSTRUCTION_IDENTIFIER)
+            if identifier is not None:
+                return self.return_values.get(identifier, value)
 
             return self.replace_return_values(value)
 
@@ -350,7 +350,7 @@ class Program:
                     self.substitute_filepaths(args)
                     self.substitute_filepaths(kwargs)
 
-                    substituted_instructions.append(Instruction(instruction.index, instruction.executor, instruction.func, *args, **kwargs))
+                    substituted_instructions.append(Instruction(instruction.identifier, instruction.executor, instruction.func, *args, **kwargs))
 
                 executor.run(
                     instructions = substituted_instructions,
@@ -365,7 +365,7 @@ class Program:
                     continue
 
                 with open(self.return_values_file, encoding='utf-8') as f:
-                    self.return_values = {int(key): value for key, value in json.load(f).items()}
+                    self.return_values.update(json.load(f).items())
 
         print("EXECUTION END:", time.strftime('%H:%M:%S %Y-%m-%d'), flush=True)
         print(f"TIME: {round(time.perf_counter() - start_time, 2)} SECONDS", flush=True)
@@ -376,12 +376,23 @@ class Program:
     def run(self, executor, func: 'typing.Callable[P, T]', *args: P.args, **kwargs: P.kwargs) -> T:
         """ `args` and `kwargs` must be JSON serializable. """
 
-        instruction = Instruction(self._instruction_index, executor, func, *args, **kwargs)
+
+        identifier = func.__name__
+        index = 2
+
+        while identifier in self._instruction_identifiers:
+            identifier = func.__name__ + f'_{index}'
+            index += 1
+
+        self._instruction_identifiers.add(identifier)
+
+
+        instruction = Instruction(identifier, executor, func, *args, **kwargs)
         self.instructions.append(instruction)
 
-        self._instruction_index += 1
 
-        return {K_INSTRUCTION_INDEX: instruction.index}
+        return {K_INSTRUCTION_IDENTIFIER: instruction.identifier}
+
 
 
 class Config_Base:
@@ -550,9 +561,9 @@ def get_new_return_value(value, return_values: dict, instructions: list):
 
     elif type(value) is dict:
 
-        instruction_index = value.get(K_INSTRUCTION_INDEX)
-        if instruction_index is not None:
-            return return_values[instruction_index]
+        identifier = value.get(K_INSTRUCTION_IDENTIFIER)
+        if identifier is not None:
+            return return_values[identifier]
 
         settings_name = value.get(settings_base.K_CLASS_NAME)
         if settings_name:

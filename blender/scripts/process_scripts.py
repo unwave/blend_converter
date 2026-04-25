@@ -173,7 +173,7 @@ def process():
                 module = import_module_from_file(instruction['filepath'])
 
             result = getattr(module, instruction['name'])(*common.replace_return_value(instruction['args'], return_values, INSTRUCTIONS), **common.replace_return_value(instruction['kwargs'], return_values, INSTRUCTIONS))
-            return_values[index] = result
+            return_values[instruction['identifier']] = result
 
             utils.print_in_color(utils.get_color_code(56, 199, 134, 0, 0, 0), f"Processed in {round(time.perf_counter() - script_start_time, 2)} seconds.", flush=True)
 

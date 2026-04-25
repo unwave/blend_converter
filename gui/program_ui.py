@@ -39,8 +39,8 @@ def get_pg_prop(path: str, value: typing.Any, spec: settings_base.Attribute_Spec
 
     is_read_only = False
 
-    if type(value) is dict and value.get(common.K_INSTRUCTION_INDEX):
-        value = f"[INSTRUCTION {value[common.K_INSTRUCTION_INDEX]}]"
+    if type(value) is dict and value.get(common.K_INSTRUCTION_IDENTIFIER):
+        value = f"[{value[common.K_INSTRUCTION_IDENTIFIER]}]"
         is_read_only = True
 
     property = get_property(path, value, spec)
@@ -80,8 +80,8 @@ class Program_Dialog(wx.Dialog):
             arguments = {name: value for name, value in zip(signature.parameters.keys(), instruction.args)}
             arguments.update(instruction.kwargs)
 
-            instruction_path = f'{instruction.name}@{instruction.index}'
-            instruction_prop = self.grid.Append(pg.PropertyCategory(f"{instruction.index} - {instruction.name}", instruction_path))
+            instruction_path = instruction.identifier
+            instruction_prop = self.grid.Append(pg.PropertyCategory(instruction_path, instruction_path))
 
             for argument_name, argument in arguments.items():
 
@@ -111,7 +111,12 @@ class Program_Dialog(wx.Dialog):
 
                     spec = settings_base.Attribute_Spec(name = argument_name, type = str, default = '')
 
-                    prop = get_pg_prop(argument_path, repr(argument), spec)
+                    if type(argument) is dict and argument.get(common.K_INSTRUCTION_IDENTIFIER):
+                        value = f"[{argument[common.K_INSTRUCTION_IDENTIFIER]}]"
+                    else:
+                        value = repr(argument)
+
+                    prop = get_pg_prop(argument_path, value, spec)
                     prop.Enable(False)
 
                     self.grid.AppendIn(instruction_prop, prop)
