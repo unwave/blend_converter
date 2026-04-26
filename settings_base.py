@@ -303,7 +303,17 @@ class Settings():
 
     @classmethod
     def _get_attribute_spec(cls, name):
-        return _get_specs(cls)[name]
+
+        try:
+            return _get_specs(cls)[name]
+        except KeyError:
+            annotations = getattr(cls, '__annotations__', {})
+            default = getattr(cls, name, None)
+            return Attribute_Spec(
+                name = name,
+                type = annotations.get(name, type(default)),
+                default = default,
+            )
 
 
     @classmethod
