@@ -41,6 +41,7 @@ def get_pg_prop(path: str, value: typing.Any, spec: settings_base.Attribute_Spec
 
     if type(value) is dict and value.get(common.K_INSTRUCTION_IDENTIFIER):
         value = f"[{value[common.K_INSTRUCTION_IDENTIFIER]}]"
+        spec = settings_base.Attribute_Spec(**(spec._asdict() | {'type': str}))
         is_read_only = True
 
     property = get_property(path, value, spec)
