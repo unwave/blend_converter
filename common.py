@@ -129,35 +129,6 @@ class Instruction:
         return json.dumps(self._to_dict(), indent = 4, ensure_ascii = False, default = lambda x: x._to_dict())
 
 
-    def iter_arguments(self):
-
-        signature = inspect.signature(self.func)
-
-        arguments = {name: value for name, value in zip(signature.parameters.keys(), self.args)}
-        arguments.update(self.kwargs)
-
-        instruction_path = [self.identifier]
-
-        for argument_name, argument in arguments.items():
-
-            argument_path = instruction_path + [argument_name]
-
-            if isinstance(argument, settings_base.Settings):
-                for key in argument.__class__.__dict__:
-
-                    if key.startswith('_'):
-                        continue
-
-                    spec = argument._get_attribute_spec(key)
-                    value = getattr(argument, key, spec.default)
-
-                    yield argument_path + [key], value, spec
-
-            elif isinstance(argument, (bool, int, float, str)):
-                spec = settings_base.Attribute_Spec(name = argument_name, type = type(argument), default = argument)
-                yield argument_path, argument, spec
-
-
 class Program:
 
 
@@ -658,36 +629,96 @@ def _replace_argument(arguments: typing.Union[list, dict], key: typing.Union[int
         _replace_dictionary_argument_recursive(arguments[key], path, value)
 
 
+def _get_config_value(config: configparser.ConfigParser, path: typing.List[str], spec: settings_base.Attribute_Spec):
+
+    section = path[0]
+    option = '.'.join(path[1:])
+
+    if not config.has_option(section, option):
+        return SENTINEL
+
+    if spec.type is bool:
+        return config.getboolean(section, option)
+    elif spec.type is int:
+        return config.getint(section, option)
+    elif spec.type is float:
+        return config.getfloat(section, option)
+    else:
+        return config.get(section, option)
+
+
 def apply_instruction_settings(instruction: Instruction, config: configparser.ConfigParser, args: list, kwargs: dict):
     """ Replace a dictionary based arguments. """
 
     positional_arguments = instruction.func.__code__.co_varnames[:len(instruction.args)]
     key_to_index = {key: index for index, key in enumerate(positional_arguments)}
 
+    for item in iter_arguments(instruction, config):
 
-    for path, current_value, spec in instruction.iter_arguments():
-
-        section = path[0]
-        option = '.'.join(path[1:])
-
-        if not config.has_option(section, option):
+        if item.override is SENTINEL:
             continue
 
-        if spec.type is bool:
-            value = config.getboolean(section, option)
-        elif spec.type is int:
-            value = config.getint(section, option)
-        elif spec.type is float:
-            value = config.getfloat(section, option)
-        else:
-            value = config.get(section, option)
-
-        if value == current_value:
-            continue
-
-        positional_argument_index = key_to_index.get(path[1])
+        positional_argument_index = key_to_index.get(item.path[1])
 
         if positional_argument_index is None:
-            _replace_argument(kwargs, path[1], path[2:], value)
+            _replace_argument(kwargs, item.path[1], item.path[2:], item.override)
         else:
-            _replace_argument(args, positional_argument_index, path[2:], value)
+            _replace_argument(args, positional_argument_index, item.path[2:], item.override)
+
+
+class Argument_Walk_Item(typing.NamedTuple):
+
+    path: str
+    value: typing.Any
+    spec: settings_base.Attribute_Spec
+    override: typing.Any
+    is_read_only: bool
+
+
+def _is_instruction_return(value: typing.Any):
+    return type(value) is dict and value.get(K_INSTRUCTION_IDENTIFIER)
+
+
+def iter_arguments(instruction: Instruction, config: configparser.ConfigParser):
+
+    signature = inspect.signature(instruction.func)
+
+    arguments = {name: value for name, value in zip(signature.parameters.keys(), instruction.args)}
+    arguments.update(instruction.kwargs)
+
+    instruction_path = [instruction.identifier]
+
+    for argument_name, argument in arguments.items():
+
+        argument_path = instruction_path + [argument_name]
+
+        if isinstance(argument, settings_base.Settings):
+            for key in argument.__class__.__dict__:
+
+                if key.startswith('_'):
+                    continue
+
+                spec = argument._get_attribute_spec(key)
+
+                path = argument_path + [key]
+                value = getattr(argument, key, spec.default)
+
+                yield Argument_Walk_Item(
+                    path,
+                    value,
+                    spec,
+                    _get_config_value(config, path, spec),
+                    _is_instruction_return(value),
+                )
+
+        else:
+
+            spec = settings_base.Attribute_Spec(name = argument_name, type = type(argument), default = argument)
+
+            yield Argument_Walk_Item(
+                argument_path,
+                argument,
+                spec,
+                _get_config_value(config, argument_path, spec),
+                _is_instruction_return(argument),
+            )

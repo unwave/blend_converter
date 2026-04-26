@@ -1,6 +1,5 @@
 import typing
 import json
-import inspect
 
 import wx
 import wx.propgrid as pg
@@ -31,28 +30,46 @@ def get_property(name: str, value: typing.Any, spec: settings_base.Attribute_Spe
     elif spec.type is str:
         return pg.StringProperty(spec.name, name, value)
     else:
-        return pg.StringProperty(spec.name + ' [JSON]', name, to_json(value))
+        try:
+            return pg.StringProperty(spec.name + ' [JSON]', name, to_json(value))
+        except TypeError:
+            prop = pg.StringProperty(spec.name + ' [UNSUPPORTED]', name, repr(value))
+            prop.Enable(False)
+            return prop
+
+
+def get_read_only_property(name: str, value: typing.Any, spec: settings_base.Attribute_Spec):
+
+    if common._is_instruction_return(value):
+        value = f'[{value[common.K_INSTRUCTION_IDENTIFIER]}]'
+
+    prop = pg.StringProperty(spec.name, name, str(value))
+    prop.Enable(False)
+    return prop
 
 
 
-def get_pg_prop(path: str, value: typing.Any, spec: settings_base.Attribute_Spec):
+def get_pg_prop(item: common.Argument_Walk_Item):
 
-    is_read_only = False
+    is_type_mismatch = type(item.value) != item.spec.type
 
-    if type(value) is dict and value.get(common.K_INSTRUCTION_IDENTIFIER):
-        value = f"[{value[common.K_INSTRUCTION_IDENTIFIER]}]"
-        spec = settings_base.Attribute_Spec(**(spec._asdict() | {'type': str}))
-        is_read_only = True
+    if item.override is common.SENTINEL:
+        value = item.value
+    else:
+        value = item.override
 
-    property = get_property(path, value, spec)
+    if item.is_read_only or is_type_mismatch:
+        property = get_read_only_property('.'.join(item.path), value, item.spec)
+    else:
+        property = get_property('.'.join(item.path), value, item.spec)
 
-    if is_read_only:
-        property.Enable(False)
+    if item.spec.description:
+        property.SetHelpString(item.spec.description)
 
-    if spec.description:
-        property.SetHelpString(spec.description)
+    property.SetClientData(item.spec)
 
-    property.SetClientData(spec)
+    if item.override is not common.SENTINEL:
+        property.SetModifiedStatus(True)
 
     return property
 
@@ -75,60 +92,30 @@ class Program_Dialog(wx.Dialog):
         self.grid.SetExtraStyle(pg.PG_EX_HELP_AS_TOOLTIPS)
         self.grid.Bind(pg.EVT_PG_CHANGED, self.on_property_change)
 
-
         for instruction in program.instructions:
+            for item in common.iter_arguments(instruction, program._instructions_config):
 
-            signature = inspect.signature(instruction.func)
-
-            arguments = {name: value for name, value in zip(signature.parameters.keys(), instruction.args)}
-            arguments.update(instruction.kwargs)
-
-            instruction_path = instruction.identifier
-            instruction_prop = self.grid.Append(pg.PropertyCategory(instruction_path, instruction_path))
-
-            for argument_name, argument in arguments.items():
-
-                argument_path = instruction_path + '.' + argument_name
-
-                if isinstance(argument, settings_base.Settings):
-
-                    argument_prop = self.grid.AppendIn(instruction_prop, pg.PropertyCategory(argument_name, argument_path))
-
-                    for key in argument.__class__.__dict__:
-
-                        if key.startswith('_'):
-                            continue
-
-                        spec = argument._get_attribute_spec(key)
-
-                        path = argument_path + '.' + key
-                        value = getattr(argument, key, spec.default)
-
-                        self.grid.AppendIn(argument_prop, get_pg_prop(path, value, spec))
-
-                elif isinstance(argument, (bool, int, float, str)):
-                    spec = settings_base.Attribute_Spec(name = argument_name, type = type(argument), default = argument)
-                    self.grid.AppendIn(instruction_prop, get_pg_prop(argument_path, argument, spec))
-
-                else:
-
-                    spec = settings_base.Attribute_Spec(name = argument_name, type = str, default = '')
-
-                    if type(argument) is dict and argument.get(common.K_INSTRUCTION_IDENTIFIER):
-                        value = f"[{argument[common.K_INSTRUCTION_IDENTIFIER]}]"
-                    else:
-                        value = repr(argument)
-
-                    prop = get_pg_prop(argument_path, value, spec)
-                    prop.Enable(False)
-
-                    self.grid.AppendIn(instruction_prop, prop)
-
+                category = self.get_category(item.path)
+                self.grid.AppendIn(category, get_pg_prop(item))
 
 
         sizer.Add(self.grid, 1, wx.EXPAND)
 
         self.Layout()
+
+
+    def get_category(self, path: typing.List[str]):
+
+        print(path)
+
+        prop = self.grid.GetPropertyByName('.'.join(path[:-1]))
+        if prop:
+            return prop
+
+        if len(path) > 1:
+            return self.grid.AppendIn(self.get_category(path[:-1]), pg.PropertyCategory(path[-2], '.'.join(path[:-1])))
+        else:
+            return self.grid.Append(pg.PropertyCategory(path[0], path[0]))
 
 
     def on_property_change(self, event):
