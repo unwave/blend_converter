@@ -81,6 +81,9 @@ class Program_Dialog(wx.Dialog):
 
         self.program = program
 
+        self.changes: typing.Dict[str, typing.Any] = {}
+        self.do_save = False
+
         title = f"Settings - {program.blend_path}"
 
         super().__init__(parent, title = title, style = wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU)
@@ -89,7 +92,7 @@ class Program_Dialog(wx.Dialog):
         self.SetSizer(sizer)
 
         self.grid = pg.PropertyGrid(self, wx.ID_ANY, style = pg.PG_SPLITTER_AUTO_CENTER | pg.PG_BOLD_MODIFIED)
-        self.grid.SetExtraStyle(pg.PG_EX_HELP_AS_TOOLTIPS)
+        sizer.Add(self.grid, 1, wx.EXPAND)
         self.grid.Bind(pg.EVT_PG_CHANGED, self.on_property_change)
 
         for instruction in program.instructions:
@@ -99,14 +102,21 @@ class Program_Dialog(wx.Dialog):
                 self.grid.AppendIn(category, get_pg_prop(item))
 
 
-        sizer.Add(self.grid, 1, wx.EXPAND)
+        self.description_ctrl = wx.TextCtrl(self, style = wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_BESTWRAP, size = (-1, 150))
+        sizer.Add(self.description_ctrl, 0, wx.EXPAND)
+
+        self.grid.Bind(pg.EVT_PG_SELECTED, self.on_property_selected)
+
+
+        self.save_ctrl = wx.Button(self, label = "Save And Close")
+        sizer.Add(self.save_ctrl, 0, wx.ALL, border = 5)
+        self.save_ctrl.Bind(wx.EVT_BUTTON, self.on_save_and_close)
+
 
         self.Layout()
 
 
     def get_category(self, path: typing.List[str]):
-
-        print(path)
 
         prop = self.grid.GetPropertyByName('.'.join(path[:-1]))
         if prop:
@@ -139,22 +149,37 @@ class Program_Dialog(wx.Dialog):
 
         self.grid.RefreshProperty(prop)
 
-
-        path_list = path.split('.')
-
-        section = path_list[0]
-        option = '.'.join(path_list[1:])
-
-        if not self.program._instructions_config.has_section(section):
-            self.program._instructions_config.add_section(section)
-
-        self.program._instructions_config.set(section, option, str(value))
-
-        with open(self.program.settings_path, 'w') as f:
-            self.program._instructions_config.write(f)
+        self.changes[tuple(path.split('.'))] = value
 
 
     if typing.TYPE_CHECKING:
 
         def __enter__(self):
             return self
+
+
+    def on_save_and_close(self, event):
+
+        self.do_save = True
+        self.Destroy()
+
+
+    def on_property_selected(self, event):
+
+        prop: pg.PGProperty = event.GetProperty()
+        path: str = prop.GetName()
+        path_list = path.split('.')
+
+        spec: settings_base.Attribute_Spec = prop.GetClientData()
+
+        if spec and spec.description:
+            description = spec.description
+        else:
+            if len(path_list) > 1:
+                description = "This option does not have a description."
+            else:
+                description = "This is a name of a function."
+
+        description = ' ● '.join(path_list) + "\n\n" + description
+
+        self.description_ctrl.SetValue(description)

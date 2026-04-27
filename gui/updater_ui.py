@@ -493,10 +493,28 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             dialog.SetSize((1000, 800))
             dialog.CenterOnScreen()
 
-            result = dialog.ShowModal()
+            dialog.ShowModal()
 
-            if result != wx.ID_OK:
-                return
+
+        if not dialog.do_save:
+            return
+
+        if not dialog.changes:
+            return
+
+
+        for key, value in dialog.changes.items():
+
+            section = key[0]
+            option = '.'.join(key[1:])
+
+            if not entry.program._instructions_config.has_section(section):
+                entry.program._instructions_config.add_section(section)
+
+            entry.program._instructions_config.set(section, option, str(value))
+
+        with open(entry.program.settings_path, 'w') as f:
+            entry.program._instructions_config.write(f)
 
 
     def on_update_selected(self, event):
