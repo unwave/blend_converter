@@ -700,7 +700,7 @@ def iter_arguments(instruction: Instruction, config: configparser.ConfigParser):
         argument_path = instruction_path + [argument_name]
 
         if isinstance(argument, settings_base.Settings):
-            for key in argument.__class__.__dict__:
+            for key in typing.get_type_hints(argument):
 
                 if key.startswith('_'):
                     continue
