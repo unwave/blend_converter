@@ -9,7 +9,7 @@ from .. import common
 
 
 def to_json(value):
-    return json.dumps(value, ensure_ascii = False)
+    return json.dumps(value, ensure_ascii = False, default = lambda x: repr(x))
 
 
 def get_property(name: str, value: typing.Any, spec: settings_base.Attribute_Spec):
@@ -30,12 +30,9 @@ def get_property(name: str, value: typing.Any, spec: settings_base.Attribute_Spe
     elif spec.type is str:
         return pg.StringProperty(spec.name, name, value)
     else:
-        try:
-            return pg.StringProperty(spec.name + ' [JSON]', name, to_json(value))
-        except TypeError:
-            prop = pg.StringProperty(spec.name + ' [UNSUPPORTED]', name, repr(value))
-            prop.Enable(False)
-            return prop
+        prop = pg.StringProperty(spec.name + ' [UNSUPPORTED]', name, to_json(value))
+        prop.Enable(False)
+        return prop
 
 
 def get_read_only_property(name: str, value: typing.Any, spec: settings_base.Attribute_Spec):
