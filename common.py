@@ -683,8 +683,15 @@ def iter_arguments(instruction: Instruction, config: configparser.ConfigParser):
 
     signature = inspect.signature(instruction.func)
 
-    arguments = {name: value for name, value in zip(signature.parameters.keys(), instruction.args)}
-    arguments.update(instruction.kwargs)
+    arguments = {}
+
+    for index, (key, parameter) in enumerate(signature.parameters.items()):
+
+        if index < len(instruction.args):
+            arguments[key] = instruction.args[index]
+        else:
+            arguments[key] = instruction.kwargs.get(key, parameter.default)
+
 
     instruction_path = [instruction.identifier]
 
