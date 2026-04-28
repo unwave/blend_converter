@@ -283,7 +283,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         menu_item = menu.append_item(f"Set Config", get_func(self.set_config, entry))
         menu_item.Enable(bool(entry.program.config))
 
-        menu_item = menu.append_item(f"Settings", get_func(self.on_settings, entry))
+        menu_item = menu.append_item(f"Override", self.on_override)
 
         menu.append_separator()
         menu_item = menu.append_item(f"Enable Live Update", get_func(self.enable_live_update, True))
@@ -485,8 +485,9 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.main_frame.on_restart()
 
 
-    def on_settings(self, entry: updater.Program_Entry):
+    def on_override(self, event):
 
+        entry = self.get_active_item()
 
         with program_ui.Program_Dialog(self, entry.program) as dialog:
 
@@ -1063,7 +1064,8 @@ class Button:
 
     TERMINATE = Button_Data("Terminate", wx_icon = wx.ART_DELETE, description = "Terminate selected entries.")
     EXECUTE = Button_Data("Execute", wx_icon = wx.ART_REDO, description = "Execute selected entries.")
-    CONFIGURE = Button_Data("Configure", wx_icon = wx.ART_REPORT_VIEW, description = "Open the active entry's configuration.")
+    CONFIGURE = Button_Data("Factory", icon = '🏭', description = "Open the active entry's configuration.")
+    OVERRIDE = Button_Data("Arguments", icon = '✏️', description = "Open instruction override GUI.")
 
     SHOW_SOURCE_FILES = Button_Data("Show Source", wx_icon = wx.ART_FIND, description = "Show source files in the file explorer.")
     SHOW_RESULT_FILES = Button_Data("Show Result", wx_icon = wx.ART_FIND, description = "Show result files in the file explorer.")
@@ -1246,6 +1248,11 @@ class Main_Frame(wxp_utils.Generic_Frame):
         bar.SetShowToolTipsForDisabled(True)
         bar.AddButton(*Button.TERMINATE.get_data())
         bar.AddButton(*Button.EXECUTE.get_data())
+
+
+        settings = RB.RibbonPanel(main_page, wx.ID_ANY, "Settings", style = RB.RIBBON_PANEL_NO_AUTO_MINIMISE)
+        bar = RB.RibbonButtonBar(settings)
+        bar.AddButton(*Button.OVERRIDE.get_data())
         bar.AddButton(*Button.CONFIGURE.get_data())
 
 
@@ -1396,6 +1403,8 @@ class Main_Frame(wxp_utils.Generic_Frame):
             self.set_button_text(button.id, button.label + f" ({count})")
             self.enable_button(button.id, bool(count))
 
+        self.enable_button(Button.OVERRIDE.id, has_active)
+        self.set_button_text(Button.OVERRIDE.id, Button.OVERRIDE.label + f"{' 🚫' if not has_active else ' (Active)'}")
 
         self.enable_button(Button.CONFIGURE.id, is_configurable)
         self.set_button_text(Button.CONFIGURE.id, Button.CONFIGURE.label + f"{' 🚫' if not is_configurable else ' (Active)'}")
@@ -1446,6 +1455,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_terminate_selected, Button.TERMINATE.id)
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_force_execute_selected, Button.EXECUTE.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_override, Button.OVERRIDE.id)
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_set_config, Button.CONFIGURE.id)
 
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_show_source_files, Button.SHOW_SOURCE_FILES.id)
