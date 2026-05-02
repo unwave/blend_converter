@@ -166,8 +166,9 @@ def process():
 
             script_start_time = time.perf_counter()
 
-            if instruction['module_name'].startswith(CANONICAL_NAME + '.'):
-                module = importlib.import_module(instruction['module_name'][len(CANONICAL_NAME):], CANONICAL_NAME)
+            if instruction['module_name'] != '__main__':
+                append_sys_path(os.path.dirname(instruction['package_file']))
+                module = importlib.import_module(instruction['module_name'])
             else:
                 append_sys_path(os.path.dirname(instruction['filepath']))
                 module = import_module_from_file(instruction['filepath'])

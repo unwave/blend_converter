@@ -94,6 +94,35 @@ class File:
         return os.path.basename(os.path.dirname(self.path))
 
 
+def get_top_package_file(func: typing.Callable):
+
+    top_package_name = func.__module__.split('.')[0]
+    top_package = sys.modules[top_package_name]
+
+    func_file = func.__code__.co_filename
+    if not os.path.exists(func_file):
+        raise Exception(f"The file of the function must exist on disk: {func_file}")
+
+    func_file = os.path.realpath(func_file)
+
+    if not hasattr(top_package, '__path__'):
+        return func_file
+
+    for path in top_package.__path__:
+
+        path = os.path.realpath(path)
+
+        try:
+            common_path = os.path.commonpath([path, func_file])
+        except ValueError:
+            continue
+
+        if common_path == path:
+            return path
+
+    raise Exception(f"Fail to find the source package of the function: {repr(func)}")
+
+
 class Instruction:
 
 
@@ -104,6 +133,7 @@ class Instruction:
         self.executor = executor
         self.filepath: str = os.path.realpath(func.__code__.co_filename)
         self.module_name = func.__module__
+        self.package_file = get_top_package_file(func)
         self.name: str = func.__name__
         self.args: typing.List[typing.Any] = list(args)
         self.kwargs: typing.Dict[str, typing.Any] = kwargs
@@ -118,6 +148,7 @@ class Instruction:
             executor = self.executor,
             filepath = self.filepath,
             module_name = self.module_name,
+            package_file = self.package_file,
             name = self.name,
             args = self.args,
             kwargs = self.kwargs,

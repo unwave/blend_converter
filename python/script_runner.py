@@ -49,8 +49,13 @@ def main(data: dict):
 
     for script in instructions:
 
-        append_sys_path(os.path.dirname(script['filepath']))
-        module = import_module_from_file(script['filepath'])
+        if script['module_name'] != '__main__':
+            append_sys_path(os.path.dirname(script['package_file']))
+            module = importlib.import_module(script['module_name'])
+        else:
+            append_sys_path(os.path.dirname(script['filepath']))
+            module = import_module_from_file(script['filepath'])
+
         getattr(module, script['name'])(
             *common.replace_return_value(script['args'], return_values, instructions),
             **common.replace_return_value(script['kwargs'], return_values, instructions)
