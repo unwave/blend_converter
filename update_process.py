@@ -39,9 +39,8 @@ def run(*,
             updater_command_queue: multiprocessing.SimpleQueue,
             updater_response_queue: multiprocessing.SimpleQueue,
             execution_context: common.Execution_Context,
-            module_file_path: str,
-            programs_getter_name: str,
-            keyword_arguments: str,
+            programs_getter: common.Function,
+            keyword_arguments: dict,
         ):
 
 
@@ -98,11 +97,7 @@ def run(*,
         stderr_capturing.start()
         stdout_capturing.start()
 
-        program = program_getter_process.get_program(
-            module_file_path = module_file_path,
-            program_getter_name = programs_getter_name,
-            keyword_arguments = keyword_arguments,
-        )
+        program = programs_getter.get()(**keyword_arguments)
 
         try:
             program.execute(

@@ -11,6 +11,8 @@ import textwrap
 import inspect
 import time
 import multiprocessing
+import sys
+import importlib
 
 
 from . import utils
@@ -558,20 +560,76 @@ class Config_Base:
             self.set_option(section, option, value)
 
 
+class Function:
+
+
+    name: str
+    module_name: str
+    package_file: str
+
+
+    def get(self) -> typing.Callable:
+
+        parent_dir = os.path.dirname(self.package_file)
+        if not parent_dir in sys.path:
+            sys.path.append(parent_dir)
+
+        if self.module_name != '__main__':
+            module = importlib.import_module(self.module_name)
+        else:
+            module = utils.import_module_from_file(self.package_file)
+
+        return getattr(module, self.name)
+
+
+    def _to_dict(self):
+        return dict(
+            name = self.name,
+            module_name = self.module_name,
+            package_file = self.package_file,
+        )
+
+
+    @classmethod
+    def from_func(cls, func: typing.Callable):
+
+        instance = cls()
+
+        instance.name: str = func.__name__
+        instance.module_name = func.__module__
+        instance.package_file = get_top_package_file(func)
+
+        return instance
+
+
+    @classmethod
+    def from_dict(cls, data: dict):
+
+        instance = cls()
+
+        instance.name = data['name']
+        instance.module_name = data['module_name']
+        instance.package_file = data['package_file']
+
+        return instance
+
+
+    def __repr__(self):
+        return f"{self.package_file}::{self.module_name}::{self.name}"
+
+
 class Program_Definition:
 
     def __init__(
                 self,
-                file_name: str,
-                program_getter_name: str,
-                arguments_getter_name: str,
+                program_getter: typing.Callable,
+                arguments_getter: typing.Callable,
                 args: list = None,
                 kwargs: dict = None,
             ):
 
-        self.file_name = file_name
-        self.program_getter_name = program_getter_name
-        self.arguments_getter_name = arguments_getter_name
+        self.program_getter = Function.from_func(program_getter)
+        self.arguments_getter = Function.from_func(arguments_getter)
 
         self.args = [] if args is None else args
         self.kwargs = {} if kwargs is None else kwargs

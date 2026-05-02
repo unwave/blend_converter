@@ -31,10 +31,19 @@ def import_module_from_file(file_path: str, module_name: typing.Optional[str] = 
     return module
 
 
-def get_program(*, module_file_path: str, program_getter_name: str, keyword_arguments: dict) -> 'common.Program':
+def get_program(*, programs_getter_data: dict, keyword_arguments: dict) -> 'common.Program':
 
-    module = import_module_from_file(module_file_path)
+    name = programs_getter_data['name']
+    module_name = programs_getter_data['module_name']
+    package_file = programs_getter_data['package_file']
 
-    program_getter = getattr(module, program_getter_name)
+    parent_dir = os.path.dirname(package_file)
+    if not parent_dir in sys.path:
+        sys.path.append(parent_dir)
 
-    return program_getter(**keyword_arguments)
+    if module_name != '__main__':
+        module = importlib.import_module(module_name)
+    else:
+        module = import_module_from_file(package_file)
+
+    return getattr(module, name)(**keyword_arguments)

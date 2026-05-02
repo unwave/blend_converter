@@ -283,9 +283,9 @@ def show_file(file, failure_message: str):
         utils.print_in_color(utils.get_color_code(255,0,0, 0,0,0), failure_message)
 
 
-def run_program(module_path, programs_getter_name, kwargs):
+def run_program(programs_getter_data, kwargs):
 
-    program: common.Program = getattr(import_module(module_path), programs_getter_name)(**kwargs)
+    program: common.Program = common.Function.from_dict(programs_getter_data).get()(**kwargs)
 
     program._profile = _profile
     program._debug = _debug
@@ -343,16 +343,16 @@ def run_program(module_path, programs_getter_name, kwargs):
         open_file(program.result_path, program.blender_executable, "The result does not exist.")
 
 
-for module_path, programs_getter_name, kwargs in json.loads(PROGRAMS)['programs']:
+for programs_getter_data, kwargs in json.loads(PROGRAMS)['programs']:
 
     try:
-        run_program(module_path, programs_getter_name, kwargs)
+        run_program(programs_getter_data, kwargs)
     except Exception:
 
         error_type, error_value, error_tb = sys.exc_info()
 
         print()
-        utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"{module_path}::{programs_getter_name}::{kwargs}", file=sys.stderr)
+        utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), f"{(programs_getter_data, kwargs)}", file=sys.stderr)
         utils.print_in_color(utils.get_color_code(180,0,0,0,0,0,), ''.join(traceback.format_tb(error_tb)), file=sys.stderr)
         utils.print_in_color(utils.get_color_code(255,255,255,128,0,0,), ''.join(traceback.format_exception_only(error_type, error_value)), file=sys.stderr)
         print()

@@ -56,7 +56,7 @@ STATUS_ICON = {
 class Program_Entry:
 
 
-    def __init__(self, module_file_path: str, programs_getter_name: str, keyword_arguments: dict):
+    def __init__(self, programs_getter: common.Function, keyword_arguments: dict):
 
         self.entry_id = uuid.uuid1().hex
 
@@ -75,12 +75,8 @@ class Program_Entry:
         self.keyword_arguments = keyword_arguments
         """ The program keyword arguments. """
 
-        self.module_file_path = module_file_path
-        """ A module file which the common.Program was collected from. """
-
-        self.programs_getter_name = programs_getter_name
-        """ Name of a function that will return a dictionary with programs """
-
+        self.programs_getter = programs_getter
+        """ The function that will return the program. """
 
         self.lock = threading.RLock()
 
@@ -164,8 +160,7 @@ class Program_Entry:
                     updater_command_queue = updater_command_queue,
                     updater_response_queue = self.updater_response_queue,
                     execution_context = self.execution_context,
-                    module_file_path = self.module_file_path,
-                    programs_getter_name = self.programs_getter_name,
+                    programs_getter = self.programs_getter,
                     keyword_arguments = self.keyword_arguments,
                 ),
                 daemon=True,
@@ -339,7 +334,7 @@ class Program_Entry:
 
 
     def __repr__(self):
-        return f"<Entry {self.entry_id}: {self.module_file_path}::{self.programs_getter_name}({self.keyword_arguments})>"
+        return f"<Entry {self.entry_id}: {self.programs_getter}::({self.keyword_arguments})>"
 
 
 class Blend_Event_Handler(watchdog_events.PatternMatchingEventHandler):
@@ -383,18 +378,11 @@ def get_program_entries(definitions: typing.List[common.Program_Definition]):
 
     entries = []
 
-    path_to_module_map = import_files([d.file_name for d in definitions])
-
     for d in definitions:
 
-        module = path_to_module_map[os.path.realpath(d.file_name)]
+        for arguments in d.arguments_getter.get()(*d.args, **d.kwargs):
 
-        arguments_getter = getattr(module, d.arguments_getter_name)
-
-        for arguments in arguments_getter(*d.args, **d.kwargs):
-
-
-            entries.append(Program_Entry(module.__file__, d.program_getter_name, arguments))
+            entries.append(Program_Entry(d.program_getter, arguments))
 
     return entries
 
@@ -449,8 +437,7 @@ class Updater:
             tasks.append(self.program_getting_pool.apply_async(
                 program_getter_process.get_program,
                 kwds = dict(
-                    module_file_path = entry.module_file_path,
-                    program_getter_name = entry.programs_getter_name,
+                    programs_getter_data = entry.programs_getter._to_dict(),
                     keyword_arguments = entry.keyword_arguments,
                 ),
                 callback = lambda program, entry=entry: callback(entry, program),

@@ -350,8 +350,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         for entry in entries:
             programs.append([
-                entry.module_file_path,
-                entry.programs_getter_name,
+                entry.programs_getter._to_dict(),
                 entry.keyword_arguments,
             ])
 
