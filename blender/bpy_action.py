@@ -798,3 +798,186 @@ def get_bone_walk_parent_map(object: bpy.types.Object, deform_root: str):
 
 
     return parent_map
+
+
+class KDTree_Wrapper:
+
+
+    def __init__(self, points: typing.List[mathutils.Vector]):
+
+        self.tree = mathutils.kdtree.KDTree(len(points))
+
+        for i, point in enumerate(points):
+            self.tree.insert(point, i)
+
+        self.tree.balance()
+
+
+    def get_index(self, point: mathutils.Vector, radius = 0.0001):
+
+        indexes = list(map(operator.itemgetter(1), self.tree.find_range(point, radius)))
+
+        if len(indexes) != 1:
+            print(
+                f"Unexpected amount of indexes per point: {indexes}"
+                "\n\t" f"Point: {point}"
+            )
+
+        return indexes[0]
+
+
+def find_deform_root(object: bpy.types.Object):
+
+    points, links, bone_to_points = get_bone_walk_mesh(object)
+    graph = get_bone_walk_graph(points, links)
+
+    if not graph:
+        return None
+
+    kdtree = KDTree_Wrapper(points)
+
+    deform_bones = {bone.name for bone in object.data.bones if bone.use_deform}
+
+
+    bone_to_indexes = {}
+    index_to_bones = collections.defaultdict(list)
+
+    for bone, _points in bone_to_points.items():
+
+        if not bone in deform_bones:
+            continue
+
+        bone_to_indexes[bone] = list(map(kdtree.get_index, _points))
+
+        for is_tail, index in enumerate(bone_to_indexes[bone]):
+            index_to_bones[index].append((bone, is_tail))
+
+
+    eccentricities = get_graph_eccentricities(graph)
+
+    for item in eccentricities:
+        center_bones = index_to_bones[item[0]]
+        if center_bones:
+            break
+    else:
+        raise Exception("Fail to find the graph center.")
+
+
+    ## descend the bone chain
+    max_point_connections = 0
+
+    def get_down_in_chain(name: str):
+
+
+        points = bone_to_points[name]
+        index = kdtree.get_index(points[0])
+
+
+        nonlocal max_point_connections
+        point_connections = len(graph[index])
+        is_decreasing_connectivity = False
+
+        if max_point_connections > point_connections:
+            is_decreasing_connectivity = True
+        else:
+            max_point_connections = point_connections
+
+
+        return index_to_bones[index], is_decreasing_connectivity
+
+
+    current_bones = center_bones
+    seen = set()
+
+    while True:
+
+        # stop at a root point shared between bone chains
+        if sum(b[1] == 0 for b in current_bones) > 1:
+            break
+
+        for bone in current_bones:
+
+            if bone[0] in seen:
+                continue
+            seen.add(bone[0])
+
+            if bone[1] == 1:
+
+                next_bones, is_decreasing_connectivity = get_down_in_chain(bone[0])
+                if is_decreasing_connectivity:
+                    if current_bones[0][1] == 0:
+                        return current_bones[0][0]
+                    else:
+                        return next_bones[0][0]
+                else:
+                    current_bones = next_bones
+
+                break
+        else:
+            break
+
+
+    return current_bones[0][0]
+
+
+def get_largest_subgraph(graph: typing.Dict[int, typing.Dict[int, float]]):
+
+    seen = set()
+
+    subgraphs = []
+
+    for start_index in graph:
+
+        if start_index in seen:
+            continue
+
+        subgraph = []
+        pool = [start_index]
+
+        while pool:
+
+            index = pool.pop()
+
+            if index in seen:
+                continue
+
+            seen.add(index)
+            subgraph.append(index)
+            pool.extend(graph[index])
+
+        subgraphs.append(subgraph)
+
+    return max(subgraphs, key=len)
+
+
+def get_graph_eccentricities(graph: typing.Dict[int, typing.Dict[int, float]]):
+
+
+    INFINITY = float('inf')
+
+    eccentricities = {}
+
+    for start_index in get_largest_subgraph(graph):
+
+        queue = [(0, start_index)]
+        distances = {start_index: 0}
+
+        while queue:
+
+            distance, index = heapq.heappop(queue)
+
+            if distance > distances.get(index, INFINITY):
+                continue
+
+            for neighbor, length in graph[index].items():
+
+                new_distance = distance + length
+
+                if new_distance < distances.get(neighbor, INFINITY):
+                    distances[neighbor] = new_distance
+                    heapq.heappush(queue, (new_distance, neighbor))
+
+        eccentricities[start_index] = max(distances.values())
+
+
+    return list(sorted(eccentricities.items(), key = operator.itemgetter(1)))
