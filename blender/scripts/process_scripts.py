@@ -4,9 +4,6 @@ start_time = time.perf_counter()
 print("BLENDER START", time.strftime('%H:%M:%S %Y-%m-%d'))
 
 import argparse
-import functools
-import importlib
-import importlib.util
 import json
 import os
 import sys
@@ -14,9 +11,6 @@ import traceback
 import typing
 import warnings
 import builtins
-
-
-BC_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 SENTINEL = object()
 
@@ -31,18 +25,6 @@ if 'bpy' in sys.modules:
         bpy.context.user_preferences.filepaths.save_version = 32
 
 
-def remove_PYTHONPATH():
-    """
-    #115648 - New Windows install, multiple Blender versions crash: EXCEPTION_ACCESS_VIOLATION (Python 3.12.0 conflict?)
-    https://projects.blender.org/blender/blender/issues/115648
-    """
-    for pythonpath in filter(None, os.environ.get('PYTHONPATH', "").split(os.pathsep)):
-        if pythonpath in sys.path:
-            sys.path.remove(pythonpath)
-
-    importlib.invalidate_caches()
-
-
 def get_args() -> dict:
 
     parser = argparse.ArgumentParser()
@@ -52,27 +34,6 @@ def get_args() -> dict:
     args, _ = parser.parse_known_args(args)
 
     return json.loads(args.json_args)
-
-
-@functools.lru_cache(None)
-def import_module_from_file(file_path: str, module_name: typing.Optional[str] = None):
-
-    if not os.path.isabs(file_path):
-        raise Exception(f"Path to file must be absolute: {file_path}")
-
-    if module_name is None:
-        module_name = os.path.splitext(os.path.basename(file_path))[0]
-
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
-    if spec is None:
-        raise Exception(f"Spec not found: {module_name}, {file_path}")
-
-    module = importlib.util.module_from_spec(spec)
-
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)  # type: ignore[reportOptionalMemberAccess]
-
-    return module
 
 
 class Profiled:
@@ -117,24 +78,17 @@ class Profiled:
             p.strip_dirs().sort_stats(1).print_stats(20)
 
 
-def append_sys_path(path: str):
-    if not path in sys.path:
-        sys.path.append(path)
-
-
-CANONICAL_NAME = 'blend_converter'
-
-if typing.TYPE_CHECKING:
-    import blend_converter
-else:
-    blend_converter = import_module_from_file(os.path.join(BC_ROOT, '__init__.py'), CANONICAL_NAME)
+import runpy
+BC_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+runpy.run_path(os.path.join(BC_ROOT, 'serialization.py'))['bootstrap']()
 
 
 from blend_converter import utils
 from blend_converter import common
+from blend_converter import serialization
 from blend_converter.blender import blend_inspector
-
 from blend_converter.blender import communication
+
 
 return_values = {}
 ARGS = get_args()
@@ -166,14 +120,9 @@ def process():
 
             script_start_time = time.perf_counter()
 
-            if instruction['module_name'] != '__main__':
-                append_sys_path(os.path.dirname(instruction['package_file']))
-                module = importlib.import_module(instruction['module_name'])
-            else:
-                append_sys_path(os.path.dirname(instruction['filepath']))
-                module = import_module_from_file(instruction['filepath'])
+            func = serialization.Function.from_dict(instruction['function']).get()
 
-            result = getattr(module, instruction['name'])(*common.replace_return_value(instruction['args'], return_values, INSTRUCTIONS), **common.replace_return_value(instruction['kwargs'], return_values, INSTRUCTIONS))
+            result = func(*common.replace_return_value(instruction['args'], return_values, INSTRUCTIONS), **common.replace_return_value(instruction['kwargs'], return_values, INSTRUCTIONS))
             return_values[instruction['identifier']] = result
 
             utils.print_in_color(utils.get_color_code(56, 199, 134, 0, 0, 0), f"Processed in {round(time.perf_counter() - script_start_time, 2)} seconds.", flush=True)
@@ -218,8 +167,6 @@ if __name__ == '__main__':
             debugpy.wait_for_client()
             debugpy.breakpoint()
 
-
-    remove_PYTHONPATH() # for testing pursues
 
     warnings.filterwarnings('error')
     warnings.simplefilter('error')

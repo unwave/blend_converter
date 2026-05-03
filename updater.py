@@ -9,7 +9,6 @@ import uuid
 import types
 import atexit
 import re
-import importlib
 import traceback
 import socket
 
@@ -18,10 +17,10 @@ from watchdog import observers as watchdog_observers
 import psutil
 
 from . import common
+from . import serialization
 from . import utils
 from .blender import communication
 from . import update_process
-from . import program_getter_process
 
 
 SENTINEL = object()
@@ -56,7 +55,7 @@ STATUS_ICON = {
 class Program_Entry:
 
 
-    def __init__(self, programs_getter: common.Function, keyword_arguments: dict):
+    def __init__(self, programs_getter: serialization.Function, keyword_arguments: dict):
 
         self.entry_id = uuid.uuid1().hex
 
@@ -357,23 +356,6 @@ class Blend_Event_Handler(watchdog_events.PatternMatchingEventHandler):
         self.queue.put(event.dest_path)
 
 
-def import_files(files: typing.List[str]):
-
-    modules: typing.Dict[str, types.ModuleType] = {}
-
-    files = utils.deduplicate(os.path.realpath(f) for f in files)
-    dirs = utils.deduplicate(os.path.dirname(f) for f in files)
-
-    for dir in dirs:
-        if not dir in sys.path:
-            sys.path.append(dir)
-
-    for file in files:
-        modules[file] = utils.import_module_from_file(file)
-
-    return modules
-
-
 def get_program_entries(definitions: typing.List[common.Program_Definition]):
 
     entries = []
@@ -435,10 +417,10 @@ class Updater:
         for entry in self.entries:
 
             tasks.append(self.program_getting_pool.apply_async(
-                program_getter_process.get_program,
+                serialization.run_func_from_dict,
                 kwds = dict(
-                    programs_getter_data = entry.programs_getter._to_dict(),
-                    keyword_arguments = entry.keyword_arguments,
+                    function = entry.programs_getter._to_dict(),
+                    kwargs = entry.keyword_arguments,
                 ),
                 callback = lambda program, entry=entry: callback(entry, program),
             ))

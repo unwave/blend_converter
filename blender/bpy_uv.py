@@ -28,6 +28,7 @@ from . import bpy_modifier
 from .. import utils
 from .. import tool_settings
 from .. import root
+from .. import serialization
 
 
 if utils.is_in_blender():
@@ -220,7 +221,7 @@ def import_uv_packer_addon():
 
     uv_packer_path = os.path.join(root.PATH, 'external', 'uv_packer', '__init__.py')
     if os.path.exists(uv_packer_path):
-        return utils.import_module_from_file(uv_packer_path)
+        return serialization.import_module_from_file(uv_packer_path, 'uv_packer')
 
     raise Exception(f"UV Packer was not found in path: {uv_packer_path}")
 

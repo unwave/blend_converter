@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from . import utils
 from . import common
-from . import program_getter_process
+from . import serialization
 
 
 def capturing(*, file_path: str, capture_queue: queue.SimpleQueue, output_queue: multiprocessing.SimpleQueue):
@@ -39,7 +39,7 @@ def run(*,
             updater_command_queue: multiprocessing.SimpleQueue,
             updater_response_queue: multiprocessing.SimpleQueue,
             execution_context: common.Execution_Context,
-            programs_getter: common.Function,
+            programs_getter: serialization.Function,
             keyword_arguments: dict,
         ):
 

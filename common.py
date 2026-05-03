@@ -7,17 +7,14 @@ import uuid
 import tempfile
 from datetime import datetime
 import configparser
-import textwrap
 import inspect
 import time
 import multiprocessing
-import sys
-import importlib
-
 
 from . import utils
 from . import tool_settings
 from . import settings_base
+from . import serialization
 
 
 SENTINEL = object()
@@ -96,35 +93,6 @@ class File:
         return os.path.basename(os.path.dirname(self.path))
 
 
-def get_top_package_file(func: typing.Callable):
-
-    top_package_name = func.__module__.split('.')[0]
-    top_package = sys.modules[top_package_name]
-
-    func_file = func.__code__.co_filename
-    if not os.path.exists(func_file):
-        raise Exception(f"The file of the function must exist on disk: {func_file}")
-
-    func_file = os.path.realpath(func_file)
-
-    if not hasattr(top_package, '__path__'):
-        return func_file
-
-    for path in top_package.__path__:
-
-        path = os.path.realpath(path)
-
-        try:
-            common_path = os.path.commonpath([path, func_file])
-        except ValueError:
-            continue
-
-        if common_path == path:
-            return path
-
-    raise Exception(f"Fail to find the source package of the function: {repr(func)}")
-
-
 class Instruction:
 
 
@@ -133,9 +101,7 @@ class Instruction:
         self.func = func
         self.identifier = identifier
         self.executor = executor
-        self.filepath: str = os.path.realpath(func.__code__.co_filename)
-        self.module_name = func.__module__
-        self.package_file = get_top_package_file(func)
+        self.function = serialization.Function.from_func(func)
         self.name: str = func.__name__
         self.args: typing.List[typing.Any] = list(args)
         self.kwargs: typing.Dict[str, typing.Any] = kwargs
@@ -148,9 +114,7 @@ class Instruction:
             _type = type(self).__name__,
             identifier = self.identifier,
             executor = self.executor,
-            filepath = self.filepath,
-            module_name = self.module_name,
-            package_file = self.package_file,
+            function = self.function,
             name = self.name,
             args = self.args,
             kwargs = self.kwargs,
@@ -560,64 +524,6 @@ class Config_Base:
             self.set_option(section, option, value)
 
 
-class Function:
-
-
-    name: str
-    module_name: str
-    package_file: str
-
-
-    def get(self) -> typing.Callable:
-
-        parent_dir = os.path.dirname(self.package_file)
-        if not parent_dir in sys.path:
-            sys.path.append(parent_dir)
-
-        if self.module_name != '__main__':
-            module = importlib.import_module(self.module_name)
-        else:
-            module = utils.import_module_from_file(self.package_file)
-
-        return getattr(module, self.name)
-
-
-    def _to_dict(self):
-        return dict(
-            name = self.name,
-            module_name = self.module_name,
-            package_file = self.package_file,
-        )
-
-
-    @classmethod
-    def from_func(cls, func: typing.Callable):
-
-        instance = cls()
-
-        instance.name: str = func.__name__
-        instance.module_name = func.__module__
-        instance.package_file = get_top_package_file(func)
-
-        return instance
-
-
-    @classmethod
-    def from_dict(cls, data: dict):
-
-        instance = cls()
-
-        instance.name = data['name']
-        instance.module_name = data['module_name']
-        instance.package_file = data['package_file']
-
-        return instance
-
-
-    def __repr__(self):
-        return f"{self.package_file}::{self.module_name}::{self.name}"
-
-
 class Program_Definition:
 
     def __init__(
@@ -628,8 +534,8 @@ class Program_Definition:
                 kwargs: dict = None,
             ):
 
-        self.program_getter = Function.from_func(program_getter)
-        self.arguments_getter = Function.from_func(arguments_getter)
+        self.program_getter = serialization.Function.from_func(program_getter)
+        self.arguments_getter = serialization.Function.from_func(arguments_getter)
 
         self.args = [] if args is None else args
         self.kwargs = {} if kwargs is None else kwargs

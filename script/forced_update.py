@@ -1,6 +1,5 @@
 import sys
 import os
-import importlib.util
 import typing
 import re
 import json
@@ -12,27 +11,8 @@ PROGRAMS = sys.argv[1]
 ARGS = sys.argv[2:]
 
 
-def import_module(module_path: str):
-
-    module_dir = os.path.dirname(module_path)
-    if not module_dir in sys.path:
-        sys.path.append(module_dir)
-
-    module_name = os.path.splitext(os.path.basename(module_path))[0]
-
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
-    if spec is None:
-        raise Exception(f"Spec not found: {module_name}, {module_path}")
-
-    module = importlib.util.module_from_spec(spec)
-
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)  # type: ignore[reportOptionalMemberAccess]
-
-    return module
-
-
 from blend_converter import common
+from blend_converter import serialization
 
 from blend_converter import diff_utils
 
@@ -285,7 +265,7 @@ def show_file(file, failure_message: str):
 
 def run_program(programs_getter_data, kwargs):
 
-    program: common.Program = common.Function.from_dict(programs_getter_data).get()(**kwargs)
+    program: common.Program = serialization.Function.from_dict(programs_getter_data).get()(**kwargs)
 
     program._profile = _profile
     program._debug = _debug
