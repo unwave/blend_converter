@@ -377,6 +377,7 @@ class Updater:
         self.is_paused = True
 
         self.entries: list[Program_Entry] = []
+        self.result_path_to_entry: typing.Dict[str, Program_Entry] = {}
 
         self.max_parallel_execution_per_tag = {}
 
@@ -437,6 +438,8 @@ class Updater:
             for folder in utils.deduplicate(dirs_to_watch):
                 self.observer.schedule(self.event_handler, folder)
 
+            self.result_path_to_entry = {e.program.result_path: e for e in self.entries if e.program.result_path}
+
             self.despatch()
 
 
@@ -467,17 +470,15 @@ class Updater:
 
 
     def has_non_updated_dependency(self, entry: Program_Entry):
-        return any(
-            (
-                _entry.program.result_path
-                and
-                entry.program.blend_path
-                and
-                _entry.program.result_path == entry.program.blend_path
-            )
-            for _entry in self.entries
-            if not _entry is entry and _entry.status != Status.OK
-        )
+
+        if not entry.program.blend_path:
+            return False
+
+        parent_entry = self.result_path_to_entry.get(entry.program.blend_path)
+        if parent_entry is None:
+            return False
+
+        return parent_entry.status != Status.OK
 
 
     def poke_entry(self, entry: Program_Entry):
