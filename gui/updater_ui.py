@@ -1644,13 +1644,19 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     def pause(self, value: bool):
+
         self.updater.is_paused = value
+
         if self.updater.is_paused:
             self.SetTitle(self.init_title + ' [Paused]')
             self.pause_menu_item.SetItemLabel("Unpause\tCtrl+P")
         else:
             self.SetTitle(self.init_title)
             self.pause_menu_item.SetItemLabel("Pause\tCtrl+P")
+
+        self.enable_button(Button.PAUSE.id, not self.updater.is_paused)
+        self.enable_button(Button.RESUME.id, self.updater.is_paused)
+
         self.updater.despatch()
 
 
