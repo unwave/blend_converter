@@ -270,13 +270,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         menu.append_separator()
 
-        # menu_item = menu.append_item(f"Force Update", get_func(self.on_entry_force_update, entry))
-
-        menu_item = menu.append_item(f"Update Selected", self.on_update_selected)
-
-        menu.append_separator()
-
-        menu_item = menu.append_item(f"Force Execute Selected", self.on_force_execute_selected)
+        menu_item = menu.append_item(f"Execute Selected", self.on_execute_selected)
 
         menu.append_separator()
 
@@ -517,14 +511,6 @@ class Model_List(wxp_utils.Item_Viewer_Native):
             entry.program._instructions_config.write(f)
 
 
-    def on_update_selected(self, event):
-        for entry in self.get_selected_items():
-            if entry.status in (updater.Status.STALE, updater.Status.ERROR):
-                entry.is_manual_update = True
-        self.main_frame.updater.despatch()
-        self.refresh_visible()
-
-
     def on_terminate_selected(self, event):
 
         self.main_frame.updater.updater_command_queue.put({
@@ -533,9 +519,16 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         })
 
 
-    def on_force_execute_selected(self, event):
+    def on_execute_selected(self, event):
 
         for entry in self.get_selected_items():
+
+            if entry.status in (updater.Status.UPDATING, updater.Status.YIELDING, updater.Status.SLEEPING):
+                continue
+
+            if entry.is_manual_update:
+                continue
+
             entry.is_manual_update = True
 
         self.main_frame.updater.despatch()
@@ -1113,7 +1106,6 @@ class Button:
 
 
 BUTTONS_WITH_COUNT =[
-    Button.EXECUTE,
     Button.SHOW_SOURCE_FILES,
     Button.SHOW_RESULT_FILES,
     Button.EDIT_SOURCE_FILES,
@@ -1429,15 +1421,20 @@ class Main_Frame(wxp_utils.Generic_Frame):
             running_entries_count = 999
             sleeping_entries = 999
             terminatable_entries = 999
+            executable_entries = 999
         else:
             count = len(selected)
             running_entries_count = sum(entry.status in (updater.Status.UPDATING, updater.Status.YIELDING) for entry in selected)
             sleeping_entries = sum(entry.status == updater.Status.SLEEPING for entry in selected)
             terminatable_entries = running_entries_count + sleeping_entries
+            executable_entries = count - sum(entry.status in (updater.Status.UPDATING, updater.Status.YIELDING, updater.Status.SLEEPING) or entry.is_manual_update for entry in selected)
 
 
         self.enable_button(Button.TERMINATE.id, bool(terminatable_entries))
         self.set_button_text(Button.TERMINATE.id, Button.TERMINATE.label + f" ({terminatable_entries}/{count})")
+
+        self.enable_button(Button.EXECUTE.id, bool(executable_entries))
+        self.set_button_text(Button.EXECUTE.id, Button.EXECUTE.label + f" ({executable_entries}/{count})")
 
         self.enable_button(Button.SLEEP.id, bool(running_entries_count))
         self.set_button_text(Button.SLEEP.id, Button.SLEEP.label + f" ({running_entries_count}/{count})")
@@ -1453,7 +1450,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_terminate_selected, Button.TERMINATE.id)
-        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_force_execute_selected, Button.EXECUTE.id)
+        self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_execute_selected, Button.EXECUTE.id)
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_override, Button.OVERRIDE.id)
         self.Bind(RB.EVT_RIBBONBUTTONBAR_CLICKED, self.result_panel.model_list.on_set_config, Button.CONFIGURE.id)
 
