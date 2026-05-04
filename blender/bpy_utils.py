@@ -21,11 +21,11 @@ from . import bpy_uv
 from . import bpy_modifier
 from . import bpy_material
 from . import bpy_mesh
-from . import communication
 from . import bpy_data
 
 from .. import tool_settings
 from .. import utils
+from .. import communication
 
 
 if utils.is_in_blender():

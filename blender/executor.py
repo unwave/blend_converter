@@ -14,7 +14,7 @@ import multiprocessing
 from .. import utils
 from .. import common
 from .. import root
-from . import communication
+from .. import communication
 
 
 

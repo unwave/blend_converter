@@ -22,7 +22,7 @@ from .. import utils
 from .. import common
 from .. import root
 from .. import updater
-from ..blender import communication
+from .. import communication
 
 from . import wxp_utils
 from . import program_ui

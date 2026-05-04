@@ -21,7 +21,7 @@ import psutil
 from . import common
 from . import serialization
 from . import utils
-from .blender import communication
+from . import communication
 from . import update_process
 
 

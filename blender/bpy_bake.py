@@ -13,13 +13,13 @@ import math
 
 from .. import tool_settings
 from .. import utils
+from .. import communication
 
 from . import bpy_node
 from . import bpy_context
 from . import bpy_utils
 from . import bake_settings
 from . import blend_inspector
-from . import communication
 
 
 if utils.is_in_blender():

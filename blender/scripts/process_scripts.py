@@ -87,7 +87,7 @@ from blend_converter import utils
 from blend_converter import common
 from blend_converter import serialization
 from blend_converter.blender import blend_inspector
-from blend_converter.blender import communication
+from blend_converter import communication
 
 
 return_values = {}
