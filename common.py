@@ -10,6 +10,8 @@ import configparser
 import inspect
 import time
 import multiprocessing
+import functools
+
 
 from . import utils
 from . import tool_settings
@@ -93,6 +95,11 @@ class File:
         return os.path.basename(os.path.dirname(self.path))
 
 
+@functools.lru_cache(None)
+def get_func_serialized(func: typing.Callable):
+    return serialization.Function.from_func(func)
+
+
 class Instruction:
 
 
@@ -101,12 +108,24 @@ class Instruction:
         self.func = func
         self.identifier = identifier
         self.executor = executor
-        self.function = serialization.Function.from_func(func)
         self.name: str = func.__name__
         self.args: typing.List[typing.Any] = list(args)
         self.kwargs: typing.Dict[str, typing.Any] = kwargs
-        self.sha256: str = utils.get_function_sha256(func)
-        self.code: str = utils.get_source(func)
+
+
+    @property
+    def function(self):
+        return get_func_serialized(self.func)
+
+
+    @property
+    def sha256(self):
+        return utils.get_function_sha256(self.func)
+
+
+    @property
+    def code(self):
+        return utils.get_source(self.func)
 
 
     def _to_dict(self):
