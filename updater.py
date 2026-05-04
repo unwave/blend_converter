@@ -400,17 +400,7 @@ class Updater:
     def update_entries(self):
 
         def callback(entry: Program_Entry, program: common.Program):
-
             entry.program = program
-
-            self.updater_command_queue.put({
-                communication.Key.COMMAND: communication.Command.POKE,
-                'entry_ids': [entry.entry_id]
-            })
-
-            if program.blend_path and os.path.exists(program.blend_path):
-                self.observer.schedule(self.event_handler, os.path.dirname(program.blend_path))
-
 
         tasks = []
 
@@ -427,9 +417,28 @@ class Updater:
 
 
         def final_callback():
-            [t.get() for t in tasks]
-            self.despatch()
+
+            for t in tasks:
+                t.get()
+
             update_ui()
+
+            self.updater_command_queue.put({
+                communication.Key.COMMAND: communication.Command.POKE,
+                'entry_ids': [entry.entry_id for entry in self.entries]
+            })
+
+            dirs_to_watch = []
+
+            for entry in self.entries:
+                if entry.program.blend_path:
+                    dirs_to_watch.append(os.path.dirname(entry.program.blend_path))
+
+            for folder in utils.deduplicate(dirs_to_watch):
+                self.observer.schedule(self.event_handler, folder)
+
+            self.despatch()
+
 
         threading.Thread(target=final_callback).start()
 
