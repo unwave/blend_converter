@@ -11,6 +11,8 @@ import atexit
 import re
 import traceback
 import socket
+import collections
+
 
 from watchdog import events as watchdog_events
 from watchdog import observers as watchdog_observers
@@ -376,6 +378,7 @@ class Updater:
 
         self.entries: list[Program_Entry] = []
         self.result_path_to_entry: typing.Dict[str, Program_Entry] = {}
+        self.source_path_to_entry: typing.Dict[str, typing.List[Program_Entry]] = {}
 
         self.max_parallel_execution_per_tag = {}
 
@@ -429,6 +432,10 @@ class Updater:
 
             self.result_path_to_entry = {e.program.result_path: e for e in self.entries if e.program.result_path}
 
+            self.source_path_to_entry = collections.defaultdict(list)
+            for e in self.entries:
+                self.source_path_to_entry[e.program.blend_path].append(e)
+
             for entry in self.entries:
                 if self.has_non_updated_dependency(entry):
                     entry.status = Status.WAITING_FOR_DEPENDENCY
@@ -474,10 +481,10 @@ class Updater:
         return parent_entry.status != Status.OK
 
 
-    def poke_entry(self, entry: Program_Entry):
+    def poke_entries(self, entires: typing.Iterable[Program_Entry]):
         self.updater_command_queue.put({
             communication.Key.COMMAND: communication.Command.POKE,
-            'entry_ids': [entry.entry_id]
+            'entry_ids': [entry.entry_id for entry in entires]
         })
 
 
@@ -531,7 +538,6 @@ class Updater:
                 continue
 
             if self.has_non_updated_dependency(entry):
-                self.poke_entry(entry)
                 continue
 
             entry.is_manual_update = False
@@ -561,7 +567,6 @@ class Updater:
                 continue
 
             if self.has_non_updated_dependency(entry):
-                self.poke_entry(entry)
                 continue
 
 
@@ -832,7 +837,7 @@ class Updater:
                     if self.has_non_updated_dependency(entry):
                         entry.status = Status.WAITING_FOR_DEPENDENCY
                     else:
-                        entry.status = get_status(self.program)
+                        entry.status = get_status(entry.program)
 
             elif command == communication.Command.JOIN:
 
@@ -844,6 +849,8 @@ class Updater:
                         entry.status = Status.OK
                     else:
                         entry.status = Status.ERROR
+
+                    self.poke_entries(self.source_path_to_entry.get(entry.program.result_path, ()))
 
                     self.despatch()
 
