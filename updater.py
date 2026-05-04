@@ -52,6 +52,20 @@ STATUS_ICON = {
     Status.SLEEPING: '💤',
 }
 
+
+def get_status(program: common.Program):
+
+    if not program.blend_path:
+        return Status.UNKNOWN
+    elif os.path.exists(program.blend_path):
+        if program.are_instructions_changed:
+            return Status.STALE
+        else:
+            return Status.OK
+    else:
+        return Status.DOES_NOT_EXIST
+
+
 class Program_Entry:
 
 
@@ -109,22 +123,6 @@ class Program_Entry:
             self.execution_context = common.Execution_Context()
 
             self.post_initialized = True
-
-
-    def poke(self, has_non_updated_dependency: bool):
-
-        if has_non_updated_dependency:
-            self.status = Status.WAITING_FOR_DEPENDENCY
-        elif not self.program.blend_path:
-            pass
-        elif os.path.exists(self.program.blend_path):
-            if self.program.are_instructions_changed:
-                self.status = Status.STALE
-            else:
-                self.status = Status.OK
-        else:
-            self.status = Status.DOES_NOT_EXIST
-
 
 
     def _run(self, *, callback: typing.Callable, thread_identity: uuid.UUID, updater_command_queue: 'multiprocessing.SimpleQueue[dict]' = None):
@@ -400,38 +398,29 @@ class Updater:
 
     def update_entries(self):
 
-        def callback(entry: Program_Entry, program: common.Program):
-            entry.program = program
-
         tasks = []
 
         for entry in self.entries:
 
             tasks.append(self.program_getting_pool.apply_async(
-                serialization.run_func_from_dict,
+                load_program,
                 kwds = dict(
                     function = entry.programs_getter._to_dict(),
                     kwargs = entry.keyword_arguments,
-                ),
-                callback = lambda program, entry=entry: callback(entry, program),
+                )
             ))
-
 
         def final_callback():
 
-            for t in tasks:
-                t.get()
-
-            update_ui()
-
-            self.updater_command_queue.put({
-                communication.Key.COMMAND: communication.Command.POKE,
-                'entry_ids': [entry.entry_id for entry in self.entries]
-            })
-
             dirs_to_watch = []
 
-            for entry in self.entries:
+            for task, entry in zip(tasks, self.entries):
+
+                program, status = task.get()
+
+                entry.program = program
+                entry.status = status
+
                 if entry.program.blend_path:
                     dirs_to_watch.append(os.path.dirname(entry.program.blend_path))
 
@@ -439,6 +428,10 @@ class Updater:
                 self.observer.schedule(self.event_handler, folder)
 
             self.result_path_to_entry = {e.program.result_path: e for e in self.entries if e.program.result_path}
+
+            for entry in self.entries:
+                if self.has_non_updated_dependency(entry):
+                    entry.status = Status.WAITING_FOR_DEPENDENCY
 
             self.despatch()
 
@@ -836,7 +829,10 @@ class Updater:
                 target_entries = [e for e in self.entries if e.status not in (Status.UPDATING, Status.YIELDING, Status.SLEEPING) and e.entry_id in item['entry_ids']]
 
                 for entry in target_entries:
-                    entry.poke(self.has_non_updated_dependency(entry))
+                    if self.has_non_updated_dependency(entry):
+                        entry.status = Status.WAITING_FOR_DEPENDENCY
+                    else:
+                        entry.status = get_status(self.program)
 
             elif command == communication.Command.JOIN:
 
@@ -872,3 +868,8 @@ def stdout_line_printed():
 
 def stderr_line_printed():
     pass
+
+
+def load_program(function: dict, kwargs: dict):
+    program: common.Program = serialization.Function.from_dict(function).get()(**kwargs)
+    return program, get_status(program)
