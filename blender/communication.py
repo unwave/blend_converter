@@ -103,6 +103,7 @@ class Command:
     SET_AS_OK = 'set_as_ok'
     POKE = 'poke'
     JOIN = 'join'
+    EXECUTE = 'execute'
 
 
 class Suspend_Others:

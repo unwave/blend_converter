@@ -857,6 +857,16 @@ class Updater:
 
                     self.despatch()
 
+            elif command == communication.Command.EXECUTE:
+
+                entries = [e for e in self.entries if e.entry_id in item['entry_ids']]
+                target_entries = [e for e in entries if e.status not in (Status.UPDATING, Status.YIELDING, Status.SLEEPING) and not e.is_manual_update]
+
+                for entry in target_entries:
+                    entry.is_manual_update = True
+
+                self.despatch()
+
 
             get_active_yield_target()  # for validation
             update_ui()

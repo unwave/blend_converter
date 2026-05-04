@@ -521,20 +521,10 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
     def on_execute_selected(self, event):
 
-        for entry in self.get_selected_items():
-
-            if entry.status in (updater.Status.UPDATING, updater.Status.YIELDING, updater.Status.SLEEPING):
-                continue
-
-            if entry.is_manual_update:
-                continue
-
-            entry.is_manual_update = True
-
-        self.main_frame.updater.despatch()
-
-        self.main_frame.update_status_dependant_buttons()
-        self.refresh_visible()
+        self.main_frame.updater.updater_command_queue.put({
+            communication.Key.COMMAND: communication.Command.EXECUTE,
+            'entry_ids': [e.entry_id for e in self.get_selected_items()]
+        })
 
 
     def show_diff_vscode(self, entry: updater.Program_Entry):
