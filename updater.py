@@ -800,6 +800,9 @@ class Updater:
 
             elif command == communication.Command.TERMINATE:
 
+                for e in [e for e in self.entries if e.entry_id in item['entry_ids']]:
+                    e.is_manual_update = False
+
                 entries_to_terminate = [e for e in self.entries if e.status in (Status.UPDATING, Status.YIELDING, Status.SLEEPING) and e.entry_id in item['entry_ids']]
 
 
