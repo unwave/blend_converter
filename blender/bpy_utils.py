@@ -22,6 +22,7 @@ from . import bpy_modifier
 from . import bpy_material
 from . import bpy_mesh
 from . import bpy_data
+from . import bpy_action
 
 from .. import tool_settings
 from .. import utils
@@ -71,7 +72,7 @@ def iter_bone_names(action: bpy.types.Action):
 
     re_bone_animation = re.compile(r'pose.bones\["(.+)"\]')
 
-    for fcurve in action.fcurves:
+    for fcurve in bpy_action.iter_fcurves(action):
         match = re_bone_animation.match(fcurve.data_path)
         if match:
             yield b_utils.unescape_identifier(match.group(1))
@@ -460,7 +461,7 @@ def copy_action_range(action: bpy.types.Action, from_frame: float, to_frame: flo
 
     multiplayer = to_fps/from_fps
 
-    for fc in action.fcurves:
+    for fc in bpy_action.iter_fcurves(action):
 
         keyframe_to_delete = [keyframe for keyframe in fc.keyframe_points if keyframe.co[0] < from_frame or keyframe.co[0] > to_frame]
         for keyframe in reversed(keyframe_to_delete):

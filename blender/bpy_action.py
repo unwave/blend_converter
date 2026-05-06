@@ -290,7 +290,7 @@ def reset_pose_to_rest(object: bpy.types.Object):
 
 def move_action_keys_to_frame(action: bpy.types.Action, frame = 0):
 
-    for fc in action.fcurves:
+    for fc in iter_fcurves(action):
 
         if not fc.keyframe_points:
             continue
@@ -981,3 +981,20 @@ def get_graph_eccentricities(graph: typing.Dict[int, typing.Dict[int, float]]):
 
 
     return list(sorted(eccentricities.items(), key = operator.itemgetter(1)))
+
+
+
+def iter_fcurves(action: bpy.types.Action):
+    yield from action.fcurves
+
+
+def iter_fcurves_new(action: bpy.types.Action):
+
+    for layer in action.layers:
+        for strip in layer.strips:
+            for channelbag in strip.channelbags:
+                yield from channelbag.fcurves
+
+
+if not hasattr(bpy.types.Action, 'fcurves'):
+    iter_fcurves = iter_fcurves_new
