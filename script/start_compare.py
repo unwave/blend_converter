@@ -15,6 +15,12 @@ import bpy
 import mathutils
 
 
+import runpy
+
+BC_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+runpy.run_path(os.path.join(BC_ROOT, 'serialization.py'))['bootstrap']()
+
+
 from blend_converter.blender import bpy_utils
 from blend_converter import utils
 from blend_converter import root
