@@ -124,12 +124,23 @@ def get_blender_executable_windows():
         except Exception:
             return None
 
-    command = get_value(winreg.HKEY_CLASSES_ROOT, r'blendfile\shell\open\command', '')
+
+    prog_id = get_value(winreg.HKEY_CLASSES_ROOT, '.blend', '')
+    if not prog_id:
+        prog_id = 'blendfile'
+
+    command = get_value(winreg.HKEY_CLASSES_ROOT, fr'{prog_id}\shell\open\command', '')
     if command:
-        path = command.split('"')[1] # "C:\blender\blender-3.1.2-windows-x64\blender-launcher.exe" "%1"
-        path = os.path.join(os.path.dirname(path), 'blender.exe')
-        if os.path.exists(path):
-            return path
+
+        import shlex
+        blender_path = shlex.split(command)[0]  # "C:\blender\blender-3.1.2-windows-x64\blender-launcher.exe" "%1"
+
+        if os.path.basename(blender_path).lower() == 'blender-launcher.exe':
+            blender_path = os.path.join(os.path.dirname(blender_path), 'blender.exe')
+
+        if os.path.exists(blender_path):
+            return blender_path
+
 
     def get_stream_blender(stream_path: str, re_library_path = re.compile(r'"path"\W+"(.+)"')):
 
