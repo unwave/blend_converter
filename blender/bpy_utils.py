@@ -1011,10 +1011,11 @@ def pack_and_task(
 
         materials = list(group_objects_by_material(objects))
 
-        def pack_uvs(resolution: int, material_key: str):
+        def pack_uvs(width: int, height: int, material_key: str):
 
             _pack_settings = tool_settings.S_Pack_UVs(
-                resolution = resolution,
+                width = width,
+                height = height,
                 uv_layer_name = settings.uv_layer_bake,
                 material_key = material_key,
                 average_uv_scale = False,
@@ -1023,10 +1024,11 @@ def pack_and_task(
             bpy_uv.pack(objects, _pack_settings)
 
 
-        def ensure_pixel_per_island(resolution: int, material_key: str):
+        def ensure_pixel_per_island(width: int, height: int, material_key: str):
 
             _pack_settings = tool_settings.S_Pack_UVs(
-                    resolution = resolution,
+                    width = width,
+                    height = height,
                     uv_layer_name = settings.uv_layer_bake,
                     material_key = material_key,
                 )
@@ -1052,9 +1054,10 @@ def pack_and_task(
 
             _bake_settings = tool_settings.S_Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)._update(bake_settings)
 
-            if settings.resolution:
+            if not settings.use_texel_density:
                 # the final resolution is hard set
-                _bake_settings.resolution = settings.resolution
+                _bake_settings.width = settings.width
+                _bake_settings.height = settings.height
             else:
                 # pre packing to calculate the texel density
                 # to match the final resolution, we have to pack a second time for preciseness
@@ -1076,11 +1079,12 @@ def pack_and_task(
                     max_udim_count = 1,
                 )
 
-                _bake_settings.resolution = resolution
+                _bake_settings.width = resolution
+                _bake_settings.height = resolution
 
 
-            pack_uvs(_bake_settings.resolution, material_key)
-            ensure_pixel_per_island(_bake_settings.resolution, material_key)
+            pack_uvs(_bake_settings.width, _bake_settings.height, material_key)
+            ensure_pixel_per_island(_bake_settings.width, _bake_settings.height, material_key)
 
 
             bake_types = get_pbr_bake_types(

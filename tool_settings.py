@@ -304,12 +304,12 @@ class S_Bake(Settings):
 
     @property
     def _actual_width(self):
-        return self.width if self.width else self.resolution
+        return self.width
 
 
     @property
     def _actual_height(self):
-        return self.height if self.height else self.resolution
+        return self.height
 
 
     @property
@@ -320,13 +320,13 @@ class S_Bake(Settings):
     @property
     def _bake_width(self):
         """ An actual bake image width resolution. """
-        return int(self.width if self.width else self.resolution * self.resolution_multiplier)
+        return int(self.width * self.resolution_multiplier)
 
 
     @property
     def _bake_height(self):
         """ An actual bake image height resolution. """
-        return int(self.height if self.height else self.resolution * self.resolution_multiplier)
+        return int(self.height * self.resolution_multiplier)
 
 
     image_dir: str = os.path.join(tempfile.gettempdir(), 'blend_converter', 'default_image_dir')
@@ -338,29 +338,22 @@ class S_Bake(Settings):
     #### Default: `os.path.join(tempfile.gettempdir(), 'blend_converter', 'default_image_dir')`
     """
 
-    resolution: int = 1024
+    width: int = 1024
     """
-    Resolution of both X and Y sides of the image.
+    X Resolution
+
+    Width of the image.
 
     #### Default: `1024`
     """
 
-    width: int = 0
-    """
-    X Resolution
-
-    Width of the image, if not `0` then this is used instead of `resolution`.
-
-    #### Default: `0`
-    """
-
-    height: int = 0
+    height: int = 1024
     """
     Y Resolution
 
-    Height of the image, if not `0` then this is used instead of `resolution`.
+    Height of the image.
 
-    #### Default: `0`
+    #### Default: `1024`
     """
 
     merge_materials: bool = True
@@ -675,12 +668,11 @@ class S_Pack_UVs(Settings):
 
     @property
     def _actual_width(self):
-        return self.width if self.width else self.resolution
-
+        return self.width
 
     @property
     def _actual_height(self):
-        return self.height if self.height else self.resolution
+        return self.height
 
 
     @property
@@ -694,29 +686,22 @@ class S_Pack_UVs(Settings):
         return self._actual_padding / min(self._actual_height, self._actual_width)
 
 
-    resolution: int = 1024
+    width: int = 1024
     """
-    Resolution of both X and Y sides of the image.
+    X Resolution
+
+    Width of the image.
 
     #### Default: `1024`
     """
 
-    width: int = 0
-    """
-    X Resolution
-
-    Width of the image, if not `0` then this is used instead of `resolution`.
-
-    #### Default: `0`
-    """
-
-    height: int = 0
+    height: int = 1024
     """
     Y Resolution
 
-    Height of the image, if not `0` then this is used instead of `resolution`.
+    Height of the image.
 
-    #### Default: `0`
+    #### Default: `1024`
     """
 
     uv_layer_name: str = ''
@@ -744,7 +729,7 @@ class S_Pack_UVs(Settings):
 
     Due to how the margin generation is working and how Cycles is baking from the centers of the pixels, the values less than 4 are not generally working.
 
-    `-1` means calculated automatically: `max(4, self.resolution / 128 / 2)`
+    `-1` means calculated automatically: `max(4, min(self.height, self.width) / 128 / 2)`
 
     #### Default: `-1`
     """
@@ -812,7 +797,7 @@ class S_Pack_UVs(Settings):
         if self.padding >= 0:
             return self.padding
 
-        return max(4, self.resolution / 128 / 2)
+        return max(4, min(self.height, self.width) / 128 / 2)
 
 
 
@@ -1370,13 +1355,29 @@ class S_Bake_Materials(Settings):
     #### Default: `os.path.join(tempfile.gettempdir(), 'blend_converter', 'default_image_dir')`
     """
 
-    resolution: int = 1024
+    width: int = 1024
     """
-    Resolution of both X and Y sides of the image.
+    X Resolution
 
-    If `0` — `texel_density` is used.
+    Width of the image.
 
     #### Default: `1024`
+    """
+
+    height: int = 1024
+    """
+    Y Resolution
+
+    Height of the image.
+
+    #### Default: `1024`
+    """
+
+    use_texel_density: bool = False
+    """
+    Weather or not to use the texel density.
+
+    #### Default: `False`
     """
 
     texel_density: int = 1024
