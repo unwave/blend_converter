@@ -510,6 +510,8 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         with open(entry.program.settings_path, 'w') as f:
             entry.program._instructions_config.write(f)
 
+        self.main_frame.updater.poke_entries([entry])
+
 
     def on_terminate_selected(self, event):
 
