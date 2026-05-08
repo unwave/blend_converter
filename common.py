@@ -672,6 +672,9 @@ def apply_instruction_settings(instruction: Instruction, config: configparser.Co
         if item.override is SENTINEL:
             continue
 
+        if item.is_instruction_return:
+            continue
+
         positional_argument_index = key_to_index.get(item.path[1])
 
         if positional_argument_index is None:
