@@ -55,7 +55,7 @@ def get_pg_prop(item: common.Argument_Walk_Item):
     else:
         value = item.override
 
-    if item.is_read_only or is_type_mismatch:
+    if item.is_instruction_return or is_type_mismatch:
         property = get_read_only_property('.'.join(item.path), value, item.spec)
     else:
         property = get_property('.'.join(item.path), value, item.spec)

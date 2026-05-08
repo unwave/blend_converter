@@ -686,7 +686,7 @@ class Argument_Walk_Item(typing.NamedTuple):
     value: typing.Any
     spec: settings_base.Attribute_Spec
     override: typing.Any
-    is_read_only: bool
+    is_instruction_return: bool
 
 
 def _is_instruction_return(value: typing.Any):
