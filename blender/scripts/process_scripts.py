@@ -118,6 +118,10 @@ def process():
             utils.print_separator(char='█')
             utils.print_in_color(utils.get_color_code(256,256,256, 0, 150, 255), 'SCRIPT:', instruction['name'], "...", flush=True)
 
+            if not instruction['is_instruction_enabled']:
+                utils.print_in_color(utils.get_color_code(227, 123, 18, 20, 20, 20), "The instruction is disabled.")
+                continue
+
             script_start_time = time.perf_counter()
 
             func = serialization.Function.from_dict(instruction['function']).get()

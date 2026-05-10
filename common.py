@@ -103,7 +103,7 @@ def get_func_serialized(func: typing.Callable):
 class Instruction:
 
 
-    def __init__(self, identifier: str, executor, func: typing.Callable, *args, **kwargs):
+    def __init__(self, identifier: str, executor, func: typing.Callable, *args, is_instruction_enabled = True, **kwargs):
 
         self.func = func
         self.identifier = identifier
@@ -111,6 +111,7 @@ class Instruction:
         self.name: str = func.__name__
         self.args: typing.List[typing.Any] = list(args)
         self.kwargs: typing.Dict[str, typing.Any] = kwargs
+        self.is_instruction_enabled = is_instruction_enabled
 
 
     @property
@@ -139,6 +140,7 @@ class Instruction:
             kwargs = self.kwargs,
             sha256 = self.sha256,
             code = self.code,
+            is_instruction_enabled = self.is_instruction_enabled,
         )
 
     def __repr__(self):
@@ -270,6 +272,7 @@ class Program:
 
         for instruction, dictionary in zip(self.instructions, instructions):
             apply_instruction_settings(instruction, self._instructions_config, dictionary['args'], dictionary['kwargs'])
+            dictionary['is_instruction_enabled'] = get_is_instruction_enabled(instruction, self._instructions_config)
 
         return dict(
             instructions = instructions,
@@ -382,7 +385,14 @@ class Program:
 
                     apply_instruction_settings(instruction, self._instructions_config, args, kwargs)
 
-                    substituted_instructions.append(Instruction(instruction.identifier, instruction.executor, instruction.func, *args, **kwargs))
+                    substituted_instructions.append(Instruction(
+                        instruction.identifier,
+                        instruction.executor,
+                        instruction.func,
+                        *args,
+                        is_instruction_enabled = get_is_instruction_enabled(instruction, self._instructions_config),
+                        **kwargs,
+                    ))
 
                 executor.run(
                     instructions = substituted_instructions,
@@ -405,7 +415,7 @@ class Program:
         self.write_report()
 
 
-    def run(self, executor, func: 'typing.Callable[P, T]', *args: P.args, **kwargs: P.kwargs) -> T:
+    def run(self, executor, func: 'typing.Callable[P, T]', *args: P.args, is_instruction_enabled = True, **kwargs: P.kwargs) -> T:
         """ `args` and `kwargs` must be JSON serializable. """
 
 
@@ -419,7 +429,7 @@ class Program:
         self._instruction_identifiers.add(identifier)
 
 
-        instruction = Instruction(identifier, executor, func, *args, **kwargs)
+        instruction = Instruction(identifier, executor, func, *args, is_instruction_enabled = is_instruction_enabled, **kwargs)
         self.instructions.append(instruction)
 
 
@@ -675,6 +685,9 @@ def apply_instruction_settings(instruction: Instruction, config: configparser.Co
         if item.is_instruction_return:
             continue
 
+        if item.is_instruction_enabler:
+            continue
+
         positional_argument_index = key_to_index.get(item.path[1])
 
         if positional_argument_index is None:
@@ -690,10 +703,40 @@ class Argument_Walk_Item(typing.NamedTuple):
     spec: settings_base.Attribute_Spec
     override: typing.Any
     is_instruction_return: bool
+    is_instruction_enabler: bool = False
 
 
 def _is_instruction_return(value: typing.Any):
     return type(value) is dict and value.get(K_INSTRUCTION_IDENTIFIER)
+
+
+def _get_instruction_enabler_item(instruction: Instruction, config: configparser.ConfigParser):
+
+    path = [instruction.identifier, 'is_instruction_enabled']
+
+    spec = settings_base.Attribute_Spec(
+        name = 'is_instruction_enabled',
+        type = bool,
+        default = instruction.is_instruction_enabled
+    )
+
+    return Argument_Walk_Item(
+        path,
+        instruction.is_instruction_enabled,
+        spec,
+        _get_config_value(config, path, spec),
+        False,
+        is_instruction_enabler = True
+    )
+
+
+def get_is_instruction_enabled(instruction: Instruction, config: configparser.ConfigParser):
+
+    override = _get_instruction_enabler_item(instruction, config).override
+    if override is SENTINEL:
+        return instruction.is_instruction_enabled
+    else:
+        return override
 
 
 def iter_arguments(instruction: Instruction, config: configparser.ConfigParser):
@@ -709,6 +752,7 @@ def iter_arguments(instruction: Instruction, config: configparser.ConfigParser):
         else:
             arguments[key] = instruction.kwargs.get(key, parameter.default)
 
+    yield _get_instruction_enabler_item(instruction, config)
 
     instruction_path = [instruction.identifier]
 

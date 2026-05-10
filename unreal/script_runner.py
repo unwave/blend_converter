@@ -21,6 +21,9 @@ def run(data: dict):
 
     for script in data['instructions']:
 
+        if not script['is_instruction_enabled']:
+            continue
+
         func = serialization.Function.from_dict(script['function']).get()
 
         func(*script['args'], **script['kwargs'])

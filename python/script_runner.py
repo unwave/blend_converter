@@ -23,6 +23,9 @@ def main(data: dict):
 
     for script in instructions:
 
+        if not script['is_instruction_enabled']:
+            continue
+
         func = serialization.Function.from_dict(script['function']).get()
 
         func(
