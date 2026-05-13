@@ -1123,12 +1123,12 @@ BUTTONS_WITH_COUNT =[
 class Main_Frame(wxp_utils.Generic_Frame):
 
 
-    def __init__(self, definitions: typing.List[common.Program_Definition], columns: typing.Optional[typing.Iterable[typing.Tuple[str, int, typing.Callable[[int], str]]]] = None):
+    def __init__(self, program_collections: typing.List[common.Program_Collection], columns: typing.Optional[typing.Iterable[typing.Tuple[str, int, typing.Callable[[int], str]]]] = None):
 
-        self.updater = updater.Updater.from_entries(updater.get_program_entries(definitions))
+        self.updater = updater.Updater.from_entries(updater.get_program_entries(program_collections))
 
         if not self.updater.entries:
-            raise Exception(f"No programs provided in files: {definitions}")
+            raise Exception(f"No programs provided in files: {program_collections}")
 
         self.init_title = "Blend Converter"
 
@@ -1181,10 +1181,10 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     @classmethod
-    def get_app(cls, definitions: typing.List[common.Program_Definition], columns = None):
+    def get_app(cls, program_collections: typing.List[common.Program_Collection], columns = None):
 
         app = BC_App()
-        frame = cls(definitions, columns = columns)
+        frame = cls(program_collections, columns = columns)
         app.main_frame = frame
 
         is_console_shown = False

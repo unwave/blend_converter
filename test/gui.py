@@ -6,7 +6,7 @@ def main():
     from blend_converter.gui import updater_ui
     from blend_converter import common
 
-    app = updater_ui.Main_Frame.get_app([common.Program_Definition.from_callable(get_bake_program, get_keyword_arguments)])
+    app = updater_ui.Main_Frame.get_app([common.Program_Collection.from_callable(get_bake_program, get_keyword_arguments)])
 
     import psutil
     cpu_count = psutil.cpu_count(logical=False)

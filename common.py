@@ -553,7 +553,7 @@ class Config_Base:
             self.set_option(section, option, value)
 
 
-class Program_Definition:
+class Program_Collection:
 
 
     def __init__(

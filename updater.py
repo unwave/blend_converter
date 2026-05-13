@@ -356,15 +356,15 @@ class Blend_Event_Handler(watchdog_events.PatternMatchingEventHandler):
         self.queue.put(event.dest_path)
 
 
-def get_program_entries(definitions: typing.List[common.Program_Definition]):
+def get_program_entries(program_collections: typing.List[common.Program_Collection]):
 
     entries = []
 
-    for d in definitions:
+    for program_collection in program_collections:
 
-        for arguments in d.arguments_getter.get()(*d.args, **d.kwargs):
+        for arguments in program_collection.arguments_getter.get()(*program_collection.args, **program_collection.kwargs):
 
-            entries.append(Program_Entry(d.program_getter, arguments))
+            entries.append(Program_Entry(program_collection.program_getter, arguments))
 
     return entries
 
