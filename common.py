@@ -555,19 +555,62 @@ class Config_Base:
 
 class Program_Definition:
 
+
     def __init__(
                 self,
+                program_getter: serialization.Function,
+                arguments_getter: serialization.Function,
+                args: list,
+                kwargs: dict,
+            ):
+
+        self.program_getter = program_getter
+        self.arguments_getter = arguments_getter
+        self.args = args
+        self.kwargs = kwargs
+
+
+    @classmethod
+    def from_callable(
+                cls,
                 program_getter: typing.Callable,
                 arguments_getter: typing.Callable,
                 args: list = None,
                 kwargs: dict = None,
             ):
 
-        self.program_getter = serialization.Function.from_func(program_getter)
-        self.arguments_getter = serialization.Function.from_func(arguments_getter)
+        return cls(
+            program_getter = serialization.Function.from_func(program_getter),
+            arguments_getter = serialization.Function.from_func(arguments_getter),
+            args = [] if args is None else args,
+            kwargs = {} if kwargs is None else kwargs,
+        )
 
-        self.args = [] if args is None else args
-        self.kwargs = {} if kwargs is None else kwargs
+
+    @classmethod
+    def from_dict(
+                cls,
+                program_getter: dict,
+                arguments_getter: dict,
+                args: list = None,
+                kwargs: dict = None,
+            ):
+
+        return cls(
+            program_getter = serialization.Function.from_dict(program_getter),
+            arguments_getter = serialization.Function.from_dict(arguments_getter),
+            args = [] if args is None else args,
+            kwargs = {} if kwargs is None else kwargs,
+        )
+
+
+    def _to_dict(self):
+        return dict(
+            program_getter = self.program_getter._to_dict(),
+            arguments_getter = self.arguments_getter._to_dict(),
+            args = self.args,
+            kwargs = self.kwargs,
+        )
 
 
     def __repr__(self):
