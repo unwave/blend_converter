@@ -834,6 +834,7 @@ class Updater:
 
                 for entry in target_entries:
                     entry.program.write_report()
+                    entry.status = Status.OK
 
             elif command == communication.Command.POKE:
 
