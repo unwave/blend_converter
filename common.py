@@ -803,8 +803,10 @@ def iter_arguments(instruction: Instruction, config: configparser.ConfigParser):
 
         if index < len(instruction.args):
             arguments[key] = instruction.args[index]
+        elif not key in instruction.kwargs:
+            continue
         else:
-            arguments[key] = instruction.kwargs.get(key, parameter.default)
+            arguments[key] = instruction.kwargs[key]
 
     yield _get_instruction_enabler_item(instruction, config)
 
