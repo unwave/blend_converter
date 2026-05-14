@@ -571,14 +571,14 @@ class Program_Collection:
                 self,
                 program_getter: serialization.Function,
                 arguments_getter: serialization.Function,
-                args: list,
-                kwargs: dict,
+                args: list = None,
+                kwargs: dict = None,
             ):
 
         self.program_getter = program_getter
         self.arguments_getter = arguments_getter
-        self.args = args
-        self.kwargs = kwargs
+        self.args = [] if args is None else args
+        self.kwargs = {} if kwargs is None else kwargs
 
 
     @classmethod
@@ -593,8 +593,8 @@ class Program_Collection:
         return cls(
             program_getter = serialization.Function.from_func(program_getter),
             arguments_getter = serialization.Function.from_func(arguments_getter),
-            args = [] if args is None else args,
-            kwargs = {} if kwargs is None else kwargs,
+            args = args,
+            kwargs = kwargs,
         )
 
 
@@ -610,8 +610,8 @@ class Program_Collection:
         return cls(
             program_getter = serialization.Function.from_dict(program_getter),
             arguments_getter = serialization.Function.from_dict(arguments_getter),
-            args = [] if args is None else args,
-            kwargs = {} if kwargs is None else kwargs,
+            args = args,
+            kwargs = kwargs,
         )
 
 
