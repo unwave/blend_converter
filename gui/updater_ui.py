@@ -1615,12 +1615,12 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
 
     def on_show_app_scripts(self, event = None):
-        utils.os_show(utils.deduplicate(utils.deduplicate(e.module_file_path for e in self.updater.entries)))
+        utils.os_show(utils.deduplicate(e.programs_getter.package_file for e in self.updater.entries))
 
 
     def on_open_VSCode_workspace(self, event = None):
 
-        folders = utils.deduplicate(os.path.dirname(e.module_file_path) for e in self.updater.entries)
+        folders = utils.deduplicate(os.path.dirname(e.programs_getter.package_file) for e in self.updater.entries)
 
         for folder in folders:
             for path in os.scandir(folder):
