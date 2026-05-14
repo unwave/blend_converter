@@ -338,9 +338,9 @@ class Program_Entry:
 
 class Blend_Event_Handler(watchdog_events.PatternMatchingEventHandler):
 
-    def __init__(self, queue: queue.SimpleQueue,  *args, **kwargs):
+    def __init__(self, updater: 'Updater',  *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.queue = queue
+        self.updater = updater
 
     def on_any_event(self, event):
 
@@ -353,7 +353,11 @@ class Blend_Event_Handler(watchdog_events.PatternMatchingEventHandler):
         if not event.src_path == event.dest_path + '@':
             return
 
-        self.queue.put(event.dest_path)
+        entries = self.updater.source_path_to_entry.get(event.dest_path)
+        if not entries:
+            return
+
+        self.updater.poke_entries(entries)
 
 
 def get_program_entries(program_collections: typing.List[common.Program_Collection]):
@@ -449,8 +453,7 @@ class Updater:
 
     def init_observer(self):
 
-        self.queue = queue.SimpleQueue()
-        self.event_handler = Blend_Event_Handler(self.queue, patterns=['*.blend'])
+        self.event_handler = Blend_Event_Handler(self, patterns=['*.blend'])
 
         self.observer = watchdog_observers.Observer()
         self.observer.start()
