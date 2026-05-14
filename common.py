@@ -60,14 +60,25 @@ class File:
 
 
     def _to_dict(self):
-        stat = os.stat(self.path)
 
-        return dict(
-            _type = type(self).__name__,
-            path = self.path,
-            mtime = stat.st_mtime,
-            size = stat.st_size,
-        )
+        try:
+            stat = os.stat(self.path)
+
+            return dict(
+                _type = type(self).__name__,
+                path = self.path,
+                mtime = stat.st_mtime,
+                size = stat.st_size,
+            )
+
+        except FileNotFoundError:
+
+            return dict(
+                _type = type(self).__name__,
+                path = self.path,
+                mtime = 0,
+                size = 0,
+            )
 
 
     @property
