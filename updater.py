@@ -338,26 +338,38 @@ class Program_Entry:
 
 class Blend_Event_Handler(watchdog_events.PatternMatchingEventHandler):
 
+
     def __init__(self, updater: 'Updater',  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.updater = updater
 
+
     def on_any_event(self, event):
 
-        if not isinstance(event, watchdog_events.FileMovedEvent):
-            return
 
         if event.is_directory:
             return
 
-        if not event.src_path == event.dest_path + '@':
-            return
 
-        entries = self.updater.source_path_to_entry.get(event.dest_path)
+        paths = []
+
+        if hasattr(event, 'dest_path'):
+            paths.append(event.dest_path)
+
+        if hasattr(event, 'src_path'):
+            paths.append(event.src_path)
+
+
+        entries = []
+
+        for path in paths:
+            entries.extend(self.updater.source_path_to_entry.get(path, ()))
+
         if not entries:
             return
 
-        self.updater.poke_entries(entries)
+
+        self.updater.poke_entries(list(dict.fromkeys(entries)))
 
 
 def get_program_entries(program_collections: typing.List[common.Program_Collection]):
