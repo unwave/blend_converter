@@ -52,6 +52,9 @@ def open_mainfile(filepath: str, load_ui = True, use_scripts = False):
     except RuntimeError as e:
         print(e)
 
+        if not os.path.exists(filepath):
+            raise Exception(f"File does not exist: {filepath}")
+
     blend_inspector.inspect_if_has_identifier(blend_inspector.COMMON.INSPECT_BLEND_OPEN)
 
 
