@@ -183,7 +183,7 @@ class Program:
         """ Used for the GUI """
 
         if report_path is None:
-            self.report_path = self.result_path + '.json'
+            self.report_path = self.result_path + '.bc_report'
         else:
             self.report_path = os.fspath(report_path)
 
