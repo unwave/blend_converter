@@ -1051,11 +1051,11 @@ class Button:
     CONFIGURE = Button_Data("Factory", icon = '🏭', description = "Open the active entry's configuration.")
     OVERRIDE = Button_Data("Arguments", icon = '✏️', description = "Open instruction override GUI.")
 
-    SHOW_SOURCE_FILES = Button_Data("Show Source", wx_icon = wx.ART_FIND, description = "Show source files in the file explorer.")
-    SHOW_RESULT_FILES = Button_Data("Show Result", wx_icon = wx.ART_FIND, description = "Show result files in the file explorer.")
+    SHOW_SOURCE_FILES = Button_Data("Show Source", wx_icon = wx.ART_FIND, description = "Show source files in the file explorer. [Ctrl + Double Left Mouse]")
+    SHOW_RESULT_FILES = Button_Data("Show Result", wx_icon = wx.ART_FIND, description = "Show result files in the file explorer. [Alt + Double Left Mouse]")
 
-    EDIT_SOURCE_FILES = Button_Data("Edit Source", icon = '🌱', description = "Open the source files.")
-    EDIT_RESULT_FILES = Button_Data("Edit Result", icon = '🏆', description = "Open the result files.")
+    EDIT_SOURCE_FILES = Button_Data("Edit Source", icon = '🌱', description = "Open the source files. [Shift + Ctrl + Double Left Mouse]")
+    EDIT_RESULT_FILES = Button_Data("Edit Result", icon = '🏆', description = "Open the result files. [Shift + Alt + Double Left Mouse]")
 
     PAUSE = Button_Data("Pause", icon = '⏸️', description = "Pause the live execution.")
     RESUME = Button_Data("Resume", icon = '▶️', description = "Resume the live execution.")
@@ -1076,7 +1076,7 @@ class Button:
 
     SHOW_PYTHON_SCRIPTS = Button_Data("Show Python Script", wx_icon = wx.ART_FIND, description = "Show the Python scripts the file explore.")
 
-    COMPARE = Button_Data("Compare", icon = '🧐', icon_color = (227, 114, 0), description = "Compare the active entry's source and result files in Blender.")
+    COMPARE = Button_Data("Compare", icon = '🧐', icon_color = (227, 114, 0), description = "Compare the active entry's source and result files in Blender. [Shift + Ctrl + Alt + Double Left Mouse]")
 
     DIFF_VSCODE = Button_Data("Diff VSCode", wx_icon = wx.ART_MISSING_IMAGE, description = "Show the difference in the program instructions in VSCode.")
     DIFF = Button_Data("Diff", wx_icon = wx.ART_MISSING_IMAGE, description = "Show the difference in the program instructions.")
