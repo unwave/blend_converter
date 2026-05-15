@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import typing
 import uuid
 import tempfile
@@ -707,7 +708,7 @@ def _replace_argument(arguments: typing.Union[list, dict], key: typing.Union[int
         _replace_dictionary_argument_recursive(arguments[key], path, value)
 
 
-def _get_config_value(config: configparser.ConfigParser, path: typing.List[str], spec: settings_base.Attribute_Spec):
+def _get_config_value_strict(config: configparser.ConfigParser, path: typing.List[str], spec: settings_base.Attribute_Spec):
 
     section = path[0]
     option = '.'.join(path[1:])
@@ -721,8 +722,20 @@ def _get_config_value(config: configparser.ConfigParser, path: typing.List[str],
         return config.getint(section, option)
     elif spec.type is float:
         return config.getfloat(section, option)
-    else:
+    elif spec.type is str:
         return config.get(section, option)
+    else:
+        return SENTINEL
+
+
+@functools.wraps(_get_config_value_strict)
+def _get_config_value(*args, **kwargs):
+
+    try:
+        return _get_config_value_strict(*args, **kwargs)
+    except Exception as e:
+        print(e, file = sys.stderr)
+        return SENTINEL
 
 
 def apply_instruction_settings(instruction: Instruction, config: configparser.ConfigParser, args: list, kwargs: dict):
