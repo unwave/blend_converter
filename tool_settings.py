@@ -1373,6 +1373,24 @@ class S_Bake_Materials(Settings):
     #### Default: `1024`
     """
 
+    alpha_width: int = 1024
+    """
+    X Resolution
+
+    Width of the alpha image.
+
+    #### Default: `1024`
+    """
+
+    alpha_height: int = 1024
+    """
+    Y Resolution
+
+    Height of the alpha image.
+
+    #### Default: `1024`
+    """
+
     use_texel_density: bool = False
     """
     Weather or not to use the texel density.

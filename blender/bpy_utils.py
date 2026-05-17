@@ -1055,9 +1055,14 @@ def pack_and_task(
             _bake_settings = tool_settings.S_Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)._update(bake_settings)
 
             if not settings.use_texel_density:
-                # the final resolution is hard set
-                _bake_settings.width = settings.width
-                _bake_settings.height = settings.height
+
+                if material_key == alpha_material_key:
+                    _bake_settings.width = settings.alpha_width
+                    _bake_settings.height = settings.alpha_height
+                else:
+                    _bake_settings.width = settings.width
+                    _bake_settings.height = settings.height
+
             else:
                 # pre packing to calculate the texel density
                 # to match the final resolution, we have to pack a second time for preciseness
