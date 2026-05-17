@@ -8,10 +8,6 @@ from .. import settings_base
 from .. import common
 
 
-def to_json(value):
-    return json.dumps(value, ensure_ascii = False, default = lambda x: repr(x))
-
-
 def get_property(name: str, value: typing.Any, spec: settings_base.Attribute_Spec):
 
     if spec.type is int:
@@ -30,7 +26,7 @@ def get_property(name: str, value: typing.Any, spec: settings_base.Attribute_Spe
     elif spec.type is str:
         return pg.StringProperty(spec.name, name, value)
     else:
-        prop = pg.StringProperty(spec.name + ' [UNSUPPORTED]', name, to_json(value))
+        prop = pg.StringProperty(spec.name + ' [UNSUPPORTED]', name, repr(value))
         prop.Enable(False)
         return prop
 
