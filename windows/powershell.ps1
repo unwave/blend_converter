@@ -16,6 +16,24 @@ function Get-LnkTarget([PSCustomObject]$arguments) {
 }
 
 
+function Create-ShortCut([PSCustomObject]$arguments) {
+
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    $name = $arguments.Name + ".lnk"
+    $shortcut_path = Join-Path -Path $desktop -ChildPath $name
+
+    $shortcut = $script_shell.CreateShortcut($shortcut_path)
+
+    $shortcut.TargetPath = $arguments.TargetPath
+    $shortcut.Arguments = $arguments.Arguments
+    $Shortcut.WorkingDirectory = $arguments.WorkingDirectory
+
+    $shortcut.Save()
+
+    return @{ path = $shortcut_path }
+}
+
+
 :mainLoop while ($true) {
 
     $raw_request = [Console]::ReadLine()
@@ -36,6 +54,10 @@ function Get-LnkTarget([PSCustomObject]$arguments) {
 
         'Get-LnkTarget' {
             $response = @{ status = "ok"; result = Get-LnkTarget $request.arguments }
+        }
+
+        'Create-ShortCut' {
+            $response = @{ status = "ok"; result = Create-ShortCut $request.arguments }
         }
 
         Default {
