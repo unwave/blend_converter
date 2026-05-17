@@ -838,6 +838,7 @@ class Updater:
                 target_entries = [e for e in self.entries if e.status in (Status.OK, Status.ERROR) and e.entry_id in item['entry_ids']]
 
                 for entry in target_entries:
+                    entry.program.write_report({'instructions': [], 'comment': "This report was forced written as STALE."})
                     entry.status = Status.STALE
 
             elif command == communication.Command.SET_AS_OK:
@@ -845,7 +846,7 @@ class Updater:
                 target_entries = [e for e in self.entries if e.status in (Status.STALE, Status.ERROR) and e.entry_id in item['entry_ids']]
 
                 for entry in target_entries:
-                    entry.program.write_report()
+                    entry.program.write_report({'comment': "This report was forced written as OK."})
                     entry.status = Status.OK
 
             elif command == communication.Command.POKE:

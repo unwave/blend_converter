@@ -235,7 +235,7 @@ class Program:
                 return {}
 
 
-    def write_report(self):
+    def write_report(self, extra: dict = None):
         """ Write the current instructions with additional information. """
 
         report = self.read_report()
@@ -254,6 +254,9 @@ class Program:
         report['write_count'] = report.get('write_count', 0) + 1
         report['write_times'] = report.get('write_times', []) + [now.timestamp()]
         report['write_times_str'] = report.get('write_times_str', []) + [now.astimezone().isoformat(' ', 'seconds')]
+
+        if extra:
+            report.update(extra)
 
         os.makedirs(os.path.dirname(self.report_path), exist_ok = True)
 
