@@ -1086,7 +1086,7 @@ class Button:
     SET_AS_NEEDS_UPDATE = Button_Data("Set As Stale", icon = '🦕', icon_color = (166, 171, 0), description = "Change the status of the entries to stale.")
     POKE = Button_Data("Poke", icon = '👇', description = "Refresh the status.")
 
-    COPY_COMMAND = Button_Data("Command", wx_icon = wx.ART_COPY, description = "Copy the execution command for a command line interface.")
+    COPY_COMMAND = Button_Data("Command", wx_icon = wx.ART_COPY, description = "Copy the execution command for a command line interface. [Ctrl + C]")
     COPY_FOLDER_BASENAME = Button_Data("Folder Basename", wx_icon = wx.ART_COPY, description = "Copy the source folder base name.")
     COPY_SOURCE_PATH = Button_Data("Source Path", wx_icon = wx.ART_COPY, description = "Copy the source path.")
 
