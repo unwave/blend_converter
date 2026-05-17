@@ -809,6 +809,15 @@ def get_is_instruction_enabled(instruction: Instruction, config: configparser.Co
         return override
 
 
+class Read_Only:
+
+    def __init__(self, value):
+        self.value = value
+
+    def __repr__(self):
+        return repr(self.value)
+
+
 def iter_arguments(instruction: Instruction, config: configparser.ConfigParser):
 
     signature = inspect.signature(instruction.func)
@@ -820,7 +829,10 @@ def iter_arguments(instruction: Instruction, config: configparser.ConfigParser):
         if index < len(instruction.args):
             arguments[key] = instruction.args[index]
         elif not key in instruction.kwargs:
-            continue
+            if type(parameter.default) in (bool, int, float, str):
+                arguments[key] = parameter.default
+            else:
+                arguments[key] = Read_Only(parameter.default)
         else:
             arguments[key] = instruction.kwargs[key]
 
