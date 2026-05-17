@@ -1678,7 +1678,6 @@ class Main_Frame(wxp_utils.Generic_Frame):
             if entry.psutil_process:
                 utils.kill_process(entry.psutil_process)
 
-        # TODO: does not work for argv with spaces
 
         position = self.GetPosition()
         size = self.GetSize()
@@ -1699,13 +1698,16 @@ class Main_Frame(wxp_utils.Generic_Frame):
 
         command = [
             sys.executable,
-            utils.get_command_from_list(argv),  # https://github.com/python/cpython/issues/64650
-            utils.get_command_from_list(['__restart__', json.dumps(restart_info)]),
+            *argv,
+            '__restart__',
+            json.dumps(restart_info),
         ]
 
         self.show_console(True)
 
-        os.execv(sys.executable, command)
+        wx.CallAfter(subprocess.Popen, command)
+
+        self.Close(force = True)
 
 
     def on_settings(self, event):
