@@ -171,7 +171,11 @@ def get_viewport_camera_data():
 
         'fov': math.degrees(2.0 * math.atan((sensor_width / 2.0) / space_view.lens * zoom)),
         'near': space_view.clip_start,
-        'far': space_view.clip_end
+        'far': space_view.clip_end,
+
+        'view_location': list(space_view.region_3d.view_location),
+        'view_rotation': list(space_view.region_3d.view_rotation),
+        'view_distance': space_view.region_3d.view_distance,
     }
 
 

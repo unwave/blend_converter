@@ -138,7 +138,11 @@ def update_scene():
     # m = m @ CAMERA_ROTATION
 
     if pre_view_matrix != data['view_matrix']:
-        space_view.region_3d.view_matrix = data['view_matrix']
+
+        space_view.region_3d.view_location = data['view_location']
+        space_view.region_3d.view_rotation = data['view_rotation']
+        space_view.region_3d.view_distance = data['view_distance']
+
 
     pre_view_matrix = data['view_matrix']
 
