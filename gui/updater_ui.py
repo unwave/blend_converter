@@ -1165,6 +1165,7 @@ class Main_Frame(wxp_utils.Generic_Frame):
         self.init_ui()
         self.init_ribbon_events()
         self.map_button_to_id()
+        self.remove_wip_buttons()
         self.update_ribbon_state(True)
         self.ribbon.Realize()
         self.update_ribbon_state()
@@ -1353,14 +1354,37 @@ class Main_Frame(wxp_utils.Generic_Frame):
                                     self.button_id_to_bar[bar.GetItemId(bar.GetItem(i))] = bar
 
 
+    def remove_wip_buttons(self):
+
+        self.delete_button(Button.CONFIGURE.id)
+        self.delete_button(Button.SETTINGS.id)
+
+
     def enable_button(self, id: wx.WindowIDRef, enable: bool):
+
         bar = self.button_id_to_bar[id]
+        if not bar.GetItemById(id):
+            return
+
         bar.EnableButton(id, enable)
 
 
     def set_button_text(self, id: wx.WindowIDRef, text: str):
+
         bar = self.button_id_to_bar[id]
+        if not bar.GetItemById(id):
+            return
+
         bar.SetButtonText(id, text)
+
+
+    def delete_button(self, id: wx.WindowIDRef):
+
+        bar = self.button_id_to_bar[id]
+        if not bar.GetItemById(id):
+            return
+
+        bar.DeleteButton(id)
 
 
     def update_ribbon_state(self, initial = False):
