@@ -726,6 +726,14 @@ class Updater:
                 entry.status = Status.ERROR
 
 
+        def get_entries():
+            return [e for e in self.entries if e.entry_id in item['entry_ids']]
+
+
+        def get_entry():
+            return next(e for e in self.entries if e.entry_id == item['entry_id'])
+
+
         for item in iter(self.updater_command_queue.get, SENTINEL):
 
             print("[updater got]:", item)
@@ -749,7 +757,7 @@ class Updater:
 
             elif command == communication.Command.SUSPEND_OTHERS:
 
-                entry_to_yield_for = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
+                entry_to_yield_for = get_entry()
 
                 if not get_active_yield_target() or get_active_yield_target() is entry_to_yield_for:
                     make_others_yield([entry_to_yield_for])
@@ -761,7 +769,7 @@ class Updater:
 
             elif command == communication.Command.RESUME_OTHERS:
 
-                entry_to_yield_for = next(entry for entry in self.entries if entry.entry_id == item['entry_id'])
+                entry_to_yield_for = get_entry()
 
                 if get_active_yield_target() is entry_to_yield_for:
                     release_yielding_others([entry_to_yield_for])
@@ -773,7 +781,7 @@ class Updater:
 
             elif command == communication.Command.SLEEP:
 
-                target_entries = [e for e in self.entries if e.status in (Status.UPDATING, Status.YIELDING) and e.entry_id in item['entry_ids']]
+                target_entries = [e for e in get_entries() if e.status in (Status.UPDATING, Status.YIELDING)]
 
 
                 if not target_entries:
@@ -791,7 +799,7 @@ class Updater:
 
             elif command == communication.Command.WAKE:
 
-                target_sleeping_entries = [e for e in self.entries if e.status == Status.SLEEPING and e.entry_id in item['entry_ids']]
+                target_sleeping_entries = [e for e in get_entries() if e.status == Status.SLEEPING]
 
 
                 if not target_sleeping_entries:
@@ -822,10 +830,12 @@ class Updater:
 
             elif command == communication.Command.TERMINATE:
 
-                for e in [e for e in self.entries if e.entry_id in item['entry_ids']]:
+                target_entries = get_entries()
+
+                for e in target_entries:
                     e.is_manual_update = False
 
-                entries_to_terminate = [e for e in self.entries if e.status in ACTIVE_ENTRIES and e.entry_id in item['entry_ids']]
+                entries_to_terminate = [e for e in target_entries if e.status in ACTIVE_ENTRIES]
 
 
                 if not entries_to_terminate:
@@ -842,7 +852,7 @@ class Updater:
 
             elif command == communication.Command.SET_AS_STALE:
 
-                target_entries = [e for e in self.entries if e.status in (Status.OK, Status.ERROR) and e.entry_id in item['entry_ids']]
+                target_entries = [e for e in get_entries() if e.status in (Status.OK, Status.ERROR)]
 
                 for entry in target_entries:
                     entry.program.write_report({'instructions': [], 'comment': "This report was forced written as STALE."})
@@ -850,7 +860,7 @@ class Updater:
 
             elif command == communication.Command.SET_AS_OK:
 
-                target_entries = [e for e in self.entries if e.status in (Status.STALE, Status.ERROR) and e.entry_id in item['entry_ids']]
+                target_entries = [e for e in get_entries() if e.status in (Status.STALE, Status.ERROR)]
 
                 for entry in target_entries:
                     entry.program.write_report({'comment': "This report was forced written as OK."})
@@ -858,7 +868,7 @@ class Updater:
 
             elif command == communication.Command.POKE:
 
-                target_entries = [e for e in self.entries if e.status not in ACTIVE_ENTRIES and e.entry_id in item['entry_ids']]
+                target_entries = [e for e in get_entries() if e.status not in ACTIVE_ENTRIES]
 
                 for entry in target_entries:
                     if self.has_non_updated_dependency(entry):
@@ -868,7 +878,7 @@ class Updater:
 
             elif command == communication.Command.JOIN:
 
-                entry = next(e for e in self.entries if e.entry_id == item['entry_id'])
+                entry = get_entry()
 
                 if entry.thread_identity == item['thread_identity']:
 
@@ -883,8 +893,7 @@ class Updater:
 
             elif command == communication.Command.EXECUTE:
 
-                entries = [e for e in self.entries if e.entry_id in item['entry_ids']]
-                target_entries = [e for e in entries if e.status not in ACTIVE_ENTRIES and not e.is_manual_update]
+                target_entries = [e for e in get_entries() if e.status not in ACTIVE_ENTRIES and not e.is_manual_update]
 
                 for entry in target_entries:
                     entry.is_manual_update = True
