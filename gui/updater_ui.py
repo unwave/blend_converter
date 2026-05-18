@@ -57,7 +57,8 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         self.main_frame: Main_Frame = self.GetTopLevelParent()
 
         self.columns = [
-            ('live', 40, self.get_column_live_update),
+            ('🔨', 40, self.get_column_execution),
+            ('▶️', 40, self.get_column_live_update),
             ('ℹ️', 40, self.get_column_icon_status),
             ('status', 175, self.get_column_status),
             ('path', 800, self.get_column_path),
@@ -128,10 +129,15 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
     def get_column_live_update(self, item: updater.Program_Entry):
-        if item.is_manual_update:
-            return '🚀'
-        elif item.is_live_update:
+        if item.is_live_update:
             return '⚡'
+        else:
+            return ''
+
+
+    def get_column_execution(self, item: updater.Program_Entry):
+        if item.is_manual_update:
+            return '🚩'
         else:
             return ''
 
