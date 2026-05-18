@@ -54,6 +54,13 @@ STATUS_ICON = {
     Status.SLEEPING: '💤',
 }
 
+ACTIVE_ENTRIES = {
+    Status.UPDATING,
+    Status.YIELDING,
+    Status.SLEEPING,
+}
+""" Entries that have a process attached to them. """
+
 
 def get_status(program: common.Program):
 
@@ -514,7 +521,7 @@ class Updater:
 
 
     def total_max_parallel_executions_exceeded(self):
-        return sum(entry.status in (Status.UPDATING, Status.YIELDING, Status.SLEEPING) for entry in self.entries) >= self.total_max_parallel_executions
+        return sum(entry.status in ACTIVE_ENTRIES for entry in self.entries) >= self.total_max_parallel_executions
 
 
     def _despatch(self):
@@ -607,7 +614,7 @@ class Updater:
 
     def max_executions_per_tag_exceeded(self, tags: typing.Iterable[str]):
 
-        updating_entries = [entry for entry in self.entries if entry.status in (Status.UPDATING, Status.YIELDING, Status.SLEEPING)]
+        updating_entries = [entry for entry in self.entries if entry.status in ACTIVE_ENTRIES]
 
         execution_limiting_tags = [tag for tag in tags if tag in self.max_parallel_execution_per_tag]
         if not execution_limiting_tags:
@@ -818,7 +825,7 @@ class Updater:
                 for e in [e for e in self.entries if e.entry_id in item['entry_ids']]:
                     e.is_manual_update = False
 
-                entries_to_terminate = [e for e in self.entries if e.status in (Status.UPDATING, Status.YIELDING, Status.SLEEPING) and e.entry_id in item['entry_ids']]
+                entries_to_terminate = [e for e in self.entries if e.status in ACTIVE_ENTRIES and e.entry_id in item['entry_ids']]
 
 
                 if not entries_to_terminate:
@@ -851,7 +858,7 @@ class Updater:
 
             elif command == communication.Command.POKE:
 
-                target_entries = [e for e in self.entries if e.status not in (Status.UPDATING, Status.YIELDING, Status.SLEEPING) and e.entry_id in item['entry_ids']]
+                target_entries = [e for e in self.entries if e.status not in ACTIVE_ENTRIES and e.entry_id in item['entry_ids']]
 
                 for entry in target_entries:
                     if self.has_non_updated_dependency(entry):
@@ -877,7 +884,7 @@ class Updater:
             elif command == communication.Command.EXECUTE:
 
                 entries = [e for e in self.entries if e.entry_id in item['entry_ids']]
-                target_entries = [e for e in entries if e.status not in (Status.UPDATING, Status.YIELDING, Status.SLEEPING) and not e.is_manual_update]
+                target_entries = [e for e in entries if e.status not in ACTIVE_ENTRIES and not e.is_manual_update]
 
                 for entry in target_entries:
                     entry.is_manual_update = True
