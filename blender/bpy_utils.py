@@ -1148,6 +1148,7 @@ def copy_and_bake(
         isolate_object_hierarchies = False,
         split_faces_by_materials = True,
         use_uv_texture_jitter = True,
+        use_view_space_normals = True,
     ):
     """
     `pre_bake_labels`: Bakes and replaces the nodes with the labels specified. See `label_mix_shader_nodes` and `bake_by_label`.
@@ -1232,7 +1233,7 @@ def copy_and_bake(
                 bake_and_replace_by_label([bake_proxy], pre_bake_labels, bake_settings)
 
                 any_use_denoise = assign_use_denoise([bake_proxy], bake_settings)
-                if any_use_denoise:
+                if any_use_denoise and use_view_space_normals:
                     bake_settings.view_space_normals_id = bake_world_space_normal([bake_proxy], bake_settings)
 
                 bpy_bake.bake([bake_proxy], bake_settings)
