@@ -1448,7 +1448,8 @@ class Main_Frame(wxp_utils.Generic_Frame):
             count = len(selected)
             running_entries_count = sum(entry.status in (updater.Status.UPDATING, updater.Status.YIELDING) for entry in selected)
             sleeping_entries = sum(entry.status == updater.Status.SLEEPING for entry in selected)
-            terminatable_entries = running_entries_count + sleeping_entries
+            queued_entries = sum(entry.status not in (updater.Status.UPDATING, updater.Status.YIELDING, updater.Status.SLEEPING) and entry.is_manual_update for entry in selected)
+            terminatable_entries = running_entries_count + sleeping_entries + queued_entries
             executable_entries = count - sum(entry.status in (updater.Status.UPDATING, updater.Status.YIELDING, updater.Status.SLEEPING) or entry.is_manual_update for entry in selected)
 
 
