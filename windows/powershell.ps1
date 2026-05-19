@@ -2,6 +2,7 @@
 
 
 $script:script_shell = New-Object -ComObject WScript.Shell
+$script:shell_application = New-Object -ComObject Shell.Application
 
 
 function Get-LnkTarget([PSCustomObject]$arguments) {
@@ -22,11 +23,14 @@ function Create-ShortCut([PSCustomObject]$arguments) {
     $name = $arguments.Name + ".lnk"
     $shortcut_path = Join-Path -Path $desktop -ChildPath $name
 
-    $shortcut = $script_shell.CreateShortcut($shortcut_path)
+    $script_shell.CreateShortcut($shortcut_path).Save()
 
-    $shortcut.TargetPath = $arguments.TargetPath
+    $name_space = $script:shell_application.NameSpace($desktop)
+    $shortcut = $name_space.ParseName($name).GetLink
+
+    $shortcut.Path = $arguments.TargetPath
     $shortcut.Arguments = $arguments.Arguments
-    $Shortcut.WorkingDirectory = $arguments.WorkingDirectory
+    $shortcut.WorkingDirectory = $arguments.WorkingDirectory
 
     $shortcut.Save()
 
