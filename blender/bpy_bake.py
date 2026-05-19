@@ -151,6 +151,18 @@ SRGB_SOCKETS = {
 }
 
 
+def get_current_frame_suffix():
+
+    frame_current = bpy.context.scene.frame_current
+
+    suffix = str(abs(frame_current)).zfill(4)
+
+    if frame_current < 0:
+        suffix = '-' + suffix
+
+    return suffix
+
+
 class Compositor_Image_Channel:
 
     RGB = -1
@@ -560,7 +572,7 @@ class Baked_Image:
                     if bpy.app.version >= (5, 0):
                         pass
                     else:
-                        os.replace(final_path + str(bpy.context.scene.frame_current).zfill(4), final_path)
+                        os.replace(final_path + get_current_frame_suffix(), final_path)
 
                 if self.settings.fake_bake:
                     image = bpy.data.images.new(name=self.image_name, width=4, height=4)
