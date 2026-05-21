@@ -1629,6 +1629,7 @@ def unwrap_ministry_of_flat_with_fallback(
                     correct_aspect=False,
                 )
 
+            bpy_context.set_mode([object_copy], 'OBJECT', bpy.context.view_layer)
 
         copy_uv(object_copy, object, settings.uv_layer_name)
 
