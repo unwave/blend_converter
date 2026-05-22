@@ -1404,7 +1404,14 @@ def set_mode(objects: typing.List[bpy.types.Object], mode: str, view_layer: 'bpy
         elif "Unable to execute 'Edit Mode', error changing modes" in str(error):
             raise Exception(text + "\n\t" + str(error).strip() + "\n\t" + "Try to ensure the objects are local.") from error
         else:
-            raise Exception(text + "\n\t" + "Unknown reason.") from error
+            print("Fallback:", text, file = sys.stderr)
+
+            for object in objects:
+
+                set_mode([object], mode, view_layer)
+
+                if object.mode != mode:
+                    raise Exception(f"Cannot change the mode of the object: {object.name_full}")
 
 
 class Focus:
