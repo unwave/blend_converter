@@ -10,32 +10,32 @@ class UE_Remote_Execution_Handler:
 
     def __init__(
             self,
-            MULTICAST_GROUP_ADDRESS = '239.0.0.1',
-            MULTICAST_GROUP_PORT = 6766,
-            MULTICAST_BIND_ADDRESS = '127.0.0.1',
-            RECEIVE_BUFFER_SIZE = 2 * 2 ** 20,
-            MULTICAST_TTL = 0,
-            COMMAND_ENDPOINT = ('127.0.0.1', 6776),
+            multicast_group_address = '239.0.0.1',
+            multicast_group_port = 6766,
+            multicast_bind_address = '127.0.0.1',
+            receive_buffer_size = 2 * 2 ** 20,
+            multicast_ttl = 0,
+            command_endpoint = ('127.0.0.1', 6776),
             ):
 
-        self.MULTICAST_GROUP_ADDRESS = MULTICAST_GROUP_ADDRESS
-        self.MULTICAST_GROUP_PORT = MULTICAST_GROUP_PORT
-        self.MULTICAST_BIND_ADDRESS = MULTICAST_BIND_ADDRESS
+        self.multicast_group_address = multicast_group_address
+        self.multicast_group_port = multicast_group_port
+        self.multicast_bind_address = multicast_bind_address
 
-        self.RECEIVE_BUFFER_SIZE = RECEIVE_BUFFER_SIZE
-        self.MULTICAST_TTL = MULTICAST_TTL
+        self.receive_buffer_size = receive_buffer_size
+        self.multicast_ttl = multicast_ttl
 
-        self.COMMAND_ENDPOINT = COMMAND_ENDPOINT
-
-
-    @property
-    def MULTICAST_GROUP_ENDPOINT(self):
-        return (self.MULTICAST_GROUP_ADDRESS, self.MULTICAST_GROUP_PORT)
+        self.command_endpoint = command_endpoint
 
 
     @property
-    def MULTICAST_ENDPOINT(self):
-        return (self.MULTICAST_BIND_ADDRESS, self.MULTICAST_GROUP_PORT)
+    def multicast_group_endpoint(self):
+        return (self.multicast_group_address, self.multicast_group_port)
+
+
+    @property
+    def multicast_endpoint(self):
+        return (self.multicast_bind_address, self.multicast_group_port)
 
 
     def __enter__(self):
@@ -45,10 +45,10 @@ class UE_Remote_Execution_Handler:
         self._init_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self._init_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
         self._init_socket.setsockopt(socket.IPPROTO_UDP, socket.TCP_NODELAY, True)
-        self._init_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.MULTICAST_TTL)
-        self._init_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(self.MULTICAST_GROUP_ADDRESS) + socket.inet_aton(self.MULTICAST_BIND_ADDRESS))
+        self._init_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.multicast_ttl)
+        self._init_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(self.multicast_group_address) + socket.inet_aton(self.multicast_bind_address))
         self._init_socket.settimeout(1)
-        self._init_socket.bind(self.MULTICAST_ENDPOINT)
+        self._init_socket.bind(self.multicast_endpoint)
 
         data = {
             "version": 1,
@@ -58,13 +58,13 @@ class UE_Remote_Execution_Handler:
         }
         data = json.dumps(data).encode('utf-8')
 
-        self._init_socket.sendto(data, self.MULTICAST_GROUP_ENDPOINT)
+        self._init_socket.sendto(data, self.multicast_group_endpoint)
 
         # ping
-        _ = self._init_socket.recv(self.RECEIVE_BUFFER_SIZE)
+        _ = self._init_socket.recv(self.receive_buffer_size)
 
         # pong
-        message = self._init_socket.recv(self.RECEIVE_BUFFER_SIZE)
+        message = self._init_socket.recv(self.receive_buffer_size)
         message = json.loads(message)
 
         assert message['type'] == 'pong', json.dumps(message, indent = 4)
@@ -72,7 +72,7 @@ class UE_Remote_Execution_Handler:
 
         self._command_init_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
         self._command_init_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
-        self._command_init_socket.bind(self.COMMAND_ENDPOINT)
+        self._command_init_socket.bind(self.command_endpoint)
         self._command_init_socket.listen()
 
         message = {
@@ -82,12 +82,12 @@ class UE_Remote_Execution_Handler:
             "source": self._caller_id,
             "dest": self._unreal_engine_instance_id,
             "data": {
-                "command_ip": self.COMMAND_ENDPOINT[0],
-                "command_port": self.COMMAND_ENDPOINT[1]
+                "command_ip": self.command_endpoint[0],
+                "command_port": self.command_endpoint[1]
             }
         }
         message = json.dumps(message).encode('utf-8')
-        self._init_socket.sendto(message, self.MULTICAST_GROUP_ENDPOINT)
+        self._init_socket.sendto(message, self.multicast_group_endpoint)
 
         sock, address = self._command_init_socket.accept()
         self._command_socket = sock
@@ -131,9 +131,9 @@ class UE_Remote_Execution_Handler:
         }
         data = json.dumps(data).encode('utf-8')
 
-        self._command_socket.sendto(data, self.MULTICAST_ENDPOINT)
+        self._command_socket.sendto(data, self.multicast_endpoint)
 
-        message = self._command_socket.recv(self.RECEIVE_BUFFER_SIZE)
+        message = self._command_socket.recv(self.receive_buffer_size)
         message = json.loads(message)
 
         return message
