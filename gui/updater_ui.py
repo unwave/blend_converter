@@ -491,6 +491,7 @@ class Model_List(wxp_utils.Item_Viewer_Native):
         with program_ui.Program_Dialog(self, entry.program) as dialog:
 
             dialog.SetSize((1000, 800))
+            dialog.SetTitle(f"Settings - {entry.program.blend_path}")
             dialog.CenterOnScreen()
 
             dialog.ShowModal()

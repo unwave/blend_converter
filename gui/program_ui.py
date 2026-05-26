@@ -77,9 +77,8 @@ class Program_Dialog(wx.Dialog):
         self.changes: typing.Dict[str, typing.Any] = {}
         self.do_save = False
 
-        title = f"Settings - {program.blend_path}"
 
-        super().__init__(parent, title = title, style = wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU)
+        super().__init__(parent, style = wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(sizer)
