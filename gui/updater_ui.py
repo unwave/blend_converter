@@ -488,10 +488,18 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
         entry = self.get_active_item()
 
-        with program_ui.Program_Dialog(self, entry.program) as dialog:
+        program = entry.program
+
+
+        def iter_program_arguments():
+            for instruction in program.instructions:
+                yield from common.iter_arguments(instruction, program._instructions_config)
+
+
+        with program_ui.Property_Grid_Dialog(self, iter_program_arguments()) as dialog:
 
             dialog.SetSize((1000, 800))
-            dialog.SetTitle(f"Settings - {entry.program.blend_path}")
+            dialog.SetTitle(f"Settings - {program.blend_path}")
             dialog.CenterOnScreen()
 
             dialog.ShowModal()

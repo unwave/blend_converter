@@ -67,12 +67,10 @@ def get_pg_prop(item: common.Argument_Walk_Item):
     return property
 
 
-class Program_Dialog(wx.Dialog):
+class Property_Grid_Dialog(wx.Dialog):
 
 
-    def __init__(self, parent: wx.Window, program: common.Program):
-
-        self.program = program
+    def __init__(self, parent: wx.Window, arguments: typing.Iterable[common.Argument_Walk_Item]):
 
         self.changes: typing.Dict[str, typing.Any] = {}
         self.do_save = False
@@ -87,11 +85,10 @@ class Program_Dialog(wx.Dialog):
         sizer.Add(self.grid, 1, wx.EXPAND)
         self.grid.Bind(pg.EVT_PG_CHANGED, self.on_property_change)
 
-        for instruction in program.instructions:
-            for item in common.iter_arguments(instruction, program._instructions_config):
 
-                category = self.get_category(item.path)
-                self.grid.AppendIn(category, get_pg_prop(item))
+        for item in arguments:
+            category = self.get_category(item.path)
+            self.grid.AppendIn(category, get_pg_prop(item))
 
 
         self.description_ctrl = wx.TextCtrl(self, style = wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_BESTWRAP, size = (-1, 150))
