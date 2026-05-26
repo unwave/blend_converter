@@ -12,7 +12,7 @@ class UE_Remote_Execution_Handler:
             self,
             MULTICAST_GROUP_ADDRESS = '239.0.0.1',
             MULTICAST_GROUP_PORT = 6766,
-            MULTICAST_BIND_ADDRESS = '0.0.0.0',
+            MULTICAST_BIND_ADDRESS = '127.0.0.1',
             RECEIVE_BUFFER_SIZE = 2 * 2 ** 20,
             MULTICAST_TTL = 0,
             COMMAND_ENDPOINT = ('127.0.0.1', 6776),
