@@ -15,7 +15,8 @@ class UE_Remote_Execution_Handler:
             multicast_bind_address = '127.0.0.1',
             receive_buffer_size = 2 * 2 ** 20,
             multicast_ttl = 0,
-            command_endpoint = ('127.0.0.1', 6776),
+            command_address = '127.0.0.1',
+            command_port = 6776,
             ):
 
         self.multicast_group_address = multicast_group_address
@@ -25,7 +26,8 @@ class UE_Remote_Execution_Handler:
         self.receive_buffer_size = receive_buffer_size
         self.multicast_ttl = multicast_ttl
 
-        self.command_endpoint = command_endpoint
+        self.command_address = command_address
+        self.command_port = command_port
 
 
     @property
@@ -36,6 +38,11 @@ class UE_Remote_Execution_Handler:
     @property
     def multicast_endpoint(self):
         return (self.multicast_bind_address, self.multicast_group_port)
+
+
+    @property
+    def command_endpoint(self):
+        return (self.command_address, self.command_port)
 
 
     def __enter__(self):
