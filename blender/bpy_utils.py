@@ -1100,6 +1100,11 @@ def pack_and_task(
                 environment_has_transparent_materials = environment_has_transparent_materials,
             )
 
+
+            if settings.generic_aov:
+                bake_types.append(tool_settings_bake.S_AOV(name = settings.generic_aov))
+
+
             _bake_settings.material_key = material_key
             _bake_settings.bake_types = bake_types
 

@@ -1442,6 +1442,15 @@ class S_Bake_Materials(Settings):
     #### Default: `True`
     """
 
+    generic_aov: str = ''
+    """
+    If not empty — will add an extra AOV based texture map to use for custom data.
+
+    A material must have the AOV Output node, with the name specified, and use the Color socket as the input, otherwise the result will be black.
+
+    #### Default: `''`
+    """
+
 
 @dataclasses.dataclass
 class S_Future_Bake_Materials(Settings):
