@@ -172,7 +172,7 @@ def get_docs_string(keywords: dict, is_property = False):
             docs_string.append(f"Options:")
             docs_string.append('\n')
             for item in value:
-                docs_string.append(f"* `{item.identifier}`: {item.name}{' — ' + item.description if item.description else ''}\n")
+                docs_string.append(f"* `{item.identifier}`: {item.name} — {item.description if item.description else '[No description]'}\n")
             docs_string.append('\n')
         if value is not None and not value:
             docs_string.append(f"Options: [UNKNOWN]")
