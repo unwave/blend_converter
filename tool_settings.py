@@ -1442,13 +1442,6 @@ class S_Bake_Materials(Settings):
     #### Default: `True`
     """
 
-    denoise_all: bool = False
-    """
-    Use denoise for all types of maps.
-
-    #### Default: `False`
-    """
-
 
 @dataclasses.dataclass
 class S_Future_Bake_Materials(Settings):
