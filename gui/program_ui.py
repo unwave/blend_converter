@@ -72,7 +72,7 @@ class Property_Grid_Dialog(wx.Dialog):
 
     def __init__(self, parent: wx.Window, arguments: typing.Iterable[common.Argument_Walk_Item]):
 
-        self.changes: typing.Dict[str, typing.Any] = {}
+        self.changes: typing.Dict[typing.Tuple[str], typing.Any] = {}
         self.do_save = False
 
 
