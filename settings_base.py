@@ -72,6 +72,8 @@ def is_json_serializable(object):
         json.dumps(object)
     except json.JSONDecodeError:
         return False
+    except TypeError:
+        return False
     else:
         return True
 
