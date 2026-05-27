@@ -9,7 +9,13 @@ import uuid
 import sys
 
 
-SENTINEL = object()
+class Sentinel:
+
+    def __repr__(self):
+        return '[SENTINEL]'
+
+SENTINEL = Sentinel()
+
 
 K_CLASS_NAME = '_bc_settings_name'
 
