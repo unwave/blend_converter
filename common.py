@@ -693,7 +693,7 @@ def replace_return_value(value, return_values: dict, instructions: list):
 
 def _replace_dictionary_argument_recursive(dictionary: typing.Dict, path: typing.List[str], value: typing.Any):
 
-    current_path = path.copy()
+    current_path = list(path)
     current_dictionary = dictionary
 
     while len(current_path) > 1:
