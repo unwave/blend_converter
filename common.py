@@ -434,7 +434,7 @@ class Program:
         self.write_report()
 
 
-    def run(self, executor, func: 'typing.Callable[P, T]', *args: P.args, is_instruction_enabled = True, **kwargs: P.kwargs) -> T:
+    def run(self, executor, func: 'typing.Callable[P, T]', *args: P.args, is_instruction_enabled = True, instruction_insert_index = None, **kwargs: P.kwargs) -> T:
         """ `args` and `kwargs` must be JSON serializable. """
 
 
@@ -449,8 +449,11 @@ class Program:
 
 
         instruction = Instruction(identifier, executor, func, *args, is_instruction_enabled = is_instruction_enabled, **kwargs)
-        self.instructions.append(instruction)
 
+        if instruction_insert_index is None:
+            self.instructions.append(instruction)
+        else:
+            self.instructions.insert(instruction_insert_index, instruction)
 
         return {K_INSTRUCTION_IDENTIFIER: instruction.identifier}
 
