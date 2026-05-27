@@ -107,6 +107,10 @@ class File:
         return os.path.basename(os.path.dirname(self.path))
 
 
+    def __repr__(self):
+        return self.path
+
+
 @functools.lru_cache(None)
 def get_func_serialized(func: typing.Callable):
     return serialization.Function.from_func(func)
