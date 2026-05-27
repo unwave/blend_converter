@@ -6,6 +6,7 @@ import json
 import typing
 import traceback
 import uuid
+import sys
 
 
 SENTINEL = object()
@@ -309,13 +310,18 @@ class Settings():
         try:
             return _get_specs(cls)[name]
         except KeyError:
-            annotations = getattr(cls, '__annotations__', {})
-            default = getattr(cls, name, None)
-            return Attribute_Spec(
-                name = name,
-                type = annotations.get(name, type(default)),
-                default = default,
-            )
+            pass
+        except Exception as e:
+            traceback.print_exc(file = sys.stderr)
+
+        annotations = getattr(cls, '__annotations__', {})
+        default = getattr(cls, name, None)
+
+        return Attribute_Spec(
+            name = name,
+            type = annotations.get(name, type(default)),
+            default = default,
+        )
 
 
     @classmethod
