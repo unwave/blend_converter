@@ -849,7 +849,11 @@ def iter_arguments(instruction: Instruction, config: configparser.ConfigParser):
         argument_path = instruction_path + [argument_name]
 
         if isinstance(argument, settings_base.Settings):
-            for key in typing.get_type_hints(type(argument)):
+
+            settings_keys = dict.fromkeys(typing.get_type_hints(type(argument)).keys())
+            settings_keys.update(dict.fromkeys(argument.keys()))
+
+            for key in settings_keys:
 
                 if key.startswith('_'):
                     continue
