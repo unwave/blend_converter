@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
     import bpy
 
 
-RE_ATTR = re.compile(r'([a-zA-Z0-9_]+):\s*(.+?)\s*=\s*(.+)\s*\n\s*"""([\w\W]+?)"""')
+RE_ATTR = re.compile(r'([a-zA-Z0-9_]+):\s*(.+?)\s*(?:=\s*(.+)\s*)?\n\s*"""([\w\W]+?)"""')
 RE_ATTR_ENTRY = re.compile(r'^`(.+?)`\s*:\s*`(.+?)`$')
 RE_ATTR_DEFAULT_ENTRY = re.compile(r'^#### Default: `(.+?)`$')
 RE_ATTR_ENUM_ENTRY = re.compile(r'^\* `(.+?)`\s*:\s*(.+?)\s*—\s*(.+)*$')
@@ -158,6 +158,22 @@ def get_blender_prop_specs(default_value, attribute_properties: dict):
         )
 
 
+def get_default_from_repr(cls: typing.Type, representation: str):
+
+    if cls is str:
+        return cls(representation[1:-1])
+    elif cls is bool:
+        if representation == 'True':
+            return True
+        else:
+            return False
+    elif cls is int:
+        return int(representation)
+    elif cls is float:
+        return float(representation)
+    else:
+        return SENTINEL
+
 
 @functools.lru_cache(None)
 def _get_specs(cls) -> typing.Dict[str, Attribute_Spec]:
@@ -166,17 +182,19 @@ def _get_specs(cls) -> typing.Dict[str, Attribute_Spec]:
 
     specs = dict()
 
+    type_hints = typing.get_type_hints(cls)
+
     for attr in RE_ATTR.finditer(source):
         name = attr.group(1)
         attr_type = attr.group(2)
-        default = getattr(cls, name)
+        default = getattr(cls, name, SENTINEL)
         default_repr = attr.group(3)
         docs = textwrap.dedent(attr.group(4))
 
-        attribute_properties = dict(
-            default = default,
-            description = docs.strip()
-        )
+        has_default_value = default is not SENTINEL
+
+
+        attribute_properties = dict()
 
         for line in docs.splitlines():
             line = line.strip()
@@ -205,6 +223,17 @@ def _get_specs(cls) -> typing.Dict[str, Attribute_Spec]:
 
                 attribute_properties.setdefault('enum_items', []).append((match.group(1), match.group(2), match.group(3)))
 
+
+        if not has_default_value:
+            default_repr = attribute_properties['default_repr']
+            default = get_default_from_repr(type_hints[name], default_repr)
+
+        attribute_properties['default'] = default
+        attribute_properties['description'] = docs.strip()
+
+        is_supported_type = default is not SENTINEL
+
+
         if not 'default_repr' in attribute_properties:
             raise Exception(f"The attribute does not include a default: {name}")
 
@@ -215,7 +244,7 @@ def _get_specs(cls) -> typing.Dict[str, Attribute_Spec]:
                 "\n\t" f"{default_repr}"
             )
 
-        if attr_type != type(default).__name__:
+        if is_supported_type and attr_type != type(default).__name__:
             raise Exception(
                 f"Default value and type of `{name}` do not mach:"
                 "\n\t" f"default = {default}"
@@ -223,7 +252,10 @@ def _get_specs(cls) -> typing.Dict[str, Attribute_Spec]:
             )
 
         try:
-            ui_spec = get_blender_prop_specs(default, attribute_properties)
+            if is_supported_type:
+                ui_spec = get_blender_prop_specs(default, attribute_properties)
+            else:
+                ui_spec = None
         except Exception as e:
             raise Exception(
                 "Failed to collect a Blender UI specification:"

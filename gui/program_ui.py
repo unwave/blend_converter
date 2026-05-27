@@ -51,7 +51,9 @@ def get_pg_prop(item: common.Argument_Walk_Item):
     else:
         value = item.override
 
-    if item.is_instruction_return or is_type_mismatch:
+    is_unsupported_type = value is settings_base.SENTINEL
+
+    if item.is_instruction_return or is_type_mismatch or is_unsupported_type:
         property = get_read_only_property('.'.join(item.path), value, item.spec)
     else:
         property = get_property('.'.join(item.path), value, item.spec)
