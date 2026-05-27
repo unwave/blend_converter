@@ -6,6 +6,14 @@ from .. import common
 from . import remote_execution_handler
 from .. import utils
 from .. import root
+from .. import settings_base
+
+
+if typing.TYPE_CHECKING:
+    import dataclasses
+else:
+    class dataclasses:
+        dataclass = lambda x: x
 
 
 SCRIPT_RUNNER_PATH = os.path.join(root.PATH, 'unreal', 'script_runner.py')
@@ -30,10 +38,36 @@ def runner_bootstrap(script_runner_path: str, data: dict):
     getattr(module, 'run')(data)
 
 
+@dataclasses.dataclass
+class S_Execution_Handler(settings_base.Settings):
+
+    multicast_group_address: str = '239.0.0.1'
+
+    multicast_group_port: int = 6766
+
+    multicast_bind_address: str = '127.0.0.1'
+
+    command_address: str = '127.0.0.1'
+
+    command_port: int = 6776
+
+    receive_buffer_size: int = 2 * 2 ** 20
+
+    multicast_ttl: int = 0
+
+
 class Unreal:
     """ Needs an open Unreal Engine instance. """
 
     execution_context: common.Execution_Context
+
+
+    def __init__(self, remote_execution_settings: S_Execution_Handler = None):
+
+        if remote_execution_settings is None:
+            remote_execution_settings = S_Execution_Handler()
+
+        self.remote_execution_settings = remote_execution_settings
 
 
     def run(self, *,
@@ -49,7 +83,7 @@ class Unreal:
             self.execution_context.no_pending_children.value = True
             self.execution_context.lock.notify_all()
 
-        with remote_execution_handler.UE_Remote_Execution_Handler() as handler:
+        with remote_execution_handler.UE_Remote_Execution_Handler(**self.remote_execution_settings) as handler:
 
             utils.print_in_color(utils.get_color_code(96, 154, 247, 0,0,0), "UNREAL ENGINE EXECUTION", flush = True)
             utils.print_in_color(utils.get_color_code(255, 139, 51, 0,0,0), "The output is delayed until all instructions are done.", flush = True)
