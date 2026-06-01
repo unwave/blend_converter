@@ -61,6 +61,10 @@ PROPERTY_INTERNAL = {
     'enum_items_static',
     'is_path_supports_blend_relative',
     'is_path_supports_templates',
+    'deprecated_note',
+    'deprecated_removal_version',
+    'deprecated_version',
+    'is_deprecated',
     }
 """ The internal Blender property keywords. Ignored in the docs parsing. """
 
