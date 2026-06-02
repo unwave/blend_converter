@@ -347,9 +347,11 @@ def apply_modifier_with_shape_keys(object: bpy.types.Object, modifier_name: str)
         state.remember(object.data.shape_keys, 'eval_time')
 
         if object.data.shape_keys.animation_data:
-            state.remember(object.data.shape_keys.animation_data, 'action')
+
             if object.data.shape_keys.animation_data.action and hasattr(object.data.shape_keys.animation_data, 'action_slot'):
                 state.remember(object.data.shape_keys.animation_data, 'action_slot')
+
+            state.remember(object.data.shape_keys.animation_data, 'action')
 
 
         for key in object.data.shape_keys.key_blocks:
