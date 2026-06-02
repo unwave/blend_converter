@@ -85,12 +85,12 @@ def is_json_serializable(object):
         return True
 
 
-def get_qualified_value(value: str):
+def _get_qualified_value(value: str):
 
     if value.startswith(('\'', '\"')):
         return value[1:-1]
     if ',' in value:
-        return tuple(get_qualified_value(v.strip()) for v in value.split(','))
+        return tuple(_get_qualified_value(v.strip()) for v in value.split(','))
     elif value == 'False':
         return False
     elif value == 'True':
@@ -101,20 +101,21 @@ def get_qualified_value(value: str):
         return int(value)
 
 
-def get_qualified_attr_property(key: str, value: str):
+def get_qualified_value(key: str, value: str):
 
     if key == 'cmd':  # how the parameter is specified for the underlying tool
         if value.lower() == 'none':
-            return key, None
-        else:
-            assert value.startswith('-')
-            return key, value
+            return None
+        elif value.startswith('-'):
+            return value
     elif key in ('max', 'min', 'soft_min', 'soft_max'):  # Blender UI parameters
-        return key, get_qualified_value(value)
+        return _get_qualified_value(value)
     elif key == 'subtype':  # Blender string property subtype
-        return key, get_qualified_value(value)
-    else:
-        raise ValueError(f"Unexpected key and value pare: {key} = {value}")
+        return _get_qualified_value(value)
+
+    print(f"Unexpected key and value pare: {key} = {value}", file = sys.stderr)
+
+    return SENTINEL
 
 
 def get_blender_prop_specs(default_value, attribute_properties: dict):
@@ -211,7 +212,12 @@ def _get_specs(cls) -> typing.Dict[str, Attribute_Spec]:
                 if match is None:
                     raise Exception(f"Failed to parse an item from string: {line}")
 
-                key, value = get_qualified_attr_property(match.group(1),  match.group(2))
+                key = match.group(1)
+                value = get_qualified_value(key, match.group(2))
+
+                if value is SENTINEL:
+                    continue
+
                 attribute_properties[key] = value
 
             elif line.startswith('#### Default:'):
