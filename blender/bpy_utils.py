@@ -234,46 +234,6 @@ def make_object_data_independent_from_other(objects: bpy.types.Object):
             object.data = data_copy
 
 
-def _focus(objects: typing.List[bpy.types.Object], view_layer: 'bpy.types.ViewLayer'):
-
-    view_layer_objects = get_view_layer_objects(view_layer)
-
-    for object in view_layer_objects:
-        if object in objects:
-            object.hide_set(False, view_layer=view_layer)
-            object.hide_viewport = False
-            object.hide_select = False
-            object.select_set(True, view_layer=view_layer)
-        else:
-            object.select_set(False, view_layer=view_layer)
-
-    if objects:
-        for object in objects:
-            if object in view_layer_objects:
-                view_layer.objects.active = object
-                break
-
-    return objects
-
-
-def focus(objects: T_Objects, view_layer: 'bpy.types.ViewLayer' = None) -> T_Objects:
-    """
-    Deselect, unhide, select and make active the objects according to `view_layer`.
-
-    If `view_layer` is `None` — `bpy.context.view_layer` is used.
-
-    Returns the focused objects (the input).
-    """
-
-    if view_layer is None:
-        view_layer = bpy.context.view_layer
-
-    if isinstance(objects, typing.Iterable):
-        return _focus(objects, view_layer)
-    else:
-        return _focus([objects], view_layer)[0]
-
-
 def get_all_data_blocks():
 
     blocks = []
