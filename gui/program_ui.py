@@ -161,15 +161,10 @@ class Property_Grid_Dialog(wx.Dialog):
         path: str = prop.GetName()
         path_list = path.split('.')
 
-        spec: settings_base.Attribute_Spec = prop.GetClientData()
+        description = prop.GetHelpString()
 
-        if spec and spec.description:
-            description = spec.description
-        else:
-            if len(path_list) > 1:
-                description = "This option does not have a description."
-            else:
-                description = "This is a name of a function."
+        if not description:
+            description = "[No description]"
 
         description = ' ● '.join(path_list) + "\n\n" + description
 
