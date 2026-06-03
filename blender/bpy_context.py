@@ -1823,7 +1823,6 @@ class Isolate_Focus:
     def __enter__(self):
 
         bpy.ops.scene.new(type='EMPTY')
-        bpy.ops.scene.view_layer_add(type='EMPTY')
 
         view_layer = bpy.context.view_layer
 
@@ -1845,7 +1844,6 @@ class Isolate_Focus:
 
 
     def __exit__(self, type, value, traceback):
-        bpy.ops.scene.view_layer_remove()
         bpy.ops.scene.delete()
 
 
