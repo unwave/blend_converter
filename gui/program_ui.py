@@ -107,7 +107,7 @@ class Property_Grid_Dialog(wx.Dialog):
         self.Layout()
 
 
-    def get_category(self, path: typing.List[str]):
+    def get_category(self, path: typing.List[str]) -> pg.PropertyCategory:
 
         prop = self.grid.GetPropertyByName('.'.join(path[:-1]))
         if prop:

@@ -10,6 +10,7 @@ import collections
 import base64
 import shutil
 import functools
+import textwrap
 
 import pyperclip
 import wx
@@ -497,6 +498,12 @@ class Model_List(wxp_utils.Item_Viewer_Native):
 
 
         with program_ui.Property_Grid_Dialog(self, iter_program_arguments()) as dialog:
+
+            for instruction in program.instructions:
+                category = dialog.get_category([instruction.identifier])
+
+                if instruction.func.__doc__:
+                    category.SetHelpString(textwrap.dedent(instruction.func.__doc__).strip())
 
             dialog.SetSize((1000, 800))
             dialog.SetTitle(f"Settings - {program.blend_path}")
