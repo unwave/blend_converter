@@ -1262,7 +1262,7 @@ def unwrap(
 
     with bpy_context.State() as state, bpy_context.Global_Optimizations():
 
-        for object in bpy_utils.get_view_layer_objects():
+        for object in bpy.context.scene.objects:
             if object.animation_data:
                 for driver in object.animation_data.drivers:
                     state.set(driver, 'mute', True)
@@ -1270,7 +1270,7 @@ def unwrap(
                 for nla_track in object.animation_data.nla_tracks:
                     state.set(nla_track, 'mute', True)
 
-        for object in bpy_utils.get_view_layer_objects():
+        for object in bpy.context.scene.objects:
             for modifier in object.modifiers:
                 state.set(modifier, 'show_viewport', False)
 

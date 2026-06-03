@@ -912,7 +912,7 @@ def bake_objects(objects: typing.List[bpy.types.Object], settings: tool_settings
 
         # hide other object in render
         if settings.isolate_objects:
-            for object in bpy_utils.get_view_layer_objects():
+            for object in bpy.context.scene.objects:
                 state.set(object, 'hide_render', object not in objects)
 
         for object in objects:
@@ -968,7 +968,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Bake)
 
     # validate
 
-    view_layer_objects = bpy_utils.get_view_layer_objects()
+    scene_objects = set(bpy.context.scene.objects)
 
 
     requires_single_principled_bsdf = False
@@ -985,7 +985,7 @@ def bake(objects: typing.List[bpy.types.Object], settings: tool_settings.S_Bake)
         if len(object.data.polygons) == 0:
             do_warning(f"Object has no polygons: {object.name_full}", do_raise=settings.raise_warnings)
 
-        if object not in view_layer_objects:
+        if object not in scene_objects:
             do_warning(f"Object is not in the scene: {object.name_full}", do_raise=settings.raise_warnings)
 
         if object.display_type in ('BOUNDS', 'WIRE'):
