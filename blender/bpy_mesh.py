@@ -157,6 +157,9 @@ def make_bake_cage(object: bpy.types.Object, cage_offset_ratio = 0.05, voxel_cou
         smooth: bpy.types.CorrectiveSmoothModifier = bake_cage.modifiers.new(name = '', type='CORRECTIVE_SMOOTH')
         smooth.rest_source = 'BIND'
         smooth.use_pin_boundary = True
+        smooth.factor /= number_of_steps
+        smooth.scale = 1 + cage_offset_ratio / number_of_steps
+        smooth.smooth_type = 'LENGTH_WEIGHTED'
         bpy_context.call_for_object(bake_cage, bpy.ops.object.correctivesmooth_bind, modifier=smooth.name)
 
         shrinkwrap: bpy.types.ShrinkwrapModifier = bake_cage.modifiers.new(name = '', type='SHRINKWRAP')
