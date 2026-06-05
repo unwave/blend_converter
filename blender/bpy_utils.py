@@ -1022,7 +1022,8 @@ def pack_and_task(
             else:
                 # pre packing to calculate the texel density
                 # to match the final resolution, we have to pack a second time for preciseness
-                pack_uvs(get_closest_power_of_two((settings.min_resolution + settings.max_resolution)/2), material_key)
+                width = height = get_closest_power_of_two((settings.min_resolution + settings.max_resolution)/2)
+                pack_uvs(width, height, material_key)
 
                 # calculate target resolution
                 uv_resolution, surface_resolution, uv_coverage = get_texture_resolution(
