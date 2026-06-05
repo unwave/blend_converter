@@ -1254,7 +1254,8 @@ def unwrap(
     objects = bpy_utils.get_unique_mesh_objects(objects)
 
 
-    settings = tool_settings.S_Unwrap_UVs(uv_layer_name = uv_layer_name)._update(settings)
+    settings = tool_settings.S_Unwrap_UVs()._update(settings)
+    settings.uv_layer_name = uv_layer_name
 
 
     ensure_uv_layer(objects, uv_layer_name, init_from = uv_layer_reuse, init_from_does_not_exist_ok=True)

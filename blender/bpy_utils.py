@@ -967,31 +967,18 @@ def pack_and_task(
 
         materials = list(group_objects_by_material(objects))
 
-        def pack_uvs(width: int, height: int, material_key: str):
 
-            _pack_settings = tool_settings.S_Pack_UVs(
-                width = width,
-                height = height,
-                uv_layer_name = settings.uv_layer_bake,
-                material_key = material_key,
-                average_uv_scale = False,
-            )._update(pack_settings)
+        def get_pack_settings(width: int, height: int, material_key: str):
 
-            bpy_uv.pack(objects, _pack_settings)
+            copy = tool_settings.S_Pack_UVs()._update(pack_settings)
 
+            copy.width = width
+            copy.height = height
+            copy.uv_layer_name = settings.uv_layer_bake
+            copy.material_key = material_key
+            copy.average_uv_scale = False
 
-        def ensure_pixel_per_island(width: int, height: int, material_key: str):
-
-            _pack_settings = tool_settings.S_Pack_UVs(
-                    width = width,
-                    height = height,
-                    uv_layer_name = settings.uv_layer_bake,
-                    material_key = material_key,
-                )
-
-            bpy_uv.ensure_pixel_per_island(objects, _pack_settings)
-
-
+            return copy
 
 
         ## collect bake settings
@@ -1008,7 +995,9 @@ def pack_and_task(
                 continue
 
 
-            _bake_settings = tool_settings.S_Bake(uv_layer_name = settings.uv_layer_bake, image_dir = settings.image_dir)._update(bake_settings)
+            _bake_settings = tool_settings.S_Bake()._update(bake_settings)
+            _bake_settings.uv_layer_name = settings.uv_layer_bake
+            _bake_settings.image_dir = settings.image_dir
 
             if not settings.use_texel_density:
 
@@ -1023,7 +1012,8 @@ def pack_and_task(
                 # pre packing to calculate the texel density
                 # to match the final resolution, we have to pack a second time for preciseness
                 width = height = get_closest_power_of_two((settings.min_resolution + settings.max_resolution)/2)
-                pack_uvs(width, height, material_key)
+                _pre_pack_settings = get_pack_settings(width, height, material_key)
+                bpy_uv.pack(objects, _pre_pack_settings)
 
                 # calculate target resolution
                 uv_resolution, surface_resolution, uv_coverage = get_texture_resolution(
@@ -1045,9 +1035,10 @@ def pack_and_task(
                 _bake_settings.height = resolution
 
 
-            pack_uvs(_bake_settings.width, _bake_settings.height, material_key)
-            ensure_pixel_per_island(_bake_settings.width, _bake_settings.height, material_key)
+            _pack_settings = get_pack_settings(_bake_settings.width, _bake_settings.height, material_key)
 
+            bpy_uv.pack(objects, _pack_settings)
+            bpy_uv.ensure_pixel_per_island(objects, _pack_settings)
 
             bake_types = get_pbr_bake_types(
                 has_alpha = material_key == alpha_material_key,
