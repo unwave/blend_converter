@@ -4,7 +4,8 @@ import operator
 import collections
 import math
 import heapq
-
+import re
+import sys
 
 
 from .. import tool_settings
@@ -740,22 +741,43 @@ def get_bone_walk_parent_map(object: bpy.types.Object, deform_root: str):
                 if x[0] == y[0]:
 
                     if x[0] == start:
-                        for z in b:
-                            if z[0] != start:
-                                return z[0] # flipped connected child
+
+                        for name, is_tail in b:
+
+                            if name == start:
+                                continue
+
+                            if is_recursive(name, start):
+                                continue
+
+                            return name # flipped connected child
                     else:
-                        return x[0] # connected child
+                        if not is_recursive(x[0], start):
+                            return x[0] # connected child
 
-        for x in a:
-            if x[1]:
-                return x[0]  # bypassed connected child
+        for joins in bone_path:
 
-        for x in b:
-            if x[1]:
-                return x[0]  # disconnected child
+            for name, is_tail in joins:
+
+                if not is_tail:
+                    continue
+
+                if is_recursive(name, start):
+                    continue
+
+                return name
 
 
-    def get_parent(name, root_index = get_tail_index(deform_root)):
+        print(
+            f"Fail to find a bone parent."
+            "\n\t" f"bone_path: {bone_path}"
+            "\n\t" f"start: {start}"
+            , file = sys.stderr
+        )
+
+
+
+    def get_parent(name):
 
         path = get_shortest_bone_walk_path(graph, get_head_index(name), root_index)
 
@@ -781,7 +803,53 @@ def get_bone_walk_parent_map(object: bpy.types.Object, deform_root: str):
         return parent_name
 
 
+    def is_recursive(parent: str, child: str):
+
+        if parent == child:
+            return True
+
+        seen = set()
+        pool = []
+
+        pool.append(parent)
+
+        while pool:
+
+            name = pool.pop()
+
+            if name is None:
+                continue
+
+            if name == child:
+                return True
+
+            if name in seen:
+                continue
+
+            pool.append(parent_map.get(name))
+            seen.add(name)
+
+        return False
+
+
+    def sort(bone: bpy.types.Bone):
+
+        name = bone.name
+        name_parts = []
+
+        for substring in re.split(r'(\d+)', name):
+            if substring.isdigit():
+                name_parts.append((0, int(substring)))
+            else:
+                name_parts.append((1, substring))
+
+        path_length = len(get_shortest_bone_walk_path(graph, get_head_index(name), root_index)[1])
+
+        return (-path_length, name_parts, -len(name))
+
+
     parent_map: typing.Dict[str, str] = {}
+    root_index = get_tail_index(deform_root)
 
 
     for bone in object.data.bones:
@@ -792,9 +860,24 @@ def get_bone_walk_parent_map(object: bpy.types.Object, deform_root: str):
         if bone.name == deform_root:
             continue
 
+        if bone.parent and bone.parent.use_deform:
+            parent_map[bone.name] = bone.parent.name
+
+
+    bones_to_reparent = [b for b in object.data.bones if b.use_deform and b.name != deform_root and not b.name in parent_map]
+    bones_to_reparent.sort(key = sort)
+
+
+    for bone in bones_to_reparent:
+
         parent = get_parent(bone.name)
         if parent:
             parent_map[bone.name] = parent
+
+
+    for child, parent in parent_map.items():
+        if is_recursive(parent, child):
+            print(f"Recursion in bone re-parenting: {parent} -> {child}", file = sys.stderr)
 
 
     return parent_map
