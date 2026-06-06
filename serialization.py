@@ -4,6 +4,7 @@ import typing
 import importlib
 import importlib.util
 import importlib.machinery
+import hashlib
 
 
 def get_top_package_file(func: typing.Callable):
@@ -76,7 +77,7 @@ class Function:
     def get(self) -> typing.Callable:
 
         if self.module_name == '__main__':
-            module = import_module_from_file(self.package_file, '__main__' + str(hash(self.package_file)))
+            module = import_module_from_file(self.package_file, '__main__' + hashlib.sha256(self.package_file.encode()).hexdigest())
         else:
             top_module = self.module_name.split('.')[0]
             import_module_from_file(self.package_file, top_module)
