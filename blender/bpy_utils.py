@@ -901,7 +901,7 @@ def get_pbr_bake_types(
         has_alpha: bool,
         has_emission: bool,
         has_normals: bool,
-        settings: tool_settings.S_Bake,
+        settings: tool_settings.S_Bake_Materials,
         environment_has_transparent_materials: bool,
     ):
 
@@ -927,7 +927,7 @@ def get_pbr_bake_types(
         bake_types.append(tool_settings_bake.S_Emission())
 
     if has_normals:
-        bake_types.append(tool_settings_bake.S_Normal(uv_layer = settings.uv_layer_bake))
+        bake_types.append(tool_settings_bake.S_Normal(uv_layer = settings.uv_layer_name))
 
 
     bake_types.append([tool_settings_bake.S_Base_Color()])
@@ -974,7 +974,7 @@ def pack_and_task(
 
             copy.width = width
             copy.height = height
-            copy.uv_layer_name = settings.uv_layer_bake
+            copy.uv_layer_name = settings.uv_layer_name
             copy.material_key = material_key
             copy.average_uv_scale = False
 
@@ -996,7 +996,7 @@ def pack_and_task(
 
 
             _bake_settings = tool_settings.S_Bake()._update(bake_settings)
-            _bake_settings.uv_layer_name = settings.uv_layer_bake
+            _bake_settings.uv_layer_name = settings.uv_layer_name
             _bake_settings.image_dir = settings.image_dir
 
             if not settings.use_texel_density:
@@ -1018,7 +1018,7 @@ def pack_and_task(
                 # calculate target resolution
                 uv_resolution, surface_resolution, uv_coverage = get_texture_resolution(
                     objects,
-                    uv_layer_name = settings.uv_layer_bake,
+                    uv_layer_name = settings.uv_layer_name,
                     materials = material_group,
                     px_per_meter = settings.texel_density,
                 )

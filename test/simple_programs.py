@@ -47,7 +47,7 @@ def get_bake_program(blend_dir: str, blender_executable: str):
     program.run(blender, bpy_uv.unwrap, objects, uv_layer_name)
 
     settings = tool_settings.S_Bake_Materials(
-        uv_layer_bake = uv_layer_name,
+        uv_layer_name = uv_layer_name,
         image_dir = os.path.join(result_dir, 'textures'),
         texel_density = 64,
         max_resolution = 128,

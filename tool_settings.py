@@ -1421,7 +1421,7 @@ class S_Bake_Materials(Settings):
     #### Default: `4096`
     """
 
-    uv_layer_bake: str = ''
+    uv_layer_name: str = ''
     """
     The name of a uv layer that will be used for baking.
 
