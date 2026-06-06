@@ -64,9 +64,7 @@ ACTIVE_ENTRIES = {
 
 def get_status(program: common.Program):
 
-    if not program.blend_path:
-        return Status.UNKNOWN
-    elif os.path.exists(program.blend_path):
+    if not program.blend_path or os.path.exists(program.blend_path):
         if program.are_instructions_changed:
             return Status.STALE
         else:
