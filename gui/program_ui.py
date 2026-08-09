@@ -77,18 +77,25 @@ class Property_Grid_Dialog(wx.Dialog):
         self.changes: typing.Dict[typing.Tuple[str], typing.Any] = {}
         self.do_save = False
 
+        self.items = list(arguments)
+        self.active_item_path = ''
 
         super().__init__(parent, style = wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(sizer)
 
+        self.search_ctrl = wx.SearchCtrl(self, style = wx.TE_PROCESS_ENTER)
+        sizer.Add(self.search_ctrl, 0, wx.EXPAND | wx.ALL, border = 5)
+        self.search_ctrl.ShowCancelButton(True)
+        self.search_ctrl.Bind(wx.EVT_TEXT, self.on_search)
+
         self.grid = pg.PropertyGrid(self, wx.ID_ANY, style = pg.PG_SPLITTER_AUTO_CENTER | pg.PG_BOLD_MODIFIED)
         sizer.Add(self.grid, 1, wx.EXPAND)
         self.grid.Bind(pg.EVT_PG_CHANGED, self.on_property_change)
 
 
-        for item in arguments:
+        for item in self.items:
             category = self.get_category(item.path)
             self.grid.AppendIn(category, get_pg_prop(item))
 
@@ -105,6 +112,57 @@ class Property_Grid_Dialog(wx.Dialog):
 
 
         self.Layout()
+
+
+    def on_search(self, event):
+
+        is_active_item_visible = False
+
+
+        self.Freeze()
+
+
+        query = self.search_ctrl.GetValue().lower().strip()
+
+        visible_categories = set()
+        all_categories = set()
+
+        for item in self.items:
+
+            id = '.'.join(item.path)
+
+
+            if query:
+                is_visible = query in id.lower()
+            else:
+                is_visible = True
+
+            self.grid.HideProperty(id, not is_visible)
+
+            parent_paths = [tuple(item.path[:i]) for i in range(1, len(item.path))]
+            all_categories.update(parent_paths)
+
+            if is_visible:
+                visible_categories.update(parent_paths)
+
+            if self.active_item_path == id and is_visible:
+                is_active_item_visible = True
+
+        for category_path in all_categories:
+            self.grid.HideProperty(
+                id = '.'.join(category_path),
+                hide = category_path not in visible_categories,
+                flags = pg.PG_DONT_RECURSE
+            )
+
+
+        self.Thaw()
+
+
+        if is_active_item_visible:
+            self.grid.EnsureVisible(self.active_item_path)
+        else:
+            self.grid.ClearSelection()
 
 
     def get_category(self, path: typing.List[str]) -> pg.PropertyCategory:
@@ -169,3 +227,4 @@ class Property_Grid_Dialog(wx.Dialog):
         description = ' ● '.join(path_list) + "\n\n" + description
 
         self.description_ctrl.SetValue(description)
+        self.active_item_path = path
