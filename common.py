@@ -775,7 +775,7 @@ def apply_instruction_settings(instruction: Instruction, config: configparser.Co
 
 class Argument_Walk_Item(typing.NamedTuple):
 
-    path: str
+    path: typing.List[str]
     value: typing.Any
     spec: settings_base.Attribute_Spec
     override: typing.Any
