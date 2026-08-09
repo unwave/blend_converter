@@ -858,10 +858,9 @@ def set_out_of_range_material_indexes_to_zero(objects: typing.List[bpy.types.Obj
 
 def split_faces_by_materials(object: bpy.types.Object):
 
-    copy = object.copy()
-    copy.name = object.name + '(copy)'
-    copy.data = object.data.copy()
-    copy.data.name = object.data.name + '(copy)'
+
+    with bpy_context.Focus(object):
+        bpy.ops.mesh.customdata_custom_splitnormals_add()
 
 
     with bpy_context.Focus(object, mode='EDIT'):
@@ -876,19 +875,3 @@ def split_faces_by_materials(object: bpy.types.Object):
             bpy.ops.mesh.select_all(action='DESELECT')
             bpy.ops.object.material_slot_select()
             bpy.ops.mesh.split()
-
-
-    def apply_data_transfer_modifier(from_object: bpy.types.Object, to_object: bpy.types.Object):
-
-        modifier: bpy.types.DataTransferModifier = to_object.modifiers.new('', type='DATA_TRANSFER')
-
-        modifier.object = from_object
-        modifier.use_loop_data = True
-        modifier.data_types_loops = {'CUSTOM_NORMAL'}
-
-        bpy_modifier.apply_modifier(modifier)
-
-
-    apply_data_transfer_modifier(copy, object)
-
-    bpy.data.batch_remove((copy, copy.data))
