@@ -1628,20 +1628,21 @@ class Shader_Tree_Wrapper(_Tree_Wrapper[_Shader_Node_Wrapper, _Shader_Socket_Wra
             if not 'Emission Strength' in node.inputs.identifiers:
                 continue
 
-            if (
-                    (
-                        not node.inputs['Emission Strength'].connections
-                        and
-                        node.inputs['Emission Strength'].is_close(0)
-                    )
-                    or
-                    (
-                        not node.inputs[Socket_Identifier.EMISSION].connections
-                        and
-                        node.inputs[Socket_Identifier.EMISSION].is_close((0, 0, 0))
-                    )
-                ):
+            is_zero_emission = (
+                (
+                    not node.inputs['Emission Strength'].connections
+                    and
+                    node.inputs['Emission Strength'].is_close(0)
+                )
+                or
+                (
+                    not node.inputs[Socket_Identifier.EMISSION].connections
+                    and
+                    node.inputs[Socket_Identifier.EMISSION].is_close((0, 0, 0))
+                )
+            )
 
+            if is_zero_emission:
                 node.inputs[Socket_Identifier.EMISSION].disconnect()
                 node.inputs[Socket_Identifier.EMISSION].set_default_value((1, 1, 1, 1))
                 node.inputs['Emission Strength'].disconnect()
