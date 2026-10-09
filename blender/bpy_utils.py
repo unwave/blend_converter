@@ -1100,7 +1100,7 @@ def copy_and_bake(
         pre_bake_labels: typing.List[str] = tuple(),
         isolate_object_hierarchies = False,
         split_faces_by_materials = True,
-        use_uv_texture_jitter = True,
+        use_uv_texture_jitter = False,
         use_view_space_normals = True,
     ):
     """
