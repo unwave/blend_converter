@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import operator
 import typing
+import warnings
 
 if typing.TYPE_CHECKING:
     import typing_extensions
@@ -1986,15 +1987,21 @@ class Compositor_Tree_Wrapper(_Tree_Wrapper[_Compositor_Node_Wrapper, _Composito
 
         if bpy.app.version < (5, 0):
             return cls(scene.node_tree)
-        else:
+
+        elif bpy.app.version < (6, 0):
 
             tree = bpy.data.node_groups.get('__bc_compositor')
             if not tree:
                 tree = bpy.data.node_groups.new('__bc_compositor', 'CompositorNodeTree')
 
-            scene.compositing_node_group = tree
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', DeprecationWarning)
+                scene.compositing_node_group = tree
 
             return cls(tree)
+
+        else:
+            raise NotImplementedError()
 
 
 class _Geometry_Socket_Wrapper(_Socket_Wrapper['_Geometry_Node_Wrapper']):
