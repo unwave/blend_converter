@@ -1304,6 +1304,8 @@ def get_stdev_mean(values: typing.Union[typing.Sized, typing.Iterable]):
 def reunwrap_bad_uvs(objects: typing.List[bpy.types.Object], *, only_select = False, divide_by_mean = True, uv_layer_name = ''):
     print(f"{reunwrap_bad_uvs.__name__}...")
 
+    if not objects:
+        return
 
     if uv_layer_name:
         active_uv_state = bpy_context.State()
