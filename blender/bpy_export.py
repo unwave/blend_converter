@@ -4,6 +4,7 @@ import os
 
 from .. import utils
 from .. import tool_settings
+from .. import communication
 
 
 if utils.is_in_blender():
@@ -143,7 +144,8 @@ def render_image(
         apply_settings(bpy.context.scene.cycles, cycles)
         apply_settings(bpy.context.scene.eevee, eevee)
 
-        bpy.ops.render.render()
+        with communication.Suspend_Others():
+            bpy.ops.render.render()
 
         os.makedirs(os.path.dirname(filepath), exist_ok = True)
 
