@@ -732,6 +732,9 @@ def scale_uv_to_world_per_uv_layout(objects: typing.List[bpy.types.Object], uv_l
             bm_copy.free()
 
 
+def lerp(a: float, b: float, f: float):
+    return (1 - f) * a + f * b
+
 
 def scale_uv_islands_by_weight_group(object: bpy.types.Object, uv_layer_name: str, weight_group_name: str, factor = 1.0):
     print(f"{scale_uv_islands_by_weight_group.__name__}...")
@@ -753,7 +756,7 @@ def scale_uv_islands_by_weight_group(object: bpy.types.Object, uv_layer_name: st
 
             average_weight = sum(vert[deform_layer].get(group_index, 0) for vert in all_verts)/len(all_verts)
 
-            average_weight = average_weight * (1.0 - factor) + factor
+            scale_factor = lerp(1, factor, min(1, max(0, average_weight)))
 
             island_vertices = [loop[uv_layer].uv for face in island for loop in face.loops]
             island_center = sum(island_vertices, mathutils.Vector((0,0)))/len(island_vertices)
@@ -761,7 +764,7 @@ def scale_uv_islands_by_weight_group(object: bpy.types.Object, uv_layer_name: st
             for face in island:
                 for loop in face.loops:
                     uv_loop = loop[uv_layer]
-                    uv_loop.uv = (uv_loop.uv - island_center) * average_weight + island_center
+                    uv_loop.uv = (uv_loop.uv - island_center) * scale_factor + island_center
 
         bmesh.update_edit_mesh(object.data, loop_triangles=False, destructive=False)
 
