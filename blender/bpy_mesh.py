@@ -179,7 +179,9 @@ def bisect(object: bpy.types.Object, axis = 'X', flip = False, mirror_object: ty
     if not mirror_object:
         mirror_object = object
 
-    rotation_euler = mathutils.Euler(mirror_object.evaluated_get(bpy.context.evaluated_depsgraph_get()).matrix_world.to_euler('XYZ'), 'XYZ')
+    matrix_world = mirror_object.evaluated_get(bpy.context.evaluated_depsgraph_get()).matrix_world
+
+    rotation_euler = matrix_world.to_euler('XYZ')
     plane_no = mathutils.Vector((axis == 'X', axis == 'Y' , axis == 'Z'))
     plane_no.rotate(rotation_euler)
 
@@ -189,11 +191,11 @@ def bisect(object: bpy.types.Object, axis = 'X', flip = False, mirror_object: ty
         bpy.ops.mesh.select_all(action = 'SELECT')
 
         bpy.ops.mesh.bisect(
-            plane_co = mirror_object.location,
+            plane_co = matrix_world.translation,
             plane_no = plane_no,
-            clear_inner = True,
+            clear_inner = not flip,
+            clear_outer = flip,
             threshold = threshold,
-            flip = flip,
         )
 
 
